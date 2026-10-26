@@ -6,8 +6,8 @@ import { ArrowRight } from "lucide-react";
 /** Fotos de la bienvenida; rotan con un desvanecido. */
 const SLIDES = [
   { src: "/brand/bienvenida-pinguinos.webp", alt: "Pingüinos papúa en el hábitat de hielo", position: "50% 50%" },
-  { src: "/brand/bienvenida-acuario.webp", alt: "Acuario Endless Vista de SeaWorld Abu Dhabi", position: "50% 30%" },
-  { src: "/brand/bienvenida-fachada.jpg", alt: "Fachada de SeaWorld Abu Dhabi", position: "30% 50%" },
+  { src: "/brand/bienvenida-one-ocean.webp", alt: "Domo de One Ocean con la esfera y el Animal Care Center", position: "50% 50%" },
+  { src: "/brand/bienvenida-one-ocean-render.jpg", alt: "Interior de One Ocean con el bosque de kelp", position: "50% 60%" },
 ];
 const SLIDE_MS = 6000;
 
