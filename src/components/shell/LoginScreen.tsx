@@ -1,7 +1,15 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight } from "lucide-react";
+
+/** Fotos de la bienvenida; rotan con un desvanecido. */
+const SLIDES = [
+  { src: "/brand/bienvenida-pinguinos.webp", alt: "Pingüinos papúa en el hábitat de hielo", position: "50% 50%" },
+  { src: "/brand/bienvenida-acuario.webp", alt: "Acuario Endless Vista de SeaWorld Abu Dhabi", position: "50% 30%" },
+  { src: "/brand/bienvenida-fachada.jpg", alt: "Fachada de SeaWorld Abu Dhabi", position: "30% 50%" },
+];
+const SLIDE_MS = 6000;
 
 /**
  * Pantalla de entrada de la demo. No hay autenticación real: cualquier
@@ -10,6 +18,13 @@ import { ArrowRight } from "lucide-react";
 export function LoginScreen({ onEnter }: { onEnter: (user: string) => void }) {
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
+  const [slide, setSlide] = useState(0);
+
+  useEffect(() => {
+    // Se reprograma en cada cambio, así un clic en los puntos reinicia la cuenta.
+    const id = setTimeout(() => setSlide((s) => (s + 1) % SLIDES.length), SLIDE_MS);
+    return () => clearTimeout(id);
+  }, [slide]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -18,15 +33,35 @@ export function LoginScreen({ onEnter }: { onEnter: (user: string) => void }) {
 
   return (
     <div className="flex min-h-screen bg-white text-[#0b2440]">
-      {/* Bienvenida con la foto */}
-      <div className="relative hidden flex-1 overflow-hidden lg:block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/bienvenida-pinguino.jpg" alt="Pingüino papúa sobre la nieve del hábitat" className="absolute inset-0 h-full w-full object-cover object-[50%_30%]" />
+      {/* Bienvenida con las fotos */}
+      <div className="relative hidden flex-1 overflow-hidden bg-[#03101c] lg:block">
+        {SLIDES.map((s, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={s.src}
+            src={s.src}
+            alt={s.alt}
+            aria-hidden={i !== slide}
+            style={{ objectPosition: s.position }}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${i === slide ? "opacity-100" : "opacity-0"}`}
+          />
+        ))}
         <div className="absolute inset-0 bg-gradient-to-t from-[#03101c]/85 via-[#03101c]/15 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-10 text-white">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9ff3ea]">Penguin Tracking & Care</p>
           <h2 className="mt-2 max-w-md text-3xl font-semibold leading-tight tracking-tight">Bienvenido al monitoreo de la colonia</h2>
           <p className="mt-2 max-w-md text-sm text-white/75">Ubicación, actividad y cuidado de cada ejemplar en un solo lugar.</p>
+          <div className="mt-5 flex gap-2">
+            {SLIDES.map((s, i) => (
+              <button
+                key={s.src}
+                type="button"
+                onClick={() => setSlide(i)}
+                aria-label={`Ver foto ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all ${i === slide ? "w-6 bg-white" : "w-1.5 bg-white/45 hover:bg-white/70"}`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
