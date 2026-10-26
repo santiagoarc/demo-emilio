@@ -44,9 +44,9 @@ export function Button({ variant = "ghost", size = "md", className, children, ..
       className={cx(
         "inline-flex items-center justify-center gap-1.5 rounded-xl font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
         size === "sm" ? "h-8 px-2.5 text-xs" : "h-9 px-3.5 text-sm",
-        variant === "primary" && "bg-accent text-[#032a2a] hover:bg-[#5fe6d9]",
-        variant === "ghost" && "text-muted hover:bg-white/5 hover:text-ink",
-        variant === "outline" && "border border-line-strong text-ink hover:border-accent/50 hover:bg-white/[0.03]",
+        variant === "primary" && "bg-accent text-white hover:bg-[#0b8178]",
+        variant === "ghost" && "text-muted hover:bg-ink/5 hover:text-ink",
+        variant === "outline" && "border border-line-strong text-ink hover:border-accent/50 hover:bg-ink/[0.03]",
         variant === "danger" && "border border-danger/40 text-danger hover:bg-danger/10",
         className,
       )}
@@ -91,10 +91,10 @@ export function Chip({ active, color, children, onClick, onRemove, className }: 
         className,
       )}
     >
-      {color && <span className="h-2 w-2 rounded-full" style={{ background: color }} />}
+      {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />}
       {children}
       {onRemove && (
-        <button onClick={(e) => (e.stopPropagation(), onRemove())} className="-mr-1 rounded-full p-0.5 hover:bg-white/10" aria-label="Quitar">
+        <button onClick={(e) => (e.stopPropagation(), onRemove())} className="-mr-1 rounded-full p-0.5 hover:bg-ink/10" aria-label="Quitar">
           <X size={12} />
         </button>
       )}
@@ -104,7 +104,7 @@ export function Chip({ active, color, children, onClick, onRemove, className }: 
 
 export function Badge({ tone = "neutral", children, className }: { tone?: "neutral" | "accent" | "warn" | "danger" | "ok" | "info"; children: ReactNode; className?: string }) {
   const tones = {
-    neutral: "bg-white/[0.06] text-muted",
+    neutral: "bg-ink/[0.06] text-muted",
     accent: "bg-accent/12 text-accent",
     warn: "bg-warn/12 text-warn",
     danger: "bg-danger/12 text-danger",
@@ -121,7 +121,7 @@ export function Segmented<T extends string>({ value, options, onChange, size = "
   size?: "sm" | "md";
 }) {
   return (
-    <div className="inline-flex rounded-xl border border-line bg-black/20 p-0.5">
+    <div className="inline-flex rounded-xl border border-line bg-ink/[0.05] p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
@@ -142,7 +142,7 @@ export function Segmented<T extends string>({ value, options, onChange, size = "
 export function EmptyState({ icon: Icon, title, children, action }: { icon: LucideIcon; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
-      <div className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/[0.03]">
+      <div className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-ink/[0.03]">
         <Icon size={20} className="text-muted" />
       </div>
       <p className="text-sm font-medium text-ink">{title}</p>
@@ -178,7 +178,7 @@ export function Drawer({ open, onClose, children, width = 420, title }: { open: 
       <aside className="slide-in relative flex h-full flex-col border-l border-line bg-panel-solid shadow-2xl" style={{ width: `min(${width}px, 100vw)` }}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div className="text-sm font-semibold">{title}</div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-white/5 hover:text-ink" aria-label="Cerrar">
+          <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Cerrar">
             <X size={16} />
           </button>
         </div>

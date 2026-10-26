@@ -175,7 +175,7 @@ function Detail({ teamId }: { teamId: string }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex h-9 items-center gap-2 rounded-xl border border-line bg-black/20 px-3 text-xs text-muted">
+            <label className="flex h-9 items-center gap-2 rounded-xl border border-line bg-ink/[0.05] px-3 text-xs text-muted">
               Equipo
               <select value={teamId} onChange={(e) => router.push(`/teams/${e.target.value}${tab !== "resumen" ? `?tab=${tab}` : ""}`)} className="bg-transparent text-xs text-ink outline-none">
                 {dataset.teams.map((t) => (
@@ -191,7 +191,7 @@ function Detail({ teamId }: { teamId: string }) {
                 <Pencil size={14} /> Editar equipo
               </Button>
             )}
-            <Link href={`/map?team=${teamId}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3.5 text-sm font-semibold text-[#032a2a] hover:bg-[#5fe6d9]">
+            <Link href={`/map?team=${teamId}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3.5 text-sm font-semibold text-white hover:bg-[#0b8178]">
               <MapPinned size={15} /> Ver en el mapa
             </Link>
           </div>
@@ -228,10 +228,10 @@ function Detail({ teamId }: { teamId: string }) {
               <button
                 key={t.id}
                 onClick={() => setParams({ tab: t.id === "resumen" ? null : t.id })}
-                className={cx("flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl px-4 text-sm font-medium transition", tab === t.id ? "bg-accent/15 text-ink shadow-[inset_0_-2px_0_var(--accent)]" : "text-muted hover:bg-white/[0.04] hover:text-ink")}
+                className={cx("flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl px-4 text-sm font-medium transition", tab === t.id ? "bg-accent/15 text-ink shadow-[inset_0_-2px_0_var(--accent)]" : "text-muted hover:bg-ink/[0.04] hover:text-ink")}
               >
                 {t.label}
-                {count !== null && <span className="num rounded-md bg-white/[0.06] px-1.5 text-[11px] text-muted">{count}</span>}
+                {count !== null && <span className="num rounded-md bg-ink/[0.06] px-1.5 text-[11px] text-muted">{count}</span>}
               </button>
             );
           })}
@@ -329,9 +329,9 @@ function ZonePanel({ teamId, ids }: { teamId: string; ids: string[] }) {
         <ul className="space-y-0.5">
           {rows.list.map(([z, e]) => (
             <li key={z}>
-              <Link href={`/map?team=${teamId}&zone=${z}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-white/[0.04]">
+              <Link href={`/map?team=${teamId}&zone=${z}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-ink/[0.04]">
                 <span className="w-[118px] shrink-0 truncate text-[13px]">{ZONE_BY_ID[z].name}</span>
-                <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.05]">
+                <span className="h-2 flex-1 overflow-hidden rounded-full bg-ink/[0.05]">
                   <span className="block h-full rounded-full bg-accent-2" style={{ width: `${(e.n / max) * 100}%` }} />
                 </span>
                 <span className="num w-6 text-right text-[13px] font-semibold">{e.n}</span>
@@ -413,7 +413,7 @@ function TasksSide({ tasks, onAll }: { tasks: CareTask[]; onAll: () => void }) {
             const p = t.penguinId ? dataset.penguins.find((x) => x.id === t.penguinId) : undefined;
             return (
               <li key={t.id}>
-                <Link href={`/alerts?tab=tasks&task=${t.id}`} className="flex items-start gap-2 rounded-lg px-1.5 py-1.5 hover:bg-white/[0.04]">
+                <Link href={`/alerts?tab=tasks&task=${t.id}`} className="flex items-start gap-2 rounded-lg px-1.5 py-1.5 hover:bg-ink/[0.04]">
                   <span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", pr === "high" ? "bg-danger" : pr === "medium" ? "bg-warn" : "bg-faint")} title={`Prioridad ${PRIORITY_LABEL[pr].toLowerCase()}`} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px]">{t.title}</span>
@@ -445,7 +445,7 @@ function AlertsSide({ alerts, onAll }: { alerts: ReturnType<typeof useDemo>["ale
             const p = a.penguinId ? dataset.penguins.find((x) => x.id === a.penguinId) : undefined;
             return (
               <li key={a.id}>
-                <Link href={`/alerts?alert=${a.id}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-white/[0.04]">
+                <Link href={`/alerts?alert=${a.id}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-ink/[0.04]">
                   <span className={cx("h-2 w-2 shrink-0 rounded-full", a.priority === "high" ? "bg-danger" : a.priority === "medium" ? "bg-warn" : "bg-faint")} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px]">{p ? `${p.id}${p.name ? ` · ${p.name}` : ""}` : "Sin ejemplar"}</span>
@@ -561,7 +561,7 @@ function PenguinTable({
     <section className="panel min-w-0 overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
         {compact && <h3 className="mr-2 text-[15px] font-semibold">Pingüinos del equipo <span className="num text-muted">({rows.length})</span></h3>}
-        <div className="flex h-10 min-w-[200px] flex-[2] items-center gap-2 rounded-xl border border-line bg-black/20 px-3">
+        <div className="flex h-10 min-w-[200px] flex-[2] items-center gap-2 rounded-xl border border-line bg-ink/[0.05] px-3">
           <Search size={14} className="text-muted" />
           <input value={t.q} onChange={(e) => set({ q: e.target.value })} placeholder="Buscar por código, nombre o dispositivo…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint" />
         </div>
@@ -619,7 +619,7 @@ function PenguinTable({
                 <tr
                   key={r.id}
                   onClick={() => onSelect(r.id)}
-                  className={cx("cursor-pointer border-b border-line/70 transition last:border-0", selected === r.id ? "bg-accent/[0.08]" : "hover:bg-white/[0.025]")}
+                  className={cx("cursor-pointer border-b border-line/70 transition last:border-0", selected === r.id ? "bg-accent/[0.08]" : "hover:bg-ink/[0.025]")}
                 >
                   <td className="px-3 py-1.5"><PenguinIllustration speciesId={r.species} size={32} /></td>
                   <td className="px-2 py-2 font-mono text-[13px]">{r.id}</td>
@@ -646,7 +646,7 @@ function PenguinTable({
                     )}
                   </td>
                   <td className="pr-3">
-                    <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Abrir ficha" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-white/5 hover:text-ink">
+                    <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Abrir ficha" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-ink/5 hover:text-ink">
                       <ChevronRight size={15} />
                     </Link>
                   </td>
@@ -715,7 +715,7 @@ function ReassignBox({ penguinId, onDone }: { penguinId: string; onDone: () => v
             <span className="font-mono">{p.id}</span>{p.name ? ` · ${p.name}` : ""}
           </p>
           <p className="mt-1.5 flex items-center gap-2">
-            <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5">{from?.name ?? "Sin asignar"}</span>
+            <span className="rounded-md bg-ink/[0.06] px-1.5 py-0.5">{from?.name ?? "Sin asignar"}</span>
             <ArrowRight size={13} className="text-accent" />
             <span className="rounded-md bg-accent/15 px-1.5 py-0.5 text-ink">{to.name}</span>
           </p>
@@ -811,7 +811,7 @@ function TasksTab({ teamId, ids }: { teamId: string; ids: string[] }) {
                   </td>
                   <td className="px-2 py-2">
                     {PERMISSIONS.manageTasks && (
-                      <button onClick={() => setEditing(t)} className="rounded-lg p-1.5 text-faint hover:bg-white/5 hover:text-ink" title="Editar">
+                      <button onClick={() => setEditing(t)} className="rounded-lg p-1.5 text-faint hover:bg-ink/5 hover:text-ink" title="Editar">
                         <Pencil size={14} />
                       </button>
                     )}
@@ -844,7 +844,7 @@ function TaskForm({ teamId, ids, task, onClose }: { teamId: string; ids: string[
   const [due, setDue] = useState(toLocal(task?.dueAt ?? now + DAY));
   const [penguinId, setPenguinId] = useState(task?.penguinId ?? "");
   const [zoneId, setZoneId] = useState(task?.zoneId ?? "");
-  const field = "mt-1 w-full rounded-xl border border-line-strong bg-black/20 px-3 py-2 text-sm outline-none focus:border-accent/60";
+  const field = "mt-1 w-full rounded-xl border border-line-strong bg-ink/[0.05] px-3 py-2 text-sm outline-none focus:border-accent/60";
 
   const save = () => {
     const dueAt = new Date(due).getTime();
@@ -1023,7 +1023,7 @@ function ShiftTimeline({ shifts, compact }: { shifts: Shift[]; compact?: boolean
           return (
             <li key={s.id} className="flex items-center gap-2">
               <span className="w-[112px] shrink-0 truncate text-xs" title={s.member}>{s.member}</span>
-              <span className="relative h-6 flex-1 rounded-md bg-white/[0.03]">
+              <span className="relative h-6 flex-1 rounded-md bg-ink/[0.03]">
                 <span
                   className="absolute inset-y-0.5 grid place-items-center rounded-md text-[10px] font-medium text-[#03101c]"
                   style={{ left: `${(a / 1440) * 100}%`, width: `${((end - a) / 1440) * 100}%`, background: s.availability === "unavailable" ? "#56718a" : s.availability === "partial" ? "#f5b84b" : team.color }}
@@ -1095,7 +1095,7 @@ function ScheduleTab({ teamId }: { teamId: string }) {
                     <td className="py-2"><Badge tone={s.availability === "available" ? "ok" : s.availability === "partial" ? "warn" : "neutral"}>{AVAIL_LABEL[s.availability]}</Badge></td>
                     <td className="py-2 text-right">
                       {PERMISSIONS.manageTeams && (
-                        <button onClick={() => removeShift(s.id)} className="rounded-lg p-1.5 text-faint hover:bg-white/5 hover:text-danger" title="Retirar turno"><Trash2 size={14} /></button>
+                        <button onClick={() => removeShift(s.id)} className="rounded-lg p-1.5 text-faint hover:bg-ink/5 hover:text-danger" title="Retirar turno"><Trash2 size={14} /></button>
                       )}
                     </td>
                   </tr>
@@ -1114,7 +1114,7 @@ function ScheduleTab({ teamId }: { teamId: string }) {
               const n = mine.filter((s) => s.weekday === i).length;
               return (
                 <li key={d}>
-                  <button onClick={() => setWeekday(i)} className={cx("flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm", i === weekday ? "bg-accent/10 text-ink" : "text-muted hover:bg-white/[0.04]")}>
+                  <button onClick={() => setWeekday(i)} className={cx("flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm", i === weekday ? "bg-accent/10 text-ink" : "text-muted hover:bg-ink/[0.04]")}>
                     {d}
                     <span className="num text-xs text-faint">{n ? `${n} turno${n === 1 ? "" : "s"}` : "—"}</span>
                   </button>
@@ -1135,7 +1135,7 @@ function ShiftForm({ team, weekday, onAdd, onClose }: { team: ReturnType<typeof 
   const [end, setEnd] = useState("15:00");
   const [availability, setAvailability] = useState<Shift["availability"]>("available");
   const [saved, setSaved] = useState(false);
-  const field = "mt-1 w-full rounded-xl border border-line-strong bg-black/20 px-3 py-2 text-sm outline-none focus:border-accent/60 [color-scheme:dark]";
+  const field = "mt-1 w-full rounded-xl border border-line-strong bg-ink/[0.05] px-3 py-2 text-sm outline-none focus:border-accent/60 [color-scheme:dark]";
   return (
     <Card title="Configurar turno" icon={CalendarClock} action={<button onClick={onClose} className="rounded-lg p-1 text-muted hover:text-ink"><X size={15} /></button>}>
       <form
@@ -1231,7 +1231,7 @@ function StaffTab({ teamId }: { teamId: string }) {
                           defaultValue={team.roles?.[m] ?? ""}
                           placeholder="Sin rol registrado"
                           onBlur={(e) => e.target.value.trim() !== (team.roles?.[m] ?? "") && updateTeam(teamId, { roles: { ...team.roles, [m]: e.target.value.trim() } })}
-                          className="h-8 w-44 rounded-lg border border-line bg-black/20 px-2 text-xs outline-none placeholder:text-faint focus:border-accent/60"
+                          className="h-8 w-44 rounded-lg border border-line bg-ink/[0.05] px-2 text-xs outline-none placeholder:text-faint focus:border-accent/60"
                         />
                       ) : (
                         <span className="text-xs text-muted">{team.roles?.[m] || "Sin rol registrado"}</span>
@@ -1251,7 +1251,7 @@ function StaffTab({ teamId }: { teamId: string }) {
                             <Button size="sm" variant="ghost" onClick={() => setRemoving(null)}>No</Button>
                           </span>
                         ) : (
-                          <button onClick={() => setRemoving(m)} className="rounded-lg p-1.5 text-faint hover:bg-white/5 hover:text-danger" title="Retirar del equipo"><Trash2 size={14} /></button>
+                          <button onClick={() => setRemoving(m)} className="rounded-lg p-1.5 text-faint hover:bg-ink/5 hover:text-danger" title="Retirar del equipo"><Trash2 size={14} /></button>
                         ))}
                     </td>
                   </tr>
@@ -1274,11 +1274,11 @@ function StaffTab({ teamId }: { teamId: string }) {
           >
             <label className="text-xs text-muted">
               Nuevo integrante
-              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre y apellido" className="mt-1 block h-9 w-56 rounded-xl border border-line-strong bg-black/20 px-3 text-sm outline-none focus:border-accent/60" />
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre y apellido" className="mt-1 block h-9 w-56 rounded-xl border border-line-strong bg-ink/[0.05] px-3 text-sm outline-none focus:border-accent/60" />
             </label>
             <label className="text-xs text-muted">
               Rol
-              <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Opcional" className="mt-1 block h-9 w-44 rounded-xl border border-line-strong bg-black/20 px-3 text-sm outline-none focus:border-accent/60" />
+              <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Opcional" className="mt-1 block h-9 w-44 rounded-xl border border-line-strong bg-ink/[0.05] px-3 text-sm outline-none focus:border-accent/60" />
             </label>
             <Button type="submit" variant="primary" disabled={!newName.trim() || team.members.includes(newName.trim())}>
               <UserPlus size={14} /> Agregar
@@ -1340,7 +1340,7 @@ function SortTh({ k, t, onSort, sub, children }: { k: SortKey; t: { sort: SortKe
 function HBar({ value, max, color }: { value: number; max: number; color: string }) {
   return (
     <span className="flex items-center gap-2">
-      <span className="h-2 w-14 overflow-hidden rounded-full bg-white/[0.05]">
+      <span className="h-2 w-14 overflow-hidden rounded-full bg-ink/[0.05]">
         <span className="block h-full rounded-full" style={{ width: `${(value / max) * 100}%`, background: color }} />
       </span>
       <span className="num w-11 text-xs">{fmtHours(value)}</span>
@@ -1353,7 +1353,7 @@ function PageBtn({ children, active, disabled, onClick }: { children: ReactNode;
     <button
       disabled={disabled}
       onClick={onClick}
-      className={cx("grid h-8 min-w-8 place-items-center rounded-lg px-2 text-xs transition disabled:opacity-30", active ? "border border-accent/50 bg-accent/10 text-ink" : "text-muted hover:bg-white/5 hover:text-ink")}
+      className={cx("grid h-8 min-w-8 place-items-center rounded-lg px-2 text-xs transition disabled:opacity-30", active ? "border border-accent/50 bg-accent/10 text-ink" : "text-muted hover:bg-ink/5 hover:text-ink")}
     >
       {children}
     </button>

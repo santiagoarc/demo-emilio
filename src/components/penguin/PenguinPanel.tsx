@@ -34,7 +34,7 @@ export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId:
   return (
     <aside className={cx("slide-in panel flex h-full w-[380px] max-w-[92vw] flex-col overflow-hidden !rounded-2xl", className)}>
       <div className="relative border-b border-line p-5">
-        <button onClick={onClose} className="absolute right-3 top-3 rounded-lg p-1.5 text-muted hover:bg-white/5 hover:text-ink" aria-label="Cerrar panel">
+        <button onClick={onClose} className="absolute right-3 top-3 rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Cerrar panel">
           <X size={16} />
         </button>
         <div className="flex items-center gap-4">
@@ -131,7 +131,7 @@ export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId:
       <div className="border-t border-line p-4">
         <Link
           href={`/penguins/${p.id}`}
-          className="flex h-10 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-semibold text-[#032a2a] transition hover:bg-[#5fe6d9]"
+          className="flex h-10 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-semibold text-white transition hover:bg-[#0b8178]"
         >
           Abrir ficha individual <ArrowUpRight size={15} />
         </Link>
@@ -142,7 +142,7 @@ export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId:
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="min-w-0 rounded-xl border border-line bg-white/[0.02] px-3 py-2">
+    <div className="min-w-0 rounded-xl border border-line bg-ink/[0.02] px-3 py-2">
       <p className="text-[11px] text-muted">{label}</p>
       <div className="mt-0.5 text-sm text-ink">{children}</div>
     </div>

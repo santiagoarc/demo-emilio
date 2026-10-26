@@ -2,10 +2,10 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Crosshair, Filter, Layers, Pause, Play, Radio, X, ZoomIn } from "lucide-react";
+import { Crosshair, Filter, Layers, Pause, Play, Radio, Search, X, ZoomIn } from "lucide-react";
 import { HABITAT, ZONE_BY_ID, ZONE_KIND_LABEL } from "@/domain/habitat";
 import { SPECIES_BY_ID } from "@/domain/species";
-import type { SpeciesId } from "@/domain/types";
+import type { Penguin, SpeciesId } from "@/domain/types";
 import { centroid, bbox } from "@/logic/geometry";
 import { snapshotAt, STATUS_LABEL, type LiveStatus, type Snapshot } from "@/logic/status";
 import { fmtDateTime, fmtTime, HOUR, MIN } from "@/logic/time";
@@ -37,11 +37,9 @@ export function MapView() {
     const z = params.get("zone");
     return z && ZONE_BY_ID[z] && !params.get("penguin") ? z : null;
   });
-  // El mapa abre reproduciendo las últimas 24 h y se detiene en "Ahora"
-  // (salvo que el sistema pida reducir el movimiento).
-  const [autoplay] = useState(() => !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
-  const [at, setAt] = useState(() => (autoplay ? now - 24 * HOUR : now));
-  const [playing, setPlaying] = useState(autoplay);
+  // Abre en vivo (última lectura); el botón de reproducir recorre las últimas 24 h.
+  const [at, setAt] = useState(now);
+  const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(4);
   const [smooth, setSmooth] = useState(true);
   const [loop, setLoop] = useState(true);
@@ -196,7 +194,8 @@ export function MapView() {
             selectedZones={zoneId ? [...filters.zones, zoneId] : filters.zones}
             onZoneClick={(z) => {
               if (ZONE_BY_ID[z].kind === "restricted") return;
-              setZoneId(z);
+              // Un segundo clic en la misma zona la cierra.
+              setZoneId(z === zoneId ? null : z);
               setSelectedId(null);
             }}
             zoneCounts={zoneCounts}
@@ -206,6 +205,7 @@ export function MapView() {
             wheelZoom
             penguinMarkers={filters.teams.length > 0}
             animate={!playing}
+            live={!playing && at >= now}
           />
         </div>
 
@@ -216,7 +216,7 @@ export function MapView() {
               if (!playing && at >= now) setAt(sliderMin);
               setPlaying((v) => !v);
             }}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-[#032a2a] transition hover:bg-[#5fe6d9]"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-white transition hover:bg-[#0b8178]"
             aria-label={playing ? "Pausar" : "Reproducir últimas 24 h"}
           >
             {playing ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
@@ -295,6 +295,15 @@ export function MapView() {
         <div className="border-b border-line px-4 py-3">
           <p className="eyebrow">Habitat Map</p>
           <h1 className="text-lg font-semibold tracking-tight">{HABITAT.name.split(" · ")[0]}</h1>
+          <PenguinSearch
+            penguins={dataset.penguins}
+            teamName={(id) => dataset.teams.find((t) => t.id === teamOf(id))?.name ?? ""}
+            onPick={(id) => {
+              select(id);
+              const r = snaps.get(id)?.reading;
+              if (r) setFocus({ key: Date.now(), x: r.x, y: r.y, w: 520 });
+            }}
+          />
           <div className="mt-3 grid grid-cols-2 gap-1.5">
             <MapStat label="En el mapa" value={active.filter((s) => s.reading).length} sub={`/ ${total}`} />
             {(["water", "land", "resting", "stale", "offline"] as LiveStatus[]).map((st) => (
@@ -313,7 +322,7 @@ export function MapView() {
         ) : zoneInfo ? (
           <div className="slide-in flex min-h-0 flex-1 flex-col">
             <div className="relative border-b border-line p-4">
-              <button onClick={() => setZoneId(null)} className="absolute right-3 top-3 rounded-lg p-1.5 text-muted hover:bg-white/5 hover:text-ink" aria-label="Cerrar">
+              <button onClick={() => setZoneId(null)} className="absolute right-3 top-3 rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Cerrar">
                 <X size={16} />
               </button>
               <p className="eyebrow">{ZONE_KIND_LABEL[zoneInfo.kind]}</p>
@@ -351,7 +360,7 @@ export function MapView() {
               <ul>
                 {zonePenguins.map((s) => (
                   <li key={s.penguin.id}>
-                    <button onClick={() => select(s.penguin.id)} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-white/[0.04]">
+                    <button onClick={() => select(s.penguin.id)} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-ink/[0.04]">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: SPECIES_BY_ID[s.penguin.speciesId].color }} />
                       <span className="w-[72px] font-mono text-xs">{s.penguin.id}</span>
                       <span className="flex-1 truncate text-[11px] text-faint">{dataset.teams.find((t) => t.id === teamOf(s.penguin.id))?.name}</span>
@@ -396,9 +405,78 @@ export function MapView() {
   );
 }
 
+/** Busca un ejemplar por código, nombre, especie o equipo y lo ubica en el mapa. */
+function PenguinSearch({ penguins, teamName, onPick }: { penguins: Penguin[]; teamName: (id: string) => string; onPick: (id: string) => void }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const results = useMemo(() => {
+    const t = norm(q.trim());
+    if (!t) return [];
+    return penguins
+      .filter((p) => norm(`${p.id} ${p.name ?? ""} ${SPECIES_BY_ID[p.speciesId].nameEs} ${teamName(p.id)}`).includes(t))
+      .slice(0, 8);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, penguins]);
+
+  const pick = (p: Penguin) => {
+    onPick(p.id);
+    setQ("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative mt-3">
+      <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+      <input
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+          setHi(0);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") setHi((h) => Math.min(h + 1, results.length - 1));
+          else if (e.key === "ArrowUp") setHi((h) => Math.max(h - 1, 0));
+          else if (e.key === "Enter" && results[hi]) pick(results[hi]);
+          else if (e.key === "Escape") setOpen(false);
+          else return;
+          e.preventDefault();
+        }}
+        placeholder="Buscar pingüino (código, nombre, especie…)"
+        aria-label="Buscar pingüino"
+        className="h-9 w-full rounded-xl border border-line-strong bg-panel-solid pl-8 pr-3 text-xs text-ink outline-none transition placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20"
+      />
+      {open && q.trim() && (
+        <ul className="absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-line-strong bg-panel-solid p-1 shadow-[0_4px_14px_rgba(11,36,64,0.10)]">
+          {results.length === 0 && <li className="px-3 py-2.5 text-xs text-muted">Ningún pingüino coincide.</li>}
+          {results.map((p, i) => (
+            <li key={p.id}>
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setHi(i)}
+                onClick={() => pick(p)}
+                className={cx("flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left", i === hi && "bg-ink/[0.05]")}
+              >
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: SPECIES_BY_ID[p.speciesId].color }} />
+                <span className="w-[72px] shrink-0 font-mono text-xs">{p.id}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-ink">{p.name ?? SPECIES_BY_ID[p.speciesId].nameEs.replace("Pingüino ", "")}</span>
+                <span className="shrink-0 text-[11px] text-faint">{teamName(p.id)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function MapStat({ label, value, sub, color }: { label: string; value: number; sub?: string; color?: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-black/20 px-2.5 py-1.5">
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-ink/[0.05] px-2.5 py-1.5">
       <p className="flex min-w-0 items-center gap-1.5 truncate text-[11px] text-muted">
         {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />}
         {label}
@@ -416,11 +494,11 @@ function MapLegend() {
     <div>
       <p className="eyebrow mb-2">Leyenda</p>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-muted">
-        <LegendItem icon={<circle cx="7" cy="7" r="5" fill="#cfe3f1" stroke="#03101c" />}>Ubicación reciente</LegendItem>
-        <LegendItem icon={<><circle cx="7" cy="7" r="6.3" fill="none" stroke="#4fb3ff" /><circle cx="7" cy="7" r="4" fill="#cfe3f1" /></>}>En agua (precisión de zona)</LegendItem>
+        <LegendItem icon={<circle cx="7" cy="7" r="5" fill="#9fb4c7" stroke="#03101c" />}>Ubicación reciente</LegendItem>
+        <LegendItem icon={<><circle cx="7" cy="7" r="6.3" fill="none" stroke="#4fb3ff" /><circle cx="7" cy="7" r="4" fill="#9fb4c7" /></>}>En agua (precisión de zona)</LegendItem>
         <LegendItem icon={<circle cx="7" cy="7" r="5" fill="none" stroke="#f5b84b" strokeWidth="1.6" strokeDasharray="2 1.6" />}>Última conocida</LegendItem>
         <LegendItem icon={<circle cx="7" cy="7" r="5" fill="none" stroke="#ff6b6b" strokeWidth="1.6" strokeDasharray="2 1.6" />}>Sin comunicación</LegendItem>
-        <LegendItem icon={<><circle cx="7" cy="7" r="5" fill="#cfe3f1" /><circle cx="7" cy="7" r="1.8" fill="#03101c" /></>}>Sin movimiento registrado</LegendItem>
+        <LegendItem icon={<><circle cx="7" cy="7" r="5" fill="#9fb4c7" /><circle cx="7" cy="7" r="1.8" fill="#03101c" /></>}>Sin movimiento registrado</LegendItem>
         <LegendItem icon={<path d="M1 7 H13" stroke="#2fd8c8" strokeDasharray="2 2" />}>Orden de lecturas (6 h)</LegendItem>
       </div>
       <p className="mt-2 text-[11px] leading-snug text-faint">

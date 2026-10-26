@@ -141,7 +141,7 @@ function TeamForm({ team, onClose, onSaved }: { team?: CareTeam; onClose: () => 
     onClose();
   };
 
-  const field = "mt-1 w-full rounded-xl border border-line-strong bg-black/20 px-3 py-2 text-sm outline-none placeholder:text-faint focus:border-accent/60";
+  const field = "mt-1 w-full rounded-xl border border-line-strong bg-ink/[0.05] px-3 py-2 text-sm outline-none placeholder:text-faint focus:border-accent/60";
   return (
     <form
       className="space-y-4 p-5"

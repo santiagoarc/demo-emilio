@@ -4,7 +4,7 @@ import { cx } from "@/components/ui/primitives";
 
 export const STATUS_COLOR: Record<LiveStatus, string> = {
   water: "#5cb8ff",
-  land: "#cde7f7",
+  land: "#9fb4c7",
   resting: "#9fb3c8",
   stale: "#f5b84b",
   offline: "#ff6b6b",

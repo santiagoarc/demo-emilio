@@ -20,6 +20,70 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
   const { filters, setFilters, clearFilters, dataset, range, teamOf } = useDemo();
   const n = activeFilterCount(filters);
 
+  // En el panel angosto del mapa: etiqueta a la izquierda y botones en columnas parejas.
+  if (compact) {
+    const row = "grid grid-cols-[64px_1fr] items-start gap-2";
+    const label = "eyebrow pt-2";
+    const chip = "w-full min-w-0 justify-start";
+    return (
+      <div className={cx("flex flex-col gap-3", className)}>
+        <div className={row}>
+          <span className={label}>Especie</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {SPECIES.map((s) => (
+              <Chip key={s.id} color={s.color} className={chip} active={filters.species.includes(s.id)} onClick={() => setFilters({ species: toggle(filters.species, s.id as SpeciesId) })}>
+                <span className="truncate">{s.nameEs.replace("Pingüino ", "")}</span>
+              </Chip>
+            ))}
+          </div>
+        </div>
+        <div className={row}>
+          <span className={label}>Equipo</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {dataset.teams.map((t) => (
+              <Chip key={t.id} color={t.color} className={chip} active={filters.teams.includes(t.id)} onClick={() => setFilters({ teams: toggle(filters.teams, t.id) })}>
+                <span className="truncate">{t.name}</span>
+              </Chip>
+            ))}
+          </div>
+        </div>
+        <div className={row}>
+          <span className={label}>Zona</span>
+          <div className="flex flex-col gap-1.5">
+            <Select
+              value=""
+              onChange={(e) => e.target.value && setFilters({ zones: toggle(filters.zones, e.target.value) })}
+              className="h-8 w-full rounded-lg px-2.5 text-xs"
+              aria-label="Filtrar por zona"
+            >
+              <option value="">+ Zona</option>
+              {PENGUIN_ZONES.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {filters.zones.includes(z.id) ? "✓ " : ""}
+                  {z.name}
+                </option>
+              ))}
+            </Select>
+            {filters.zones.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {filters.zones.map((z) => (
+                  <Chip key={z} active onRemove={() => setFilters({ zones: filters.zones.filter((x) => x !== z) })}>
+                    {ZONE_BY_ID[z]?.name}
+                  </Chip>
+                ))}
+              </div>
+            )}
+            {n > 0 && (
+              <Button size="sm" variant="ghost" className="self-start" onClick={clearFilters}>
+                <FilterX size={13} /> Limpiar ({n})
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cx("flex flex-col gap-3", className)}>
       <div className="flex flex-wrap items-center gap-1.5">

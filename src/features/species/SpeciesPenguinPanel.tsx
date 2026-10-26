@@ -109,7 +109,7 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
               <ul className="space-y-1.5">
                 {myAlerts.map((a) => (
                   <li key={a.id}>
-                    <Link href={`/alerts?alert=${a.id}`} className="flex items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-xs hover:bg-white/[0.03]">
+                    <Link href={`/alerts?alert=${a.id}`} className="flex items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-xs hover:bg-ink/[0.03]">
                       <Badge tone={PRIORITY_TONE[a.priority]}>{PRIORITY_LABEL[a.priority]}</Badge>
                       <span className="truncate">{ALERT_TYPE_LABEL[a.type]}</span>
                     </Link>
@@ -223,7 +223,7 @@ function Meter({ label, value, pct, color }: { label: string; value: number; pct
           {fmtHours(value)} <span className="text-faint">({pct}%)</span>
         </span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+      <div className="h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>

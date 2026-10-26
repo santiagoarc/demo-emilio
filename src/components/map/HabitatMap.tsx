@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { DoorOpen, Droplet, Locate, Minus, Plus, ScanLine, Snowflake, Waves, Scale, Maximize2 } from "lucide-react";
 import { HABITAT } from "@/domain/habitat";
 import type { HabitatZone, Medium, ReadingQuality } from "@/domain/types";
-import { bbox, centroid, smoothPath } from "@/logic/geometry";
+import { bbox, centroid, pointInPolygon, smoothPath } from "@/logic/geometry";
 import type { LiveStatus } from "@/logic/status";
 import { tessellateZones } from "@/logic/tessellation";
 
@@ -57,6 +57,76 @@ const ZONE_SURFACE: Record<string, { fill: string; texture?: string }> = {
   "observation-ledge": { fill: "url(#rock-fill)", texture: "url(#rock-tex)" },
 };
 
+/** Cuánto se aleja un ejemplar de su última lectura en modo en vivo (unidades del plano; 40 u = 1 m). */
+const LIVE_RADIUS: Partial<Record<LiveStatus, number>> = { water: 120, land: 34 };
+const LIVE_TICK_MS = 400;
+/** Fracción de ejemplares en tierra que eligen un nuevo destino en cada tick: caminan a ratos. */
+const LIVE_SHARE = 0.3;
+const LIVE_STEP_MS = 2600;
+/** Tramo de nado: al llegar a un punto eligen el siguiente, así en el agua nunca se detienen. */
+const SWIM_STEP_MS = 1500;
+/** Color del terreno alrededor de las zonas. */
+export const MAP_BG = "#ece2cd";
+
+/**
+ * Desplazamiento simulado alrededor de la última lectura: cada ejemplar en agua o
+ * en tierra deriva sin salir de su zona. Los que reposan o no tienen señal se quedan quietos.
+ */
+function useLiveDrift(markers: MapMarker[], live: boolean) {
+  const [offsets, setOffsets] = useState<Map<string, [number, number]>>(() => new Map());
+  const latest = useRef(markers);
+  const swimUntil = useRef(new Map<string, number>());
+  useEffect(() => {
+    latest.current = markers;
+  }, [markers]);
+
+  useEffect(() => {
+    if (!live || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOffsets(new Map());
+      return;
+    }
+    const zoneOf = new Map<string, HabitatZone | undefined>();
+    const swim = swimUntil.current;
+    const step = () => {
+      const now = Date.now();
+      setOffsets((prev) => {
+        const next = new Map(prev);
+        for (const m of latest.current) {
+          const radius = LIVE_RADIUS[m.status];
+          if (!radius || m.dim) continue;
+          if (m.status === "water") {
+            if ((swim.get(m.id) ?? 0) > now) continue;
+            swim.set(m.id, now + SWIM_STEP_MS - LIVE_TICK_MS / 2);
+          } else if (Math.random() > LIVE_SHARE) continue;
+          const key = `${m.id}@${m.x},${m.y}`;
+          if (!zoneOf.has(key)) zoneOf.set(key, HABITAT.zones.find((z) => pointInPolygon(m.x, m.y, z.polygon)));
+          const zone = zoneOf.get(key);
+          for (let i = 0; i < 4; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const d = radius * Math.sqrt(Math.random());
+            const dx = Math.cos(a) * d;
+            const dy = Math.sin(a) * d;
+            if (!zone || pointInPolygon(m.x + dx, m.y + dy, zone.polygon)) {
+              next.set(m.id, [dx, dy]);
+              break;
+            }
+          }
+        }
+        return next;
+      });
+    };
+    step();
+    const id = setInterval(step, LIVE_TICK_MS);
+    return () => {
+      clearInterval(id);
+      swim.clear();
+    };
+  }, [live]);
+
+  return offsets;
+}
+
 const ZONE_STYLE: Record<HabitatZone["kind"], { fill: string; stroke: string; dash?: string }> = {
   water: { fill: "url(#water-fill)", stroke: "rgba(92,184,255,0.45)" },
   land: { fill: "url(#land-fill)", stroke: "rgba(205,231,247,0.20)" },
@@ -78,6 +148,7 @@ export function HabitatMap({
   interactive = true,
   wheelZoom = false,
   animate = false,
+  live = false,
   focus,
   overlay,
   labelScale = 1,
@@ -98,6 +169,8 @@ export function HabitatMap({
   wheelZoom?: boolean;
   /** Transición suave al cambiar de posición (desactivar mientras se reproduce cuadro a cuadro). */
   animate?: boolean;
+  /** Los ejemplares se mueven alrededor de su última lectura, como en una vista en vivo. */
+  live?: boolean;
   focus?: { key: number; x: number; y: number; w?: number } | null;
   overlay?: ReactNode;
   /** Tamaño relativo de las etiquetas de zona (los mapas pequeños las agrandan). */
@@ -160,6 +233,7 @@ export function HabitatMap({
   const maxCount = Math.max(1, ...(zoneCounts ? [...zoneCounts.values()] : [1]));
   const selected = markers.find((m) => m.id === selectedId);
   const ordered = useMemo(() => [...markers].sort((a, b) => Number(!a.dim) - Number(!b.dim)), [markers]);
+  const drift = useLiveDrift(markers, live);
 
   return (
     <div className={`relative h-full w-full overflow-hidden ${className ?? ""}`}>
@@ -203,11 +277,6 @@ export function HabitatMap({
             <stop offset="0%" stopColor="#1f3d5c" />
             <stop offset="100%" stopColor="#172f48" />
           </linearGradient>
-          <linearGradient id="floor" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#1b4a42" />
-            <stop offset="55%" stopColor="#173f3a" />
-            <stop offset="100%" stopColor="#133632" />
-          </linearGradient>
           <linearGradient id="snow-fill" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#7fa9c6" />
             <stop offset="100%" stopColor="#5a87a8" />
@@ -224,14 +293,6 @@ export function HabitatMap({
             <stop offset="0%" stopColor="#3a3f6a" />
             <stop offset="100%" stopColor="#2d3256" />
           </linearGradient>
-          {/* Vegetación entre zonas: une las áreas y evita huecos vacíos. */}
-          <pattern id="foliage" width="46" height="46" patternUnits="userSpaceOnUse">
-            <circle cx="8" cy="10" r="7" fill="rgba(52,120,86,0.35)" />
-            <circle cx="30" cy="6" r="5" fill="rgba(70,140,96,0.28)" />
-            <circle cx="22" cy="30" r="8" fill="rgba(40,104,76,0.32)" />
-            <circle cx="42" cy="38" r="5" fill="rgba(62,132,90,0.25)" />
-            <circle cx="6" cy="40" r="4" fill="rgba(86,152,104,0.22)" />
-          </pattern>
           <pattern id="snow-tex" width="28" height="28" patternUnits="userSpaceOnUse">
             <circle cx="5" cy="6" r="1.6" fill="rgba(255,255,255,0.35)" />
             <circle cx="19" cy="15" r="1.2" fill="rgba(255,255,255,0.3)" />
@@ -246,9 +307,6 @@ export function HabitatMap({
             <circle cx="5" cy="5" r="2" fill="rgba(230,214,180,0.22)" />
             <circle cx="15" cy="12" r="2.4" fill="rgba(60,46,30,0.22)" />
             <circle cx="8" cy="17" r="1.6" fill="rgba(230,214,180,0.18)" />
-          </pattern>
-          <pattern id="grid" width="200" height="200" patternUnits="userSpaceOnUse">
-            <path d="M200 0H0V200" fill="none" stroke="rgba(148,197,233,0.05)" strokeWidth="1" />
           </pattern>
           <pattern id="ripples" width="120" height="60" patternUnits="userSpaceOnUse">
             <path d="M0 30 Q 15 22 30 30 T 60 30 T 90 30 T 120 30" fill="none" stroke="rgba(160,215,255,0.07)" strokeWidth="2" />
@@ -265,19 +323,8 @@ export function HabitatMap({
           </filter>
         </defs>
 
-        <rect x="20" y="20" width={HABITAT.width - 40} height={HABITAT.height - 40} rx="48" fill="url(#floor)" stroke="rgba(148,197,233,0.12)" strokeWidth="2" />
-        <rect x="20" y="20" width={HABITAT.width - 40} height={HABITAT.height - 40} rx="48" fill="url(#foliage)" />
-        {/* El terreno sigue fuera del plano para que el mapa no deje bandas vacías en pantallas anchas. */}
-        {["#163a35", "url(#foliage)"].map((fill) => (
-          <path
-            key={fill}
-            d={`M-4000 -4000H${HABITAT.width + 4000}V${HABITAT.height + 4000}H-4000Z M20 68 V${HABITAT.height - 68} Q20 ${HABITAT.height - 20} 68 ${HABITAT.height - 20} H${HABITAT.width - 68} Q${HABITAT.width - 20} ${HABITAT.height - 20} ${HABITAT.width - 20} ${HABITAT.height - 68} V68 Q${HABITAT.width - 20} 20 ${HABITAT.width - 68} 20 H68 Q20 20 20 68Z`}
-            fillRule="evenodd"
-            fill={fill}
-            pointerEvents="none"
-          />
-        ))}
-        <rect x="20" y="20" width={HABITAT.width - 40} height={HABITAT.height - 40} rx="48" fill="url(#grid)" />
+        {/* Fondo de un solo color; sigue fuera del plano para que no queden bandas en pantallas anchas. */}
+        <rect x={-4000} y={-4000} width={HABITAT.width + 8000} height={HABITAT.height + 8000} fill={MAP_BG} pointerEvents="none" />
         {/* Las zonas se reparten todo el recinto y se tocan entre sí: sin huecos. */}
         {layers.zones && (
           <g clipPath="url(#habitat-clip)">
@@ -395,13 +442,20 @@ export function HabitatMap({
             const r = (penguinMarkers ? 13 : 8) * Math.max(k, 0.4);
             const isSel = m.id === selectedId;
             const hv = hover === m.id;
+            const [dx, dy] = drift.get(m.id) ?? [0, 0];
             return (
               <g
                 key={m.id}
                 data-marker={m.dim ? undefined : m.id}
                 style={{
-                  transform: `translate(${m.x}px, ${m.y}px)`,
-                  transition: animate ? "transform 700ms cubic-bezier(0.33, 0, 0.2, 1)" : undefined,
+                  transform: `translate(${m.x + dx}px, ${m.y + dy}px)`,
+                  transition: live
+                    ? m.status === "water"
+                      ? `transform ${SWIM_STEP_MS}ms linear`
+                      : `transform ${LIVE_STEP_MS}ms cubic-bezier(0.45, 0, 0.55, 1)`
+                    : animate
+                      ? "transform 700ms cubic-bezier(0.33, 0, 0.2, 1)"
+                      : undefined,
                 }}
                 opacity={m.dim ? 0.13 : 1}
                 className={m.dim ? "" : "cursor-pointer"}
@@ -476,6 +530,15 @@ export function HabitatMap({
         </div>
       )}
       {interactive && showControls && <ScaleBar k={k} />}
+      {live && (
+        <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-[#0b2440] shadow-sm">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#e5484d] opacity-70" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#e5484d]" />
+          </span>
+          En vivo
+        </div>
+      )}
       {overlay}
     </div>
   );

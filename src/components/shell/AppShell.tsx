@@ -73,9 +73,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-[236px] shrink-0 flex-col border-r border-line bg-[rgba(3,14,26,0.7)] px-3 py-5 backdrop-blur md:flex">
+      <aside className="sticky top-0 hidden h-screen w-[236px] shrink-0 flex-col border-r border-line bg-panel-solid/80 px-3 py-5 backdrop-blur md:flex">
         <Link href="/" className="mb-6 block px-1">
-          <span className="flex justify-center rounded-2xl bg-white px-4 py-2.5 shadow-[0_6px_20px_rgba(0,0,0,0.25)]">
+          <span className="flex justify-center rounded-2xl bg-white px-4 py-2.5 shadow-[0_4px_14px_rgba(11,36,64,0.10)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/seaworld-abu-dhabi.png" alt="SeaWorld Abu Dhabi" className="h-14 w-auto" />
           </span>
@@ -86,7 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <button
           onClick={() => setSearchOpen(true)}
-          className="mb-4 flex h-9 items-center gap-2 rounded-xl border border-line bg-white/[0.02] px-3 text-xs text-muted transition hover:border-line-strong hover:text-ink"
+          className="mb-4 flex h-9 items-center gap-2 rounded-xl border border-line bg-ink/[0.02] px-3 text-xs text-muted transition hover:border-line-strong hover:text-ink"
         >
           <Search size={14} />
           Buscar ejemplar
@@ -102,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 href={href}
                 className={cx(
                   "group relative flex h-10 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition",
-                  active ? "bg-gradient-to-r from-accent/14 to-transparent text-ink" : "text-muted hover:bg-white/[0.03] hover:text-ink",
+                  active ? "bg-gradient-to-r from-accent/14 to-transparent text-ink" : "text-muted hover:bg-ink/[0.03] hover:text-ink",
                 )}
               >
                 {active && <span className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-accent" />}
@@ -117,12 +117,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="mt-auto space-y-2 px-1">
-          <div className="rounded-xl border border-line bg-white/[0.02] p-3">
+          <div className="rounded-xl border border-line bg-ink/[0.02] p-3">
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-accent-2" />
-              <span className="text-[11px] font-medium text-ice">Demo · Datos simulados</span>
+              <span className="text-[11px] font-medium text-ink">Demo · Datos simulados</span>
             </div>
-            <p className="mt-1 text-[11px] leading-snug text-faint">
+            <p className="mt-1 text-[11px] leading-snug text-muted">
               Escenario ficticio, sin dispositivos conectados. Corte de lecturas: {fmtDateTime(now, now)}.
             </p>
           </div>

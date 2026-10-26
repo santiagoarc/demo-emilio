@@ -37,7 +37,7 @@ export function FilterMenu<T extends string>({ label, allLabel = "Todos", option
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={cx(
-          "flex h-10 w-full min-w-[118px] items-center justify-between gap-2 rounded-xl border bg-black/20 px-3 text-left transition hover:border-line-strong",
+          "flex h-10 w-full min-w-[118px] items-center justify-between gap-2 rounded-xl border bg-ink/[0.05] px-3 text-left transition hover:border-line-strong",
           value.length ? "border-accent/50" : "border-line",
         )}
       >
@@ -51,7 +51,7 @@ export function FilterMenu<T extends string>({ label, allLabel = "Todos", option
         <div className="scroll-thin absolute right-0 z-30 mt-1 max-h-72 min-w-[220px] overflow-y-auto rounded-xl border border-line-strong bg-panel-solid p-1 shadow-2xl">
           <button
             onClick={() => onChange([])}
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-muted hover:bg-white/5 hover:text-ink"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-muted hover:bg-ink/5 hover:text-ink"
           >
             <span className={cx("grid h-4 w-4 place-items-center rounded border", value.length === 0 ? "border-accent bg-accent/20 text-accent" : "border-line-strong")}>
               {value.length === 0 && <Check size={11} />}
@@ -64,7 +64,7 @@ export function FilterMenu<T extends string>({ label, allLabel = "Todos", option
               <button
                 key={o.value}
                 onClick={() => onChange(on ? value.filter((x) => x !== o.value) : [...value, o.value])}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-ink hover:bg-white/5"
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-ink hover:bg-ink/5"
               >
                 <span className={cx("grid h-4 w-4 place-items-center rounded border", on ? "border-accent bg-accent/20 text-accent" : "border-line-strong")}>
                   {on && <Check size={11} />}

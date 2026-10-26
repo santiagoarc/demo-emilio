@@ -109,7 +109,7 @@ export function TeamsView() {
           <PeriodPicker />
           <DayPicker />
           {PERMISSIONS.manageTeams && (
-            <button onClick={() => setCreating(true)} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3.5 text-sm font-semibold text-[#032a2a] hover:bg-[#5fe6d9]">
+            <button onClick={() => setCreating(true)} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3.5 text-sm font-semibold text-white hover:bg-[#0b8178]">
               <Plus size={16} /> Nuevo equipo
             </button>
           )}
@@ -141,7 +141,7 @@ export function TeamsView() {
               <p className="text-xs text-muted">Selecciona un equipo para ver su información detallada. Nombres configurables, no representan la estructura real.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex h-9 w-[220px] items-center gap-2 rounded-xl border border-line bg-black/20 px-3">
+              <div className="flex h-9 w-[220px] items-center gap-2 rounded-xl border border-line bg-ink/[0.05] px-3">
                 <Search size={14} className="text-muted" />
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar equipo o responsable…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint" />
               </div>
@@ -155,7 +155,7 @@ export function TeamsView() {
                   { value: "inactive", label: "Inactivos" },
                 ]}
               />
-              <label className="flex h-9 items-center gap-2 rounded-xl border border-line bg-black/20 px-3 text-xs text-muted">
+              <label className="flex h-9 items-center gap-2 rounded-xl border border-line bg-ink/[0.05] px-3 text-xs text-muted">
                 Ordenar por
                 <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="bg-transparent text-xs text-ink outline-none">
                   <option value="penguins">Pingüinos asignados</option>
@@ -196,7 +196,7 @@ export function TeamsView() {
               <ul className="min-w-[180px] flex-1 space-y-1">
                 {[...stats].sort((a, b) => b.penguinIds.length - a.penguinIds.length).map((x) => (
                   <li key={x.team.id}>
-                    <Link href={`/teams/${x.team.id}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm hover:bg-white/[0.04]">
+                    <Link href={`/teams/${x.team.id}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm hover:bg-ink/[0.04]">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: x.team.color }} />
                       <span className="flex-1 truncate">{x.team.name}</span>
                       <span className="num font-semibold">{x.penguinIds.length}</span>
@@ -214,9 +214,9 @@ export function TeamsView() {
                 const pct = Math.round((n / Math.max(1, total)) * 100);
                 return (
                   <li key={z}>
-                    <Link href={`/map?zone=${z}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-white/[0.04]">
+                    <Link href={`/map?zone=${z}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-ink/[0.04]">
                       <span className="w-[112px] shrink-0 truncate text-[13px]">{ZONE_BY_ID[z].name}</span>
-                      <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.05]">
+                      <span className="h-2 flex-1 overflow-hidden rounded-full bg-ink/[0.05]">
                         <span className="block h-full rounded-full bg-accent-2" style={{ width: `${(n / zoneRows[0][1]) * 100}%` }} />
                       </span>
                       <span className="num w-7 text-right text-[13px] font-semibold">{n}</span>
@@ -276,7 +276,7 @@ export function TeamsView() {
                   {upcoming.map((t) => {
                     const pr = taskPriority(t, now);
                     return (
-                      <tr key={t.id} onClick={() => router.push(`/alerts?tab=tasks&task=${t.id}`)} className="cursor-pointer border-t border-line/70 hover:bg-white/[0.03]">
+                      <tr key={t.id} onClick={() => router.push(`/alerts?tab=tasks&task=${t.id}`)} className="cursor-pointer border-t border-line/70 hover:bg-ink/[0.03]">
                         <td className="py-2"><Badge tone={PRIORITY_TONE[pr]}>{PRIORITY_LABEL[pr]}</Badge></td>
                         <td className="max-w-[200px] truncate py-2 pr-2">{t.title}</td>
                         <td className="py-2 pr-2 text-xs text-muted">{teamById(t.teamId)?.name ?? "Sin asignar"}</td>
@@ -310,7 +310,7 @@ export function TeamsView() {
                 </thead>
                 <tbody>
                   {recentAlerts.map((a) => (
-                    <tr key={a.id} onClick={() => router.push(`/alerts?alert=${a.id}`)} className="cursor-pointer border-t border-line/70 hover:bg-white/[0.03]">
+                    <tr key={a.id} onClick={() => router.push(`/alerts?alert=${a.id}`)} className="cursor-pointer border-t border-line/70 hover:bg-ink/[0.03]">
                       <td className="py-2 pr-2">
                         <span className="inline-flex items-center gap-2">
                           <span className={cx("h-2 w-2 rounded-full", a.priority === "high" ? "bg-danger" : a.priority === "medium" ? "bg-warn" : "bg-faint")} />
@@ -376,7 +376,7 @@ function TeamCard({ x, total, onOpen }: { x: TeamStats; total: number; onOpen: (
             <b className="num text-sm">{x.penguinIds.length}</b> <span className="text-faint">· {pct}% del total</span>
           </span>
         </div>
-        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: team.color }} />
         </div>
       </div>

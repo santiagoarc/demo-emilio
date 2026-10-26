@@ -124,10 +124,10 @@ function Profile({ penguinId }: { penguinId: string }) {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StatusPill status={snap.status} />
                 <Badge tone={p.recordStatus === "active" ? "ok" : p.recordStatus === "recent" ? "info" : "warn"}>{RECORD_STATUS_LABEL[p.recordStatus]}</Badge>
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.05] px-2 py-0.5 text-[11px] text-muted">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-ink/[0.05] px-2 py-0.5 text-[11px] text-muted">
                   <span className="h-2 w-2 rounded-full" style={{ background: team?.color ?? "#56718a" }} /> {team?.name ?? "Sin asignar"}
                 </span>
-                <span className={cx("inline-flex items-center gap-1.5 rounded-md bg-white/[0.05] px-2 py-0.5 text-[11px]", lastKnown ? "text-warn" : "text-muted")}>
+                <span className={cx("inline-flex items-center gap-1.5 rounded-md bg-ink/[0.05] px-2 py-0.5 text-[11px]", lastKnown ? "text-warn" : "text-muted")}>
                   <MapPin size={11} />
                   {r ? `${ZONE_BY_ID[r.zoneId].name} · ${fmtDateTime(r.timestamp, now)}` : "Sin ubicación registrada"}
                   {lastKnown && " · desactualizada"}
@@ -140,7 +140,7 @@ function Profile({ penguinId }: { penguinId: string }) {
                 <Link href={`/species/${sp.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong px-3 text-sm text-ink hover:border-accent/50">
                   <ArrowLeft size={14} /> Listado de la especie
                 </Link>
-                <Link href={`/map?penguin=${p.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3.5 text-sm font-semibold text-[#032a2a] hover:bg-[#5fe6d9]">
+                <Link href={`/map?penguin=${p.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3.5 text-sm font-semibold text-white hover:bg-[#0b8178]">
                   <MapPinned size={15} /> Ver en el mapa
                 </Link>
               </div>
@@ -164,7 +164,7 @@ function Profile({ penguinId }: { penguinId: string }) {
       <div className="sticky top-0 z-20 mt-4 border-y border-line bg-bg/85 px-6 backdrop-blur lg:px-8">
         <div className="scroll-thin flex items-center gap-1 overflow-x-auto py-2">
           {SECTIONS.map((s) => (
-            <a key={s.id} href={`#${s.id}`} className="whitespace-nowrap rounded-lg px-2.5 py-1 text-xs text-muted hover:bg-white/5 hover:text-ink">
+            <a key={s.id} href={`#${s.id}`} className="whitespace-nowrap rounded-lg px-2.5 py-1 text-xs text-muted hover:bg-ink/5 hover:text-ink">
               {s.label}
             </a>
           ))}
@@ -243,7 +243,7 @@ function LocationSection({ penguinId }: { penguinId: string }) {
       }
     >
       <div className="grid gap-5 xl:grid-cols-[1fr_280px_300px]">
-        <div className="aspect-[16/10] overflow-hidden rounded-xl border border-line bg-black/20">
+        <div className="aspect-[16/10] overflow-hidden rounded-xl border border-line bg-ink/[0.05]">
           {r ? (
             <HabitatMap
               markers={[{ id: p.id, x: r.x, y: r.y, color: sp.color, status: snap.status, medium: r.medium, accuracyM: r.accuracyM }]}
@@ -644,7 +644,7 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
             onChange={(e) => setText(e.target.value)}
             rows={2}
             placeholder="Describe lo observado (sin diagnósticos)…"
-            className="mt-1 w-full resize-none rounded-lg border border-line-strong bg-black/20 px-3 py-2 text-sm outline-none placeholder:text-faint focus:border-accent/60"
+            className="mt-1 w-full resize-none rounded-lg border border-line-strong bg-ink/[0.05] px-3 py-2 text-sm outline-none placeholder:text-faint focus:border-accent/60"
           />
           <div className="mt-2 flex items-center justify-between gap-2">
             <p className="text-[10px] text-faint">Se registra con tu usuario y la hora actual del escenario. Queda separada de los registros veterinarios.</p>
@@ -749,7 +749,7 @@ function AlertsSection({ penguinId, className }: { penguinId: string; className?
     <Card className={className} title={<span id="alertas" className="scroll-mt-20">Alertas e incidencias</span>} icon={BellRing} subtitle="El estado se comparte con Alerts & Tasks.">
       {mine.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/[0.03]">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-ink/[0.03]">
             <ShieldCheck size={20} className="text-ok" />
           </span>
           <p className="text-sm">Sin alertas para este ejemplar</p>
@@ -891,7 +891,7 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
             const Icon = EVENT_ICON[e.kind];
             return (
               <li key={i} className="relative flex gap-3 px-1 py-1.5">
-                <span className="z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-line-strong bg-[#06182a]">
+                <span className="z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-line-strong bg-panel-solid">
                   <Icon size={13} className={e.warn ? "text-warn" : "text-accent"} />
                 </span>
                 <div className="min-w-0 text-xs">

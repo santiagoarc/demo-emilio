@@ -99,7 +99,7 @@ export function SpeciesView() {
         <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
           {stats.map((x, i) => (
             <article key={x.s.id} className="panel fade-up flex flex-col overflow-hidden" style={{ animationDelay: `${i * 50}ms` }}>
-              <Link href={`/species/${x.s.id}`} className="group relative flex items-center gap-4 border-b border-line p-4 transition hover:bg-white/[0.02]">
+              <Link href={`/species/${x.s.id}`} className="group relative flex items-center gap-4 border-b border-line p-4 transition hover:bg-ink/[0.02]">
                 <div className="absolute inset-y-0 right-0 w-1/2 opacity-[0.08]" style={{ background: `radial-gradient(circle at 80% 40%, ${x.s.color}, transparent 70%)` }} />
                 <PenguinIllustration speciesId={x.s.id} size={76} />
                 <div className="min-w-0 flex-1">

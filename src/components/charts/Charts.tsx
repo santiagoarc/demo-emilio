@@ -9,7 +9,7 @@ import { cx } from "@/components/ui/primitives";
 
 export const SERIES = {
   water: "#4fb3ff",
-  land: "#cfe3f1",
+  land: "#9fb4c7",
   stationary: "#8aa0b6",
   noFix: "#f5b84b",
   noComm: "#ff6b6b",
@@ -58,7 +58,7 @@ export function BarList({ items, format = (v) => String(v), max, onSelect, selec
                   {i.hint && <span className="ml-1 font-normal text-faint">{i.hint}</span>}
                 </span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+              <div className="h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
                 <div
                   className="h-full rounded-full transition-[width] duration-500"
                   style={{ width: `${(i.value / m) * 100}%`, background: i.color ?? "var(--accent)", opacity: selected?.length && !on ? 0.35 : 1 }}
@@ -76,7 +76,7 @@ export function BarList({ items, format = (v) => String(v), max, onSelect, selec
 export function SplitBar({ parts, height = 10, className }: { parts: { value: number; color: string; label: string }[]; height?: number; className?: string }) {
   const total = parts.reduce((a, p) => a + p.value, 0);
   return (
-    <div className={cx("flex w-full overflow-hidden rounded-full bg-white/[0.05]", className)} style={{ height }}>
+    <div className={cx("flex w-full overflow-hidden rounded-full bg-ink/[0.05]", className)} style={{ height }}>
       {total > 0 &&
         parts.map((p) =>
           p.value > 0 ? (
@@ -100,7 +100,7 @@ export function Donut({ parts, size = 132, thickness = 14, center }: { parts: { 
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={thickness} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(11,36,64,0.05)" strokeWidth={thickness} />
         {total > 0 &&
           parts.map((p) => {
             const len = (p.value / total) * c;
@@ -220,7 +220,7 @@ export function LineChart({ data, series, height = 200, format = (v) => String(v
         </defs>
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} stroke="rgba(148,197,233,0.08)" />
+            <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} stroke="rgba(11,36,64,0.064)" />
             <text x={padL - 6} y={y(t) + 3} textAnchor="end" fontSize="10" fill="var(--faint)">
               {format(t)}
             </text>
@@ -264,7 +264,7 @@ export function LineChart({ data, series, height = 200, format = (v) => String(v
         ))}
         {hover !== null && (
           <g pointerEvents="none">
-            <line x1={x(hover)} x2={x(hover)} y1={padT} y2={H - padB} stroke="rgba(205,231,247,0.25)" />
+            <line x1={x(hover)} x2={x(hover)} y1={padT} y2={H - padB} stroke="rgba(11,36,64,0.25)" />
             {series.map((s) =>
               data[hover].values[s.key] == null ? null : <circle key={s.key} cx={x(hover)} cy={y(data[hover].values[s.key]!)} r="3.5" fill={s.color} stroke="var(--bg)" strokeWidth="1.5" />,
             )}
@@ -327,7 +327,7 @@ export function Matrix({ rows, cols, value, format = (v) => String(v), rowLabel,
                     title={`${rowLabel(r)} → ${colLabel(c)}: ${format(v)}`}
                     className="num h-8 w-9 rounded-md text-center text-[10px]"
                     style={{
-                      background: r === c ? "rgba(255,255,255,0.02)" : v ? `rgba(47,216,200,${0.08 + (v / max) * 0.72})` : "rgba(255,255,255,0.03)",
+                      background: r === c ? "rgba(11,36,64,0.02)" : v ? `rgba(47,216,200,${0.08 + (v / max) * 0.72})` : "rgba(11,36,64,0.03)",
                       color: v / max > 0.5 ? "#032a2a" : "var(--muted)",
                     }}
                   >
@@ -375,7 +375,7 @@ export function Heatmap({ rows, cols, value, color = "47,216,200", format = (v) 
                   title={`${rowLabel(r)} ${colLabel(c)} · ${v == null ? "sin datos" : format(v)}`}
                   className="h-5 rounded-[4px]"
                   style={{
-                    background: v == null ? "repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 3px, transparent 3px 6px)" : `rgba(${color},${0.06 + (v / max) * 0.85})`,
+                    background: v == null ? "repeating-linear-gradient(45deg, rgba(11,36,64,0.04) 0 3px, transparent 3px 6px)" : `rgba(${color},${0.06 + (v / max) * 0.85})`,
                   }}
                 />
               );

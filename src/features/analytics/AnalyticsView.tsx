@@ -194,7 +194,7 @@ export function AnalyticsView() {
                           </span>
                           <span className="num font-semibold">{v}</span>
                         </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+                        <div className="h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
                           <div className="h-full rounded-full bg-accent" style={{ width: `${(v / topTransitions[0][1]) * 100}%` }} />
                         </div>
                       </li>
@@ -354,7 +354,7 @@ function PenguinTimeline() {
         <p className="text-xs text-muted">Sin ejemplares.</p>
       ) : (
         <>
-          <div className="relative h-12 overflow-hidden rounded-xl border border-line bg-black/25">
+          <div className="relative h-12 overflow-hidden rounded-xl border border-line bg-ink/[0.05]">
             {recs.map((r) => (
               <div
                 key={r.start}

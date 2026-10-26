@@ -11,7 +11,6 @@ import {
   CloudOff,
   Droplets,
   ExternalLink,
-  FilterX,
   Map as MapIcon,
   MapPinned,
   Mountain,
@@ -22,15 +21,13 @@ import {
 } from "lucide-react";
 import { PENGUIN_ZONES, ZONE_BY_ID, ZONE_KIND_LABEL } from "@/domain/habitat";
 import { SPECIES, SPECIES_BY_ID } from "@/domain/species";
-import type { SpeciesId } from "@/domain/types";
 import { ALERT_TYPE_LABEL } from "@/logic/alertRules";
-import { RANGE_LABEL, activeFilterCount, type RangePreset } from "@/logic/filters";
+import { RANGE_LABEL, type RangePreset } from "@/logic/filters";
 import { TASK_KIND_LABEL } from "@/logic/labels";
 import { computeActivity, type Breakdown } from "@/logic/metrics";
 import type { LiveStatus, Snapshot } from "@/logic/status";
 import { fmtAgo, fmtTime } from "@/logic/time";
 import { useDemo } from "@/state/DemoProvider";
-import { FilterMenu } from "@/components/filters/FilterMenu";
 import { Donut, SERIES, StackedColumns } from "@/components/charts/Charts";
 import { HabitatMap, type MapMarker } from "@/components/map/HabitatMap";
 import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
@@ -48,7 +45,6 @@ const STATUS_GROUP: Record<LiveStatus, StatusGroup> = {
   offline: "no_recent",
   no_data: "no_recent",
 };
-const STATUS_GROUP_LABEL: Record<StatusGroup, string> = { water: "En agua", land: "En tierra", no_recent: "Sin ubicación reciente" };
 
 type Category = "location" | "device" | "care";
 const CATEGORY_LABEL: Record<Category, string> = { location: "Ubicación", device: "Dispositivo", care: "Cuidado" };
@@ -57,17 +53,13 @@ const RANGES: RangePreset[] = ["today", "24h", "7d", "14d"];
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
 export function OverviewView() {
-  const { dataset, visible, snapshots, teamOf, alerts, tasks, range, filters, setFilters, clearFilters, now } = useDemo();
-  const [statusFilter, setStatusFilter] = useState<StatusGroup[]>([]);
+  const { dataset, visible, snapshots, teamOf, alerts, tasks, range, filters, setFilters, now } = useDemo();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoneId, setZoneId] = useState<string | null>(null);
   const [tab, setTab] = useState<Category | "all">("all");
 
-  // Ejemplares que pasan los filtros globales y el de estado actual.
-  const shown = useMemo(
-    () => visible.map((p) => snapshots.get(p.id)!).filter((s) => !statusFilter.length || statusFilter.includes(STATUS_GROUP[s.status])),
-    [visible, snapshots, statusFilter],
-  );
+  // Ejemplares que pasan los filtros globales.
+  const shown = useMemo(() => visible.map((p) => snapshots.get(p.id)!), [visible, snapshots]);
   const ids = useMemo(() => shown.map((s) => s.penguin.id), [shown]);
   const idSet = useMemo(() => new Set(ids), [ids]);
   const zoneSet = useMemo(() => new Set(filters.zones), [filters.zones]);
@@ -158,8 +150,6 @@ export function OverviewView() {
   const selected = selectedId && idSet.has(selectedId) ? snapshots.get(selectedId)! : null;
   const zone = zoneId ? ZONE_BY_ID[zoneId] : null;
   const fullMapHref = selected ? `/map?penguin=${selected.penguin.id}` : zone ? `/map?zone=${zone.id}` : "/map";
-  const nFilters = activeFilterCount(filters) + statusFilter.length;
-
   const kpis: { label: string; value: number; share?: number; icon: LucideIcon; color: string; href: string }[] = [
     { label: "Pingüinos registrados", value: total, icon: Bird, color: "var(--ice)", href: "/penguins" },
     { label: "En agua", value: inWater, share: pct(inWater, total), icon: Droplets, color: SERIES.water, href: "/map" },
@@ -222,50 +212,13 @@ export function OverviewView() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <FilterMenu<SpeciesId>
-                label="Especie"
-                allLabel="Todas"
-                value={filters.species}
-                onChange={(v) => setFilters({ species: v })}
-                options={SPECIES.map((s) => ({ value: s.id, label: s.nameEs.replace("Pingüino ", ""), color: s.color }))}
-              />
-              <FilterMenu
-                label="Equipo"
-                value={filters.teams}
-                onChange={(v) => setFilters({ teams: v })}
-                options={dataset.teams.map((t) => ({ value: t.id, label: t.name, color: t.color }))}
-              />
-              <FilterMenu
-                label="Zona"
-                allLabel="Todas las zonas"
-                value={filters.zones}
-                onChange={(v) => setFilters({ zones: v })}
-                options={PENGUIN_ZONES.map((z) => ({ value: z.id, label: z.name }))}
-              />
-              <FilterMenu<StatusGroup>
-                label="Estado"
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={(Object.keys(STATUS_GROUP_LABEL) as StatusGroup[]).map((g) => ({ value: g, label: STATUS_GROUP_LABEL[g] }))}
-              />
-              {nFilters > 0 && (
-                <button
-                  onClick={() => {
-                    clearFilters();
-                    setStatusFilter([]);
-                  }}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs text-muted hover:bg-white/5 hover:text-ink"
-                >
-                  <FilterX size={14} /> Limpiar ({nFilters})
-                </button>
-              )}
-              <Link href={fullMapHref} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-semibold text-[#032a2a] hover:bg-[#5fe6d9]">
+              <Link href={fullMapHref} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-semibold text-white hover:bg-[#0b8178]">
                 <MapPinned size={14} /> Abrir mapa completo
               </Link>
             </div>
           </header>
 
-          <div className="relative h-[clamp(340px,calc(100vh-290px),700px)] w-full border-y border-line bg-[#0e2f33]">
+          <div className="relative h-[clamp(340px,calc(100vh-290px),700px)] w-full border-y border-line bg-[#ece2cd]">
             <HabitatMap
               markers={markers}
               selectedId={selected?.penguin.id ?? null}
@@ -281,6 +234,7 @@ export function OverviewView() {
               }}
               zoneCounts={zoneCounts}
               labelScale={1.35}
+              live
               penguinMarkers={filters.teams.length > 0}
               layers={{ zones: true, labels: true, landmarks: false, markers: true, lastKnown: true, restricted: true, trail: false }}
             />
@@ -293,12 +247,12 @@ export function OverviewView() {
                   {zoneCounts.get(zone.id) ?? 0} ejemplares con su última ubicación aquí · {dataset.teams.filter((t) => t.zoneIds.includes(zone.id)).map((t) => t.name).join(", ") || "sin equipo asignado"}
                 </p>
                 <div className="mt-2.5 flex gap-1.5">
-                  <Link href={`/map?zone=${zone.id}`} className="inline-flex h-7 items-center gap-1 rounded-lg bg-accent px-2.5 text-[11px] font-semibold text-[#032a2a]">
+                  <Link href={`/map?zone=${zone.id}`} className="inline-flex h-7 items-center gap-1 rounded-lg bg-accent px-2.5 text-[11px] font-semibold text-white">
                     Abrir en Habitat Map <ArrowUpRight size={12} />
                   </Link>
                   <button
                     onClick={() => setFilters({ zones: filters.zones.includes(zone.id) ? filters.zones.filter((x) => x !== zone.id) : [...filters.zones, zone.id] })}
-                    className="inline-flex h-7 items-center rounded-lg border border-line-strong px-2.5 text-[11px] text-ink hover:bg-white/5"
+                    className="inline-flex h-7 items-center rounded-lg border border-line-strong px-2.5 text-[11px] text-ink hover:bg-ink/5"
                   >
                     {filters.zones.includes(zone.id) ? "Quitar filtro" : "Filtrar por zona"}
                   </button>
@@ -334,7 +288,7 @@ export function OverviewView() {
                     <button
                       onClick={() => setFilters({ species: on ? filters.species.filter((x) => x !== s.id) : [...filters.species, s.id] })}
                       title={on ? "Quitar filtro" : "Filtrar por especie"}
-                      className={cx("flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1 text-left transition hover:bg-white/[0.03]", on && "bg-white/[0.05]")}
+                      className={cx("flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1 text-left transition hover:bg-ink/[0.03]", on && "bg-ink/[0.05]")}
                     >
                       <PenguinIllustration speciesId={s.id} size={30} />
                       <div className="min-w-0 flex-1">
@@ -343,7 +297,7 @@ export function OverviewView() {
                           <span className="num w-7 text-right text-sm font-semibold">{n}</span>
                           <span className="num w-9 text-right text-[11px] text-faint">{pct(n, total)}%</span>
                         </div>
-                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
                           <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct(n, total)}%`, background: s.color }} />
                         </div>
                       </div>
@@ -369,7 +323,7 @@ export function OverviewView() {
                         <span className="min-w-0 flex-1 truncate text-[13px]">{t.name}</span>
                         <span className="num text-[11px] text-faint">{pct(n, total)}%</span>
                       </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
                         <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct(n, total)}%`, background: t.color }} />
                       </div>
                       <p className="mt-0.5 text-[11px] text-muted">
@@ -403,10 +357,10 @@ export function OverviewView() {
                   <Link
                     href={`/map?zone=${z.id}`}
                     title="Abrir la zona en Habitat Map"
-                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_36px_40px] items-center gap-x-3 rounded-md py-1 text-[12px] hover:bg-white/[0.03]"
+                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_36px_40px] items-center gap-x-3 rounded-md py-1 text-[12px] hover:bg-ink/[0.03]"
                   >
                     <span className="truncate">{z.name}</span>
-                    <span className="h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+                    <span className="h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
                       <span className="block h-full rounded-full" style={{ width: `${pct(n, Math.max(1, ...zoneCounts.values()))}%`, background: zoneColor(z.id) }} />
                     </span>
                     <span className="num text-right">{n}</span>
@@ -527,7 +481,7 @@ function LegendMark({ color, label, ring, dashed }: { color: string; label: stri
     <span className="inline-flex items-center gap-1.5">
       <span
         className="h-2.5 w-2.5 rounded-full"
-        style={dashed ? { border: `1.5px dashed ${color}` } : ring ? { background: "#9fb3c8", boxShadow: `0 0 0 2px #03101c, 0 0 0 3px ${color}` } : { background: color }}
+        style={dashed ? { border: `1.5px dashed ${color}` } : ring ? { background: "#9fb3c8", boxShadow: `0 0 0 2px var(--panel-solid), 0 0 0 3px ${color}` } : { background: color }}
       />
       {label}
     </span>
@@ -537,7 +491,7 @@ function LegendMark({ color, label, ring, dashed }: { color: string; label: stri
 function MapCard({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   return (
     <div className="panel absolute left-3 top-3 z-10 w-[min(320px,calc(100%-24px))] p-3 shadow-2xl">
-      <button onClick={onClose} aria-label="Cerrar" className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-md text-muted hover:bg-white/5 hover:text-ink">
+      <button onClick={onClose} aria-label="Cerrar" className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-md text-muted hover:bg-ink/5 hover:text-ink">
         <X size={13} />
       </button>
       {children}
@@ -568,10 +522,10 @@ function PenguinCard({ s, team, now, onClose }: { s: Snapshot; team: string; now
         <dd className="truncate text-right">{team}</dd>
       </dl>
       <div className="mt-2.5 flex gap-1.5">
-        <Link href={`/penguins/${s.penguin.id}`} className="inline-flex h-7 items-center gap-1 rounded-lg bg-accent px-2.5 text-[11px] font-semibold text-[#032a2a]">
+        <Link href={`/penguins/${s.penguin.id}`} className="inline-flex h-7 items-center gap-1 rounded-lg bg-accent px-2.5 text-[11px] font-semibold text-white">
           Ver ficha <ArrowUpRight size={12} />
         </Link>
-        <Link href={`/map?penguin=${s.penguin.id}`} className="inline-flex h-7 items-center gap-1 rounded-lg border border-line-strong px-2.5 text-[11px] text-ink hover:bg-white/5">
+        <Link href={`/map?penguin=${s.penguin.id}`} className="inline-flex h-7 items-center gap-1 rounded-lg border border-line-strong px-2.5 text-[11px] text-ink hover:bg-ink/5">
           <ExternalLink size={11} /> Recorrido en el mapa
         </Link>
       </div>
@@ -611,7 +565,7 @@ function ActivityPanel({ agg, prev, daily, rangeLabel, zonesFiltered }: {
                 thickness={9}
                 parts={[
                   { value: v, color: r.color, label: r.label },
-                  { value: Math.max(0, 100 - v), color: "rgba(255,255,255,0.04)", label: "Resto" },
+                  { value: Math.max(0, 100 - v), color: "rgba(11,36,64,0.04)", label: "Resto" },
                 ]}
                 center={<span className="num text-[17px] font-semibold">{Math.round(v)}%</span>}
               />

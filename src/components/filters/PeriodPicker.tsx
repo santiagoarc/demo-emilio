@@ -18,7 +18,7 @@ export function DayPicker() {
   const { filters, setFilters, dataset, now } = useDemo();
   const single = filters.range === "custom" && filters.customFrom && filters.customFrom === filters.customTo ? filters.customFrom : "";
   return (
-    <label className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-line bg-black/20 px-2.5 text-xs text-muted" title="Consultar un día concreto">
+    <label className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-line bg-ink/[0.05] px-2.5 text-xs text-muted" title="Consultar un día concreto">
       Fecha
       <input
         type="date"
@@ -40,7 +40,7 @@ export function PeriodPicker() {
   const { filters, setFilters, config } = useDemo();
   const value = filters.range;
   return (
-    <div className="inline-flex rounded-xl border border-line bg-black/20 p-0.5">
+    <div className="inline-flex rounded-xl border border-line bg-ink/[0.05] p-0.5">
       {OPTIONS.map((o) => {
         const days = o.value === "30d" ? 30 : o.value === "14d" ? 14 : o.value === "7d" ? 7 : 1;
         const unavailable = days > config.historyDays;

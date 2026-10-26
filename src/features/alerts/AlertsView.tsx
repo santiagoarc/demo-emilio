@@ -169,7 +169,7 @@ function AlertsTab({ onOpen }: { onOpen: (id: string) => void }) {
           {rows.map((a) => {
             const t = dataset.teams.find((x) => x.id === a.teamId);
             return (
-              <li key={a.id} className="group flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition hover:bg-white/[0.02]">
+              <li key={a.id} className="group flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition hover:bg-ink/[0.02]">
                 <Badge tone={PRIORITY_TONE[a.priority]} className="w-14 justify-center">{PRIORITY_LABEL[a.priority]}</Badge>
                 <button onClick={() => onOpen(a.id)} className="min-w-[240px] flex-1 text-left">
                   <p className="text-sm font-medium">
@@ -263,14 +263,14 @@ function TasksTab({ onOpen }: { onOpen: (id: string) => void }) {
       ) : (
         groups.map((g) => (
           <div key={g.label}>
-            <p className={cx("eyebrow border-b border-line bg-white/[0.015] px-4 py-2", g.label === "Vencidas" && "!text-danger")}>
+            <p className={cx("eyebrow border-b border-line bg-ink/[0.015] px-4 py-2", g.label === "Vencidas" && "!text-danger")}>
               {g.label} · {g.items.length}
             </p>
             <ul className="divide-y divide-line">
               {g.items.map((t) => {
                 const team = dataset.teams.find((x) => x.id === t.teamId);
                 return (
-                  <li key={t.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 hover:bg-white/[0.02]">
+                  <li key={t.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 hover:bg-ink/[0.02]">
                     <button onClick={() => onOpen(t.id)} className="min-w-[240px] flex-1 text-left">
                       <p className="text-sm font-medium">
                         {t.title}
@@ -343,7 +343,7 @@ function AlertDetail({ id, onTask }: { id: string; onTask: (taskId: string) => v
         <p className="mt-2 text-[11px] text-faint">Generada {fmtDateTime(a.createdAt, now)} · {fmtAgo(a.createdAt, now)}</p>
       </div>
 
-      <div className="rounded-xl border border-line bg-white/[0.02] p-3">
+      <div className="rounded-xl border border-line bg-ink/[0.02] p-3">
         <p className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-muted">
           <ScrollText size={12} /> Regla que la generó
         </p>
@@ -373,7 +373,7 @@ function AlertDetail({ id, onTask }: { id: string; onTask: (taskId: string) => v
       <div>
         <p className="eyebrow mb-2">Tarea relacionada</p>
         {linkedTask ? (
-          <button onClick={() => onTask(linkedTask.id)} className="flex w-full items-center justify-between rounded-xl border border-line px-3 py-2 text-left text-sm hover:bg-white/[0.03]">
+          <button onClick={() => onTask(linkedTask.id)} className="flex w-full items-center justify-between rounded-xl border border-line px-3 py-2 text-left text-sm hover:bg-ink/[0.03]">
             <span>{linkedTask.title} <span className="text-[11px] text-faint">· {linkedTask.id}</span></span>
             <Badge tone={linkedTask.status === "done" ? "ok" : "info"}>{TASK_STATUS_LABEL[linkedTask.status]}</Badge>
           </button>

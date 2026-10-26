@@ -84,20 +84,16 @@ function useTableState(speciesId: string) {
     alerts: list("al") as AlertFilter[],
     sort: (params.get("sort") as SortKey) || "id",
     dir: (params.get("dir") === "desc" ? "desc" : "asc") as "asc" | "desc",
-    page: Math.max(1, Number(params.get("page")) || 1),
-    per: Number(params.get("per")) || 10,
     sel: params.get("sel"),
   };
 
-  const set = (patch: Partial<Record<"q" | "team" | "zone" | "st" | "act" | "al" | "sort" | "dir" | "page" | "per" | "sel", string | string[] | number | null>>) => {
+  const set = (patch: Partial<Record<"q" | "team" | "zone" | "st" | "act" | "al" | "sort" | "dir" | "sel", string | string[] | number | null>>) => {
     const next = new URLSearchParams(params.toString());
     for (const [k, v] of Object.entries(patch)) {
       const s = Array.isArray(v) ? v.join(",") : v == null ? "" : String(v);
       if (s) next.set(k, s);
       else next.delete(k);
     }
-    // Cambiar un filtro regresa a la primera página.
-    if (!("page" in patch) && !("sel" in patch)) next.delete("page");
     const qs = next.toString();
     try {
       sessionStorage.setItem(storeKey, qs);
@@ -225,9 +221,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
     return [...m.entries()].sort((a, b) => b[1].n - a[1].n);
   }, [rowsAll, allIds, tasks, alerts]);
 
-  const pages = Math.max(1, Math.ceil(filtered.length / t.per));
-  const page = Math.min(t.page, pages);
-  const pageRows = filtered.slice((page - 1) * t.per, page * t.per);
   const maxH = Math.max(1, ...filtered.map((r) => Math.max(r.b?.water ?? 0, r.b?.land ?? 0)));
 
   const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -396,10 +389,10 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                 const on = t.zones.includes(z);
                 const pctv = Math.round((e.n / rowsAll.length) * 100);
                 return (
-                  <li key={z} className={cx("group flex items-center gap-2 rounded-lg px-2 py-1.5", on ? "bg-accent/10" : "hover:bg-white/[0.03]")}>
+                  <li key={z} className={cx("group flex items-center gap-2 rounded-lg px-2 py-1.5", on ? "bg-accent/10" : "hover:bg-ink/[0.03]")}>
                     <button onClick={() => t.set({ zone: toggle(t.zones, z) })} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                       <span className="w-[108px] shrink-0 truncate text-[13px]">{z === NO_ZONE ? "Sin ubicación" : ZONE_BY_ID[z].name}</span>
-                      <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.05]">
+                      <span className="h-2 flex-1 overflow-hidden rounded-full bg-ink/[0.05]">
                         <span className="block h-full rounded-full bg-accent-2" style={{ width: `${pctv}%`, opacity: t.zones.length && !on ? 0.35 : 1 }} />
                       </span>
                       <span className="num w-6 text-right text-[13px] font-semibold">{e.n}</span>
@@ -410,7 +403,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                       {e.stale > 0 && <span className="block text-warn">{e.stale} desact.</span>}
                     </span>
                     {z !== NO_ZONE ? (
-                      <Link href={`/map?zone=${z}&species=${speciesId}`} title="Abrir zona en Habitat Map" className="rounded-md p-1 text-faint hover:bg-white/5 hover:text-accent">
+                      <Link href={`/map?zone=${z}&species=${speciesId}`} title="Abrir zona en Habitat Map" className="rounded-md p-1 text-faint hover:bg-ink/5 hover:text-accent">
                         <MapPinned size={13} />
                       </Link>
                     ) : (
@@ -439,7 +432,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                         <span className="num text-sm font-semibold">{e.n}</span>
                         <span className="num w-9 text-right text-[11px] text-faint">{pctv}%</span>
                       </div>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
                         <div className="h-full rounded-full" style={{ width: `${pctv}%`, background: teamColor(k) }} />
                       </div>
                       {(e.tasks > 0 || e.alerts > 0) && (
@@ -481,7 +474,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 border-b border-line p-4">
-              <div className="flex h-10 min-w-[220px] flex-[2] items-center gap-2 rounded-xl border border-line bg-black/20 px-3">
+              <div className="flex h-10 min-w-[220px] flex-[2] items-center gap-2 rounded-xl border border-line bg-ink/[0.05] px-3">
                 <Search size={14} className="text-muted" />
                 <input
                   value={q}
@@ -545,12 +538,12 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                     <th className="w-10 px-4 py-2.5">
                       <input
                         type="checkbox"
-                        aria-label="Seleccionar página"
+                        aria-label="Seleccionar todos"
                         className="accent-[var(--accent)]"
-                        checked={pageRows.length > 0 && pageRows.every((r) => checked.has(r.id))}
+                        checked={filtered.length > 0 && filtered.every((r) => checked.has(r.id))}
                         onChange={(e) => {
                           const next = new Set(checked);
-                          for (const r of pageRows) {
+                          for (const r of filtered) {
                             if (e.target.checked) next.add(r.id);
                             else next.delete(r.id);
                           }
@@ -572,7 +565,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((r) => {
+                  {filtered.map((r) => {
                     const sel = t.sel === r.id;
                     const stale = r.snap.status === "stale" || r.snap.status === "offline";
                     const noData = !r.b || r.b.readings === 0;
@@ -580,7 +573,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                       <tr
                         key={r.id}
                         onClick={() => t.set({ sel: sel ? null : r.id })}
-                        className={cx("cursor-pointer border-b border-line/70 transition last:border-0", sel ? "bg-accent/[0.08]" : "hover:bg-white/[0.025]")}
+                        className={cx("cursor-pointer border-b border-line/70 transition last:border-0", sel ? "bg-accent/[0.08]" : "hover:bg-ink/[0.025]")}
                       >
                         <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                           <input
@@ -634,7 +627,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                           )}
                         </td>
                         <td className="pr-3">
-                          <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Abrir ficha" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-white/5 hover:text-ink">
+                          <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Abrir ficha" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-ink/5 hover:text-ink">
                             <ChevronRight size={15} />
                           </Link>
                         </td>
@@ -650,31 +643,8 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-xs text-muted">
-              <span>
-                Mostrando {filtered.length ? (page - 1) * t.per + 1 : 0}–{Math.min(page * t.per, filtered.length)} de {filtered.length} ejemplares
-              </span>
-              <div className="flex items-center gap-1">
-                <PageBtn disabled={page <= 1} onClick={() => t.set({ page: page - 1 })}>
-                  <ChevronLeft size={14} />
-                </PageBtn>
-                {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
-                  <PageBtn key={n} active={n === page} onClick={() => t.set({ page: n })}>
-                    {n}
-                  </PageBtn>
-                ))}
-                <PageBtn disabled={page >= pages} onClick={() => t.set({ page: page + 1 })}>
-                  <ChevronRight size={14} />
-                </PageBtn>
-              </div>
-              <label className="flex items-center gap-2">
-                Filas por página
-                <select value={t.per} onChange={(e) => t.set({ per: Number(e.target.value) })} className="h-8 rounded-lg border border-line-strong bg-panel-solid px-2 text-xs text-ink">
-                  {[10, 25, 50].map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </label>
+            <div className="border-t border-line px-4 py-3 text-xs text-muted">
+              {filtered.length} {filtered.length === 1 ? "ejemplar" : "ejemplares"}
             </div>
           </section>
 
@@ -701,7 +671,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
 function KpiCard({ icon, color, value, label, side, sideTone, note }: { icon: ReactNode; color?: string; value: number; label: string; side?: string; sideTone?: "ok"; note?: string }) {
   return (
     <div className="panel flex items-center gap-3 px-4 py-3.5">
-      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl" style={color ? { background: `${color}1f`, color } : { background: "rgba(255,255,255,0.04)" }}>
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl" style={color ? { background: `${color}1f`, color } : { background: "rgba(11,36,64,0.04)" }}>
         {icon}
       </span>
       <div className="min-w-0 flex-1">
@@ -709,7 +679,7 @@ function KpiCard({ icon, color, value, label, side, sideTone, note }: { icon: Re
         <p className="truncate text-xs text-muted">{label}</p>
         {note && <p className="text-[10px] text-faint">{note}</p>}
       </div>
-      {side && <span className={cx("num rounded-md px-1.5 py-0.5 text-xs font-semibold", sideTone === "ok" ? "bg-ok/12 text-ok" : "bg-white/[0.06] text-muted")}>{side}</span>}
+      {side && <span className={cx("num rounded-md px-1.5 py-0.5 text-xs font-semibold", sideTone === "ok" ? "bg-ok/12 text-ok" : "bg-ink/[0.06] text-muted")}>{side}</span>}
     </div>
   );
 }
@@ -732,7 +702,7 @@ function SortTh({ k, t, onSort, sub, children }: { k: SortKey; t: { sort: SortKe
 function HBar({ value, max, color }: { value: number; max: number; color: string }) {
   return (
     <span className="flex items-center gap-2">
-      <span className="h-2 w-16 overflow-hidden rounded-full bg-white/[0.05]">
+      <span className="h-2 w-16 overflow-hidden rounded-full bg-ink/[0.05]">
         <span className="block h-full rounded-full" style={{ width: `${(value / max) * 100}%`, background: color }} />
       </span>
       <span className="num w-12 text-xs">{fmtHours(value)}</span>
@@ -740,17 +710,3 @@ function HBar({ value, max, color }: { value: number; max: number; color: string
   );
 }
 
-function PageBtn({ children, active, disabled, onClick }: { children: ReactNode; active?: boolean; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button
-      disabled={disabled}
-      onClick={onClick}
-      className={cx(
-        "grid h-8 min-w-8 place-items-center rounded-lg px-2 text-xs transition disabled:opacity-30",
-        active ? "border border-accent/50 bg-accent/10 text-ink" : "text-muted hover:bg-white/5 hover:text-ink",
-      )}
-    >
-      {children}
-    </button>
-  );
-}

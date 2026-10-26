@@ -71,7 +71,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
                 <button
                   onMouseEnter={() => setIdx(i)}
                   onClick={() => go(p.id)}
-                  className={cx("flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left", i === idx && "bg-white/[0.05]")}
+                  className={cx("flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left", i === idx && "bg-ink/[0.05]")}
                 >
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: sp.color }} />
                   <span className="num w-20 font-mono text-[13px]">{p.id}</span>
