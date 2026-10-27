@@ -3,26 +3,22 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowRight, BellRing, ChevronRight, ClipboardList, Gauge, MapPinned, Plus, Search, Users, Waves } from "lucide-react";
+import { ChevronRight, MapPinned, Plus, Search, Users, Waves } from "lucide-react";
 import { ZONE_BY_ID } from "@/domain/habitat";
-import { ALERT_TYPE_LABEL } from "@/logic/alertRules";
-import { ALERT_STATUS_LABEL, PRIORITY_LABEL, PRIORITY_TONE, TASK_STATUS_LABEL } from "@/logic/labels";
 import { computeActivity } from "@/logic/metrics";
-import { ALERT_FAMILY, ALERT_FAMILY_LABEL, isOpenTask, taskCompliance, taskPriority } from "@/logic/tasks";
-import { fmtAgo, fmtDate, fmtDateTime, fmtHours, fmtWeekday } from "@/logic/time";
+import { fmtDate, fmtHours, fmtWeekday } from "@/logic/time";
 import { PERMISSIONS, useDemo } from "@/state/DemoProvider";
-import { Badge, Card, Segmented, SimulatedTag, cx } from "@/components/ui/primitives";
+import { Card, Segmented, SimulatedTag, cx } from "@/components/ui/primitives";
 import { Donut, SERIES, StackedColumns } from "@/components/charts/Charts";
 import { DayPicker, PeriodPicker } from "@/components/filters/PeriodPicker";
 import { ActiveBadge, Avatars, TeamFormDrawer, isActive, useTeamStats, type TeamStats } from "./shared";
 
-type SortKey = "name" | "penguins" | "tasks" | "alerts" | "status";
+type SortKey = "name" | "penguins" | "status";
 type StatusFilter = "all" | "active" | "inactive";
-const GAP_COLOR = "rgba(245,184,75,0.8)";
 
 export function TeamsView() {
   const router = useRouter();
-  const { dataset, snapshots, teamOf, tasks, alerts, range, now } = useDemo();
+  const { dataset, snapshots, teamOf, range } = useDemo();
   const stats = useTeamStats();
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<SortKey>("penguins");
@@ -31,13 +27,7 @@ export function TeamsView() {
 
   const total = dataset.penguins.length;
   const assignedIds = useMemo(() => dataset.penguins.filter((p) => dataset.teams.some((t) => t.id === teamOf(p.id))).map((p) => p.id), [dataset, teamOf]);
-  const recent = assignedIds.filter((id) => {
-    const s = snapshots.get(id)!;
-    return s.recent && s.status !== "offline";
-  }).length;
-  const openTasks = tasks.filter(isOpenTask);
-  const openAlerts = alerts.filter((a) => a.status !== "resolved");
-  const compliance = taskCompliance(tasks, range.from, range.to, now);
+  const inWater = assignedIds.filter((id) => snapshots.get(id)!.status === "water").length;
   const activeCount = dataset.teams.filter(isActive).length;
 
   const cards = useMemo(() => {
@@ -50,8 +40,6 @@ export function TeamsView() {
     const by: Record<SortKey, (a: TeamStats, b: TeamStats) => number> = {
       name: (a, b) => a.team.name.localeCompare(b.team.name),
       penguins: (a, b) => b.penguinIds.length - a.penguinIds.length,
-      tasks: (a, b) => b.openTasks - a.openTasks,
-      alerts: (a, b) => b.openAlerts - a.openAlerts,
       status: (a, b) => Number(!isActive(a.team)) - Number(!isActive(b.team)),
     };
     return [...list].sort((a, b) => by[sort](a, b) || a.team.name.localeCompare(b.team.name));
@@ -71,31 +59,6 @@ export function TeamsView() {
   const span = range.to - range.from;
   const byHour = span <= 26 * 3_600_000;
 
-  const upcoming = [...openTasks]
-    .sort((a, b) => {
-      const order = { high: 0, medium: 1, low: 2 };
-      return order[taskPriority(a, now)] - order[taskPriority(b, now)] || a.dueAt - b.dueAt;
-    })
-    .slice(0, 6);
-  const recentAlerts = [...openAlerts]
-    .sort((a, b) => {
-      const order = { high: 0, medium: 1, low: 2 };
-      return order[a.priority] - order[b.priority] || b.createdAt - a.createdAt;
-    })
-    .slice(0, 6);
-  const teamById = (id: string) => dataset.teams.find((t) => t.id === id);
-  const alertTarget = (a: (typeof alerts)[number]) => {
-    if (a.penguinId) return penguinLabel(a.penguinId);
-    const t = a.taskId ? tasks.find((x) => x.id === a.taskId) : undefined;
-    if (t?.penguinId) return penguinLabel(t.penguinId);
-    if (t?.zoneId) return ZONE_BY_ID[t.zoneId]?.name ?? "—";
-    return t ? t.title : "—";
-  };
-  function penguinLabel(id: string) {
-    const p = dataset.penguins.find((x) => x.id === id);
-    return p?.name ? `${id} · ${p.name}` : id;
-  }
-
   return (
     <div className="pb-10">
       {/* Encabezado */}
@@ -103,7 +66,7 @@ export function TeamsView() {
         <div className="min-w-0">
           <p className="eyebrow mb-1">Care Teams · SeaWorld Penguin Tracking & Care</p>
           <h1 className="text-[28px] font-semibold tracking-tight">Equipos de cuidado</h1>
-          <p className="mt-1 text-sm text-muted">Gestión de equipos, pingüinos asignados, tareas y desempeño operativo.</p>
+          <p className="mt-1 text-sm text-muted">Gestión de equipos, pingüinos asignados y actividad registrada.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPicker />
@@ -118,19 +81,10 @@ export function TeamsView() {
 
       <div className="space-y-5 px-6 lg:px-8">
         {/* Indicadores */}
-        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-3">
           <Kpi icon={Users} color="#a78bfa" value={String(dataset.teams.length)} label="Equipos de cuidado" sub={`${activeCount} activos · ${dataset.teams.length - activeCount} inactivos`} />
           <Kpi icon={Users} color="#5cb8ff" value={String(assignedIds.length)} label="Pingüinos asignados" sub={`${Math.round((assignedIds.length / Math.max(1, total)) * 100)}% del total · un equipo por ejemplar`} />
-          <Kpi icon={Waves} color="#2fd8c8" value={`${Math.round((recent / Math.max(1, assignedIds.length)) * 100)}%`} label="Con ubicación reciente" sub={`${recent} de ${assignedIds.length} · asignación actual`} />
-          <Kpi icon={ClipboardList} color="#f5b84b" value={String(openTasks.length)} label="Tareas pendientes" sub={`${openTasks.filter((t) => t.dueAt < now).length} vencidas`} subTone="warn" />
-          <Kpi icon={BellRing} color="#ff6b6b" value={String(openAlerts.length)} label="Alertas activas" sub={`${openAlerts.filter((a) => a.priority === "high").length} de prioridad alta`} subTone="danger" />
-          <Kpi
-            icon={Gauge}
-            color="#3ddc97"
-            value={compliance.pct === null ? "Sin datos" : `${compliance.pct}%`}
-            label="Cumplimiento de tareas"
-            sub={compliance.total ? `${compliance.done} de ${compliance.total} con vencimiento en el periodo` : "Sin tareas que vencieran en el periodo"}
-          />
+          <Kpi icon={Waves} color="#2fd8c8" value={`${Math.round((inWater / Math.max(1, assignedIds.length)) * 100)}%`} label="En agua ahora" sub={`${inWater} de ${assignedIds.length} · asignación actual`} />
         </div>
 
         {/* Equipos */}
@@ -160,8 +114,6 @@ export function TeamsView() {
                 <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="bg-transparent text-xs text-ink outline-none">
                   <option value="penguins">Pingüinos asignados</option>
                   <option value="name">Nombre</option>
-                  <option value="tasks">Tareas pendientes</option>
-                  <option value="alerts">Alertas</option>
                   <option value="status">Estado</option>
                 </select>
               </label>
@@ -237,102 +189,20 @@ export function TeamsView() {
               series={[
                 { key: "water", color: SERIES.water, label: "Agua" },
                 { key: "land", color: SERIES.land, label: "Tierra" },
-                { key: "gap", color: GAP_COLOR, label: "Sin lectura" },
               ]}
               data={
                 byHour
-                  ? agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land, gap: h.noFix + h.noComm } }))
-                  : agg.daily.map((d) => ({ label: fmtDate(d.day).split(" ")[0], tooltip: fmtWeekday(d.day), values: { water: d.water, land: d.land, gap: d.noFix + d.noComm } }))
+                  ? agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))
+                  : agg.daily.map((d) => ({ label: fmtDate(d.day).split(" ")[0], tooltip: fmtWeekday(d.day), values: { water: d.water, land: d.land } }))
               }
             />
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
               <Dot color={SERIES.water}>Agua</Dot>
               <Dot color={SERIES.land}>Tierra</Dot>
-              <Dot color={GAP_COLOR}>Sin lectura (no es inactividad)</Dot>
             </div>
           </Card>
         </div>
 
-        {/* Tareas y alertas */}
-        <div className="grid gap-5 xl:grid-cols-2">
-          <Card
-            title="Tareas próximas"
-            subtitle="Todos los equipos · prioridad según vencimiento"
-            action={<Link href="/alerts?tab=tasks" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">Ver todas <ArrowRight size={12} /></Link>}
-          >
-            <div className="scroll-thin overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] text-muted">
-                    <th className="pb-2 font-medium">Prioridad</th>
-                    <th className="pb-2 font-medium">Tarea</th>
-                    <th className="pb-2 font-medium">Equipo</th>
-                    <th className="pb-2 font-medium">Pingüino o zona</th>
-                    <th className="pb-2 font-medium">Vence</th>
-                    <th className="pb-2 font-medium">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {upcoming.map((t) => {
-                    const pr = taskPriority(t, now);
-                    return (
-                      <tr key={t.id} onClick={() => router.push(`/alerts?tab=tasks&task=${t.id}`)} className="cursor-pointer border-t border-line/70 hover:bg-ink/[0.03]">
-                        <td className="py-2"><Badge tone={PRIORITY_TONE[pr]}>{PRIORITY_LABEL[pr]}</Badge></td>
-                        <td className="max-w-[200px] truncate py-2 pr-2">{t.title}</td>
-                        <td className="py-2 pr-2 text-xs text-muted">{teamById(t.teamId)?.name ?? "Sin asignar"}</td>
-                        <td className="py-2 pr-2 text-xs text-muted">{t.penguinId ? penguinLabel(t.penguinId) : t.zoneId ? ZONE_BY_ID[t.zoneId]?.name : "—"}</td>
-                        <td className={cx("whitespace-nowrap py-2 pr-2 text-xs", t.dueAt < now ? "text-danger" : "text-muted")}>{fmtDateTime(t.dueAt, now)}</td>
-                        <td className="py-2"><Badge tone={t.status === "in_progress" ? "info" : "warn"}>{TASK_STATUS_LABEL[t.status]}</Badge></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {upcoming.length === 0 && <p className="py-4 text-center text-xs text-muted">Sin tareas pendientes.</p>}
-            </div>
-          </Card>
-
-          <Card
-            title="Alertas recientes"
-            subtitle="Activas, primero las de prioridad alta"
-            action={<Link href="/alerts" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">Ver todas <ArrowRight size={12} /></Link>}
-          >
-            <div className="scroll-thin overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] text-muted">
-                    <th className="pb-2 font-medium">Pingüino o zona</th>
-                    <th className="pb-2 font-medium">Equipo</th>
-                    <th className="pb-2 font-medium">Tipo</th>
-                    <th className="pb-2 font-medium">Tiempo</th>
-                    <th className="pb-2 font-medium">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentAlerts.map((a) => (
-                    <tr key={a.id} onClick={() => router.push(`/alerts?alert=${a.id}`)} className="cursor-pointer border-t border-line/70 hover:bg-ink/[0.03]">
-                      <td className="py-2 pr-2">
-                        <span className="inline-flex items-center gap-2">
-                          <span className={cx("h-2 w-2 rounded-full", a.priority === "high" ? "bg-danger" : a.priority === "medium" ? "bg-warn" : "bg-faint")} />
-                          <span className="text-xs">{alertTarget(a)}</span>
-                        </span>
-                      </td>
-                      <td className="py-2 pr-2 text-xs text-muted">{teamById(a.teamId)?.name ?? "Sin asignar"}</td>
-                      <td className="py-2 pr-2 text-xs">
-                        <span className="block">{ALERT_FAMILY_LABEL[ALERT_FAMILY[a.type]]}</span>
-                        <span className="block text-[10px] text-faint">{ALERT_TYPE_LABEL[a.type]}</span>
-                      </td>
-                      <td className="whitespace-nowrap py-2 pr-2 text-xs text-muted">{fmtAgo(a.createdAt, now)}</td>
-                      <td className="py-2"><Badge tone={a.status === "following" ? "info" : "warn"}>{ALERT_STATUS_LABEL[a.status]}</Badge></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {recentAlerts.length === 0 && <p className="py-4 text-center text-xs text-muted">Sin alertas activas.</p>}
-            </div>
-            <p className="mt-2 text-[10px] text-faint">Las alertas salen de reglas configurables; no son diagnósticos veterinarios.</p>
-          </Card>
-        </div>
       </div>
 
       <TeamFormDrawer open={creating} onClose={() => setCreating(false)} onSaved={(id) => router.push(`/teams/${id}`)} />
@@ -386,11 +256,8 @@ function TeamCard({ x, total, onOpen }: { x: TeamStats; total: number; onOpen: (
         {team.zoneIds.length > 3 && ` +${team.zoneIds.length - 3}`}
       </p>
       <div className="mt-3 flex items-center gap-3 border-t border-line pt-3 text-xs">
-        <span className={cx("inline-flex items-center gap-1", x.openAlerts ? "text-danger" : "text-faint")}>
-          <BellRing size={13} /> {x.openAlerts} alertas
-        </span>
-        <span className={cx("inline-flex items-center gap-1", x.openTasks ? "text-warn" : "text-faint")}>
-          <ClipboardList size={13} /> {x.openTasks} tareas
+        <span className="inline-flex items-center gap-1 text-muted">
+          <Waves size={13} className="text-faint" /> {x.inWater} en agua ahora
         </span>
         <Link
           href={`/map?team=${team.id}`}
@@ -404,7 +271,7 @@ function TeamCard({ x, total, onOpen }: { x: TeamStats; total: number; onOpen: (
   );
 }
 
-function Kpi({ icon: Icon, color, value, label, sub, subTone }: { icon: typeof Users; color: string; value: string; label: string; sub?: string; subTone?: "warn" | "danger" }) {
+function Kpi({ icon: Icon, color, value, label, sub }: { icon: typeof Users; color: string; value: string; label: string; sub?: string }) {
   return (
     <div className="panel flex items-center gap-3 px-4 py-3.5">
       <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl" style={{ background: `${color}1f`, color }}>
@@ -413,7 +280,7 @@ function Kpi({ icon: Icon, color, value, label, sub, subTone }: { icon: typeof U
       <div className="min-w-0">
         <p className="num text-xl font-semibold leading-tight">{value}</p>
         <p className="truncate text-xs text-muted">{label}</p>
-        {sub && <p className={cx("truncate text-[10px]", subTone === "warn" ? "text-warn" : subTone === "danger" ? "text-danger" : "text-faint")} title={sub}>{sub}</p>}
+        {sub && <p className="truncate text-[10px] text-faint" title={sub}>{sub}</p>}
       </div>
     </div>
   );

@@ -11,37 +11,33 @@ import { fmtAgo } from "@/logic/time";
 import { useDemo } from "@/state/DemoProvider";
 import { PageHeader } from "@/components/shell/AppShell";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
-import { EmptyState, Select, cx } from "@/components/ui/primitives";
+import { EmptyState, Select } from "@/components/ui/primitives";
 import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 import { StatusPill } from "@/components/penguin/StatusPill";
 
 type SortKey = "id" | "updated" | "status";
+/** Estados que se ofrecen para filtrar y ordenar. */
+const SHOWN_STATUSES: LiveStatus[] = ["water", "land", "resting"];
 
 export function PenguinsView() {
-  const { dataset, visible, snapshots, teamOf, alerts, now } = useDemo();
+  const { dataset, visible, snapshots, teamOf, now } = useDemo();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<LiveStatus | "">("");
   const [sort, setSort] = useState<SortKey>("id");
   const router = useRouter();
-
-  const openAlerts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const a of alerts) if (a.penguinId && a.status !== "resolved") m.set(a.penguinId, (m.get(a.penguinId) ?? 0) + 1);
-    return m;
-  }, [alerts]);
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
     const list = visible
       .map((p) => ({ p, snap: snapshots.get(p.id)! }))
       .filter(({ p, snap }) => (!status || snap.status === status) && (!s || [p.id, p.name ?? "", p.deviceId].some((v) => v.toLowerCase().includes(s))));
-    const order: LiveStatus[] = ["offline", "stale", "no_data", "water", "land", "resting"];
+    const rank = (st: LiveStatus) => (SHOWN_STATUSES.includes(st) ? SHOWN_STATUSES.indexOf(st) : SHOWN_STATUSES.length);
     list.sort((a, b) =>
       sort === "id"
         ? a.p.id.localeCompare(b.p.id)
         : sort === "updated"
           ? (b.snap.reading?.timestamp ?? 0) - (a.snap.reading?.timestamp ?? 0)
-          : order.indexOf(a.snap.status) - order.indexOf(b.snap.status),
+          : rank(a.snap.status) - rank(b.snap.status),
     );
     return list;
   }, [visible, snapshots, q, status, sort]);
@@ -61,14 +57,14 @@ export function PenguinsView() {
             </div>
             <Select value={status} onChange={(e) => setStatus(e.target.value as LiveStatus | "")} aria-label="Estado">
               <option value="">Todos los estados</option>
-              {(Object.keys(STATUS_LABEL) as LiveStatus[]).map((s) => (
+              {SHOWN_STATUSES.map((s) => (
                 <option key={s} value={s}>{STATUS_LABEL[s]}</option>
               ))}
             </Select>
             <Select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Orden">
               <option value="id">Ordenar por ID</option>
               <option value="updated">Última actualización</option>
-              <option value="status">Atención primero</option>
+              <option value="status">Ordenar por estado</option>
             </Select>
             <span className="num ml-auto inline-flex items-center gap-1 text-xs text-muted">
               <ArrowDownUp size={12} /> {rows.length} ejemplares
@@ -87,7 +83,6 @@ export function PenguinsView() {
                     <th className="px-4 py-2.5 font-medium">Zona registrada</th>
                     <th className="px-4 py-2.5 font-medium">Actualización</th>
                     <th className="px-4 py-2.5 font-medium">Estado</th>
-                    <th className="px-4 py-2.5 font-medium">Alertas</th>
                     <th />
                   </tr>
                 </thead>
@@ -95,7 +90,6 @@ export function PenguinsView() {
                   {rows.slice(0, 250).map(({ p, snap }) => {
                     const sp = SPECIES_BY_ID[p.speciesId];
                     const team = dataset.teams.find((t) => t.id === teamOf(p.id))!;
-                    const lastKnown = snap.status === "stale" || snap.status === "offline";
                     return (
                       <tr
                         key={p.id}
@@ -124,9 +118,8 @@ export function PenguinsView() {
                           </span>
                         </td>
                         <td className="px-4 py-2 text-muted">{snap.reading ? ZONE_BY_ID[snap.reading.zoneId].name : "—"}</td>
-                        <td className={cx("num px-4 py-2 text-xs", lastKnown ? "text-warn" : "text-muted")}>{snap.reading ? fmtAgo(snap.reading.timestamp, now) : "—"}</td>
+                        <td className="num px-4 py-2 text-xs text-muted">{snap.reading ? fmtAgo(snap.reading.timestamp, now) : "—"}</td>
                         <td className="px-4 py-2"><StatusPill status={snap.status} compact /></td>
-                        <td className="num px-4 py-2 text-xs">{openAlerts.get(p.id) ? <span className="text-warn">{openAlerts.get(p.id)}</span> : <span className="text-faint">—</span>}</td>
                         <td className="px-4 py-2 text-right">
                           <Link href={`/penguins/${p.id}`} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
                             Ficha <ArrowUpRight size={12} />

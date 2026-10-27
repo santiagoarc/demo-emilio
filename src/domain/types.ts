@@ -150,58 +150,31 @@ export interface ActivityRecord {
   stationary: boolean;
 }
 
-export type TaskStatus = "pending" | "in_progress" | "done" | "cancelled";
-export type TaskKind =
-  | "routine_review"
-  | "device_check"
-  | "weighing"
-  | "zone_maintenance"
-  | "observation_followup";
+/** Motivo de un seguimiento especial de salud. */
+export type HealthReason = "injury" | "weight" | "molt" | "treatment" | "behavior" | "other";
 
-export interface HistoryEntry {
+export interface HealthCaseEntry {
+  id: string;
   at: number;
   by: string;
   text: string;
+  /** Peso registrado en esa revisión, si se pesó. */
+  weightKg?: number;
 }
 
-export interface CareTask {
+/** Caso de seguimiento: un pingüino que el equipo vigila por algo de salud en particular. */
+export interface HealthCase {
   id: string;
-  kind: TaskKind;
+  penguinId: string;
+  reason: HealthReason;
   title: string;
-  penguinId?: string;
-  teamId: string;
-  /** Integrante del equipo a cargo, si se asignó a una persona. */
-  assignee?: string;
-  zoneId?: string;
-  createdAt: number;
-  dueAt: number;
-  status: TaskStatus;
-  notes?: string;
-  history: HistoryEntry[];
-}
-
-export type AlertType =
-  | "stale_location"
-  | "device_offline"
-  | "care_review_pending"
-  | "task_overdue"
-  | "team_review_requested";
-
-export type AlertPriority = "high" | "medium" | "low";
-export type AlertStatus = "pending" | "following" | "resolved";
-
-export interface Alert {
-  id: string;
-  type: AlertType;
-  priority: AlertPriority;
-  penguinId?: string;
-  taskId?: string;
-  teamId: string;
-  createdAt: number;
-  description: string;
-  rule: string;
-  status: AlertStatus;
-  history: HistoryEntry[];
+  owner: string;
+  openedAt: number;
+  status: "open" | "closed";
+  closedAt?: number;
+  /** De la más reciente a la más antigua. */
+  entries: HealthCaseEntry[];
+  simulated: boolean;
 }
 
 export interface CareNote {
@@ -238,7 +211,4 @@ export interface Dataset {
   activity: Map<string, ActivityRecord[]>;
   notes: CareNote[];
   incidents: Incident[];
-  tasks: CareTask[];
-  /** Pingüinos que el equipo marcó para revisión (insumo de una regla de alerta). */
-  reviewFlags: { penguinId: string; at: number; by: string }[];
 }

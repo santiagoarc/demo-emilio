@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { Activity, BellRing, ChevronRight, List, MapPinned, Users } from "lucide-react";
+import { Activity, ChevronRight, List, MapPinned, Users } from "lucide-react";
 import { ZONE_BY_ID } from "@/domain/habitat";
 import { SPECIES } from "@/domain/species";
 import { computeActivity, perPenguinPerDay, sumBreakdowns } from "@/logic/metrics";
@@ -15,7 +15,7 @@ import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 import type { RangePreset } from "@/logic/filters";
 
 export function SpeciesView() {
-  const { dataset, snapshots, teamOf, filters, setFilters, range, alerts } = useDemo();
+  const { dataset, snapshots, teamOf, filters, setFilters, range } = useDemo();
 
   // Las tarjetas muestran las seis especies; respetan equipo y zona, no el filtro de especie.
   const base = useMemo(
@@ -29,12 +29,6 @@ export function SpeciesView() {
   );
   const agg = useMemo(() => computeActivity(dataset, base.map((p) => p.id), range.from, range.to), [dataset, base, range]);
 
-  const openAlertsBy = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const a of alerts) if (a.penguinId && a.status !== "resolved") m.set(a.penguinId, (m.get(a.penguinId) ?? 0) + 1);
-    return m;
-  }, [alerts]);
-
   const stats = SPECIES.map((s) => {
     const list = base.filter((p) => p.speciesId === s.id);
     const snaps = list.map((p) => snapshots.get(p.id)!);
@@ -46,19 +40,17 @@ export function SpeciesView() {
     return {
       s,
       total: list.length,
-      recent: snaps.filter((x) => x.recent && x.status !== "offline").length,
-      alerts: list.reduce((a, p) => a + (openAlertsBy.get(p.id) ?? 0), 0),
+      inWater: snaps.filter((x) => x.status === "water").length,
+      onLand: snaps.filter((x) => x.status === "land" || x.status === "resting").length,
       zones: [...zones.entries()].sort((a, b) => b[1] - a[1]),
       teams: [...teams.entries()].sort((a, b) => b[1] - a[1]),
       water: perPenguinPerDay(b.water, list.length, range.from, range.to),
       land: perPenguinPerDay(b.land, list.length, range.from, range.to),
-      gap: perPenguinPerDay(b.noFix + b.noComm, list.length, range.from, range.to),
     };
   });
 
   const total = stats.reduce((a, x) => a + x.total, 0);
-  const recent = stats.reduce((a, x) => a + x.recent, 0);
-  const withAlerts = stats.filter((x) => x.alerts > 0).length;
+  const inWater = stats.reduce((a, x) => a + x.inWater, 0);
   const teamsInvolved = new Set(base.map((p) => teamOf(p.id))).size;
 
   return (
@@ -82,10 +74,9 @@ export function SpeciesView() {
         }
       />
       <div className="space-y-5 px-6 lg:px-8">
-        <div className="panel grid divide-line sm:grid-cols-2 sm:divide-x xl:grid-cols-4">
+        <div className="panel grid divide-line sm:grid-cols-3 sm:divide-x">
           <Kpi icon={Users} color="#5cb8ff" value={total} label="Pingüinos registrados" />
-          <Kpi icon={Activity} color="#2fd8c8" value={recent} label="Con ubicación reciente" side={total ? `${Math.round((recent / total) * 100)}%` : "—"} sideHint="del total" />
-          <Kpi icon={BellRing} color="#ff6b6b" value={withAlerts} label="Especies con alertas" side={`de ${SPECIES.length}`} />
+          <Kpi icon={Activity} color="#2fd8c8" value={inWater} label="En agua ahora" side={total ? `${Math.round((inWater / total) * 100)}%` : "—"} sideHint="del total" />
           <Kpi icon={Users} color="#a78bfa" value={teamsInvolved} label="Equipos involucrados" side="en el cuidado" />
         </div>
 
@@ -114,8 +105,8 @@ export function SpeciesView() {
               </Link>
               <div className="grid grid-cols-3 divide-x divide-line border-b border-line">
                 <Mini label="Registrados" value={String(x.total)} />
-                <Mini label="Ubicación reciente" value={String(x.recent)} />
-                <Mini label="% reciente" value={x.total ? `${Math.round((x.recent / x.total) * 100)}%` : "—"} />
+                <Mini label="En agua" value={String(x.inWater)} />
+                <Mini label="En tierra" value={String(x.onLand)} />
               </div>
               <div className="space-y-3.5 p-4">
                 <div>
@@ -124,13 +115,11 @@ export function SpeciesView() {
                     parts={[
                       { value: x.water, color: SERIES.water, label: "Agua" },
                       { value: x.land, color: SERIES.land, label: "Tierra" },
-                      { value: x.gap, color: "rgba(245,184,75,0.75)", label: "Sin lectura" },
                     ]}
                   />
                   <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
                     <Dot color={SERIES.water}>Agua <b className="num text-ink">{fmtHours(x.water)}</b></Dot>
                     <Dot color={SERIES.land}>Tierra <b className="num text-ink">{fmtHours(x.land)}</b></Dot>
-                    <Dot color="rgba(245,184,75,0.75)">Sin lectura <b className="num text-ink">{fmtHours(x.gap)}</b></Dot>
                   </div>
                 </div>
                 <div>

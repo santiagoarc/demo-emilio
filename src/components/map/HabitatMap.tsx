@@ -7,6 +7,7 @@ import type { HabitatZone, Medium, ReadingQuality } from "@/domain/types";
 import { bbox, centroid, pointInPolygon, smoothPath } from "@/logic/geometry";
 import type { LiveStatus } from "@/logic/status";
 import { tessellateZones } from "@/logic/tessellation";
+import { hideTip, showTip } from "@/components/charts/Charts";
 
 export interface MapMarker {
   id: string;
@@ -25,19 +26,52 @@ export interface TrailPoint {
   t: number;
   quality: ReadingQuality;
   medium: Medium;
+  /** Zona de la lectura: las lecturas seguidas en la misma zona forman una parada. */
+  zoneId?: string;
 }
+
+interface TrailStop {
+  n: number;
+  x: number;
+  y: number;
+  from: number;
+  to: number;
+  zoneId?: string;
+  medium: Medium;
+  readings: number;
+}
+
+/** Agrupa lecturas consecutivas en la misma zona (o muy juntas, si no hay zona) en paradas numeradas. */
+function trailStops(trail: TrailPoint[]): TrailStop[] {
+  const stops: TrailStop[] = [];
+  for (const p of trail) {
+    const last = stops[stops.length - 1];
+    const same = last && (p.zoneId !== undefined ? p.zoneId === last.zoneId : Math.hypot(p.x - last.x, p.y - last.y) < 40);
+    if (same) {
+      last.to = p.t;
+      last.readings++;
+      // La parada se dibuja donde terminó de estar.
+      last.x = p.x;
+      last.y = p.y;
+    } else {
+      stops.push({ n: stops.length + 1, x: p.x, y: p.y, from: p.t, to: p.t, zoneId: p.zoneId, medium: p.medium, readings: 1 });
+    }
+  }
+  return stops;
+}
+
+const stopTime = new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 export interface MapLayers {
   zones: boolean;
   labels: boolean;
   landmarks: boolean;
   markers: boolean;
-  lastKnown: boolean;
   restricted: boolean;
   trail: boolean;
 }
 
-export const DEFAULT_LAYERS: MapLayers = { zones: true, labels: true, landmarks: true, markers: true, lastKnown: true, restricted: true, trail: true };
+export const DEFAULT_LAYERS: MapLayers = { zones: true, labels: true, landmarks: true, markers: true, restricted: true, trail: true };
 
 interface View {
   x: number;
@@ -70,7 +104,7 @@ export const MAP_BG = "#ece2cd";
 
 /**
  * Desplazamiento simulado alrededor de la última lectura: cada ejemplar en agua o
- * en tierra deriva sin salir de su zona. Los que reposan o no tienen señal se quedan quietos.
+ * en tierra deriva sin salir de su zona. Los que reposan se quedan quietos.
  */
 function useLiveDrift(markers: MapMarker[], live: boolean) {
   const [offsets, setOffsets] = useState<Map<string, [number, number]>>(() => new Map());
@@ -232,7 +266,14 @@ export function HabitatMap({
   }, []);
   const maxCount = Math.max(1, ...(zoneCounts ? [...zoneCounts.values()] : [1]));
   const selected = markers.find((m) => m.id === selectedId);
-  const ordered = useMemo(() => [...markers].sort((a, b) => Number(!a.dim) - Number(!b.dim)), [markers]);
+  // Atenuados abajo y el seleccionado hasta arriba.
+  const ordered = useMemo(
+    () => [...markers].sort((a, b) => Number(!a.dim) - Number(!b.dim) || Number(a.id === selectedId) - Number(b.id === selectedId)),
+    [markers, selectedId],
+  );
+  // Con un ejemplar seleccionado, los demás se ven borrosos y sus paradas se numeran.
+  const focusOn = !!selectedId && markers.some((m) => m.id === selectedId);
+  const stops = useMemo(() => (trail?.length ? trailStops(trail) : []), [trail]);
   const drift = useLiveDrift(markers, live);
 
   return (
@@ -318,6 +359,9 @@ export function HabitatMap({
           <clipPath id="habitat-clip">
             <rect x="20" y="20" width={HABITAT.width - 40} height={HABITAT.height - 40} rx="48" />
           </clipPath>
+          <filter id="blur-others" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" />
+          </filter>
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="6" />
           </filter>
@@ -412,35 +456,56 @@ export function HabitatMap({
           })}
 
         {layers.trail && trail && trail.length > 0 && (
-          <g pointerEvents="none">
-            <polyline
-              points={trail.map((p) => `${p.x},${p.y}`).join(" ")}
-              fill="none"
-              stroke="rgba(47,216,200,0.45)"
-              strokeWidth={1.6 * k}
-              strokeDasharray={`${5 * k} ${5 * k}`}
-            />
+          <g pointerEvents="none" strokeLinecap="round" strokeLinejoin="round">
+            {/* Contorno claro debajo de la línea para que resalte sobre agua y arena. */}
+            <polyline points={trail.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={8 * k} />
+            {/* Tramo por tramo: de lo más antiguo (claro) a lo más reciente (intenso). */}
+            {trail.slice(1).map((p, i) => {
+              const a = trail[i];
+              const f = (i + 1) / trail.length;
+              return <line key={p.t} x1={a.x} y1={a.y} x2={p.x} y2={p.y} stroke="#0b6f68" strokeOpacity={0.35 + f * 0.65} strokeWidth={(3 + f * 2.2) * k} />;
+            })}
+            {/* Flechas de dirección a mitad de algunos tramos. */}
+            {trail.slice(1).map((p, i) => {
+              const a = trail[i];
+              const len = Math.hypot(p.x - a.x, p.y - a.y);
+              if (len < 30 * k || i % 2) return null;
+              const ang = (Math.atan2(p.y - a.y, p.x - a.x) * 180) / Math.PI;
+              const s = 6 * k;
+              return (
+                <path
+                  key={`arr-${p.t}`}
+                  d={`M${-s} ${-s * 0.8} L${s} 0 L${-s} ${s * 0.8}`}
+                  transform={`translate(${(a.x + p.x) / 2},${(a.y + p.y) / 2}) rotate(${ang})`}
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth={2.2 * k}
+                />
+              );
+            })}
             {trail.map((p, i) => (
               <circle
                 key={p.t}
                 cx={p.x}
                 cy={p.y}
-                r={(2.2 + (i / trail.length) * 2.6) * k}
-                fill={p.medium === "water" ? "#4fb3ff" : "#cfe3f1"}
-                opacity={0.25 + (i / trail.length) * 0.75}
-                stroke="#03101c"
-                strokeWidth={0.8 * k}
+                r={(3.2 + (i / trail.length) * 2.8) * k}
+                fill={p.medium === "water" ? "#2b7fd0" : "#d4920f"}
+                opacity={0.55 + (i / trail.length) * 0.45}
+                stroke="#ffffff"
+                strokeWidth={1.4 * k}
               />
             ))}
+            {/* Punto de inicio del recorrido. */}
+            <circle cx={trail[0].x} cy={trail[0].y} r={7 * k} fill="none" stroke="#0b6f68" strokeWidth={2 * k} strokeDasharray={`${3 * k} ${2 * k}`} />
           </g>
         )}
 
         {layers.markers &&
           ordered.map((m) => {
-            const lastKnown = m.status === "stale" || m.status === "offline";
-            if (lastKnown && !layers.lastKnown) return null;
-            const r = (penguinMarkers ? 13 : 8) * Math.max(k, 0.4);
             const isSel = m.id === selectedId;
+            // El seleccionado siempre es pingüino; con un filtro o estado elegido, también los que coinciden.
+            const asPenguin = isSel || (penguinMarkers && !m.dim);
+            const r = (asPenguin ? 13 : 8) * Math.max(k, 0.4);
             const hv = hover === m.id;
             const [dx, dy] = drift.get(m.id) ?? [0, 0];
             return (
@@ -457,7 +522,8 @@ export function HabitatMap({
                       ? "transform 700ms cubic-bezier(0.33, 0, 0.2, 1)"
                       : undefined,
                 }}
-                opacity={m.dim ? 0.13 : 1}
+                opacity={m.dim ? 0.13 : focusOn && !isSel ? 0.35 : 1}
+                filter={focusOn && !isSel ? "url(#blur-others)" : undefined}
                 className={m.dim ? "" : "cursor-pointer"}
                 onPointerEnter={() => !m.dim && setHover(m.id)}
                 onPointerLeave={() => setHover(null)}
@@ -472,24 +538,15 @@ export function HabitatMap({
                   />
                 )}
                 {isSel && <circle r={r * 1.2} fill="none" stroke="var(--accent)" strokeWidth={2 * k} className="pulse-ring" />}
-                {lastKnown ? (
-                  <>
-                    <circle r={r} fill="rgba(3,16,28,0.85)" stroke={m.status === "offline" ? "#ff6b6b" : m.color} strokeWidth={2 * Math.max(k, 0.5)} strokeDasharray={`${3 * Math.max(k, 0.5)} ${2.5 * Math.max(k, 0.5)}`} />
-                    {penguinMarkers ? <PenguinGlyph s={r * 0.82} faded /> : <circle r={r * 0.35} fill={m.status === "offline" ? "#ff6b6b" : m.color} opacity={0.8} />}
-                  </>
-                ) : (
-                  <>
-                    {m.medium === "water" && <circle r={r * 1.55} fill="none" stroke="rgba(92,184,255,0.55)" strokeWidth={1.2 * Math.max(k, 0.5)} />}
-                    <circle r={r} fill={m.color} stroke="#03101c" strokeWidth={1.8 * Math.max(k, 0.5)} />
-                    {penguinMarkers && <PenguinGlyph s={r * 0.82} />}
-                    {m.status === "resting" &&
-                      (penguinMarkers ? (
-                        <circle cx={r * 0.72} cy={-r * 0.72} r={r * 0.26} fill="#03101c" stroke={m.color} strokeWidth={1.2 * Math.max(k, 0.5)} />
-                      ) : (
-                        <circle r={r * 0.32} fill="#03101c" opacity={0.6} />
-                      ))}
-                  </>
-                )}
+                {m.medium === "water" && <circle r={r * 1.55} fill="none" stroke="rgba(92,184,255,0.55)" strokeWidth={1.2 * Math.max(k, 0.5)} />}
+                <circle r={r} fill={m.color} stroke="#03101c" strokeWidth={1.8 * Math.max(k, 0.5)} />
+                {asPenguin && <PenguinGlyph s={r * 0.82} />}
+                {m.status === "resting" &&
+                  (asPenguin ? (
+                    <circle cx={r * 0.72} cy={-r * 0.72} r={r * 0.26} fill="#03101c" stroke={m.color} strokeWidth={1.2 * Math.max(k, 0.5)} />
+                  ) : (
+                    <circle r={r * 0.32} fill="#03101c" opacity={0.6} />
+                  ))}
                 {isSel && <circle r={r + 3 * k} fill="none" stroke="#e6f2fb" strokeWidth={2 * Math.max(k, 0.5)} />}
                 {(isSel || hv) && (
                   <g transform={`translate(0,${-r - 8 * Math.max(k, 0.5)})`} pointerEvents="none">
@@ -502,6 +559,41 @@ export function HabitatMap({
               </g>
             );
           })}
+
+        {/* Paradas numeradas del recorrido del seleccionado (1 = la más antigua). */}
+        {layers.trail && focusOn && stops.length > 1 && (
+          <g>
+            {stops.map((st) => {
+              const z = Math.max(k, 0.5);
+              const last = st.n === stops.length;
+              const mins = Math.round((st.to - st.from) / 60_000) + 30;
+              return (
+                <g
+                  key={st.n}
+                  transform={`translate(${st.x + 11 * z},${st.y - 11 * z})`}
+                  className="cursor-default"
+                  onMouseMove={(e) =>
+                    showTip(e, {
+                      title: `Parada ${st.n}${last ? " · ahora" : ""}`,
+                      rows: [
+                        { label: "Zona", value: st.zoneId ? (HABITAT.zones.find((zz) => zz.id === st.zoneId)?.name ?? st.zoneId) : "—" },
+                        { color: st.medium === "water" ? "#2b7fd0" : "#d4920f", label: st.medium === "water" ? "En agua" : "En tierra", value: `${stopTime.format(st.from)}–${stopTime.format(st.to)}` },
+                        { label: "Tiempo", value: mins >= 60 ? `${(mins / 60).toFixed(1)} h` : `${mins} min` },
+                      ],
+                      note: `${st.readings} ${st.readings === 1 ? "lectura" : "lecturas"}`,
+                    })
+                  }
+                  onMouseLeave={hideTip}
+                >
+                  <circle r={9 * z} fill={last ? "#0b6f68" : "#ffffff"} stroke="#0b6f68" strokeWidth={2 * z} />
+                  <text y={3.6 * z} textAnchor="middle" fontSize={10 * z} fontWeight={700} fill={last ? "#ffffff" : "#0b6f68"} fontFamily="var(--font-geist-sans)">
+                    {st.n}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        )}
       </svg>
 
       {interactive && showControls && (
@@ -603,9 +695,9 @@ function toSvg(svg: SVGSVGElement, clientX: number, clientY: number) {
 }
 
 /** Pingüino dibujado dentro del punto; `s` es su medio alto. */
-function PenguinGlyph({ s, faded }: { s: number; faded?: boolean }) {
+function PenguinGlyph({ s }: { s: number }) {
   return (
-    <g transform={`scale(${s})`} opacity={faded ? 0.75 : 1} pointerEvents="none">
+    <g transform={`scale(${s})`} pointerEvents="none">
       <ellipse cx={-0.15} cy={0.84} rx={0.13} ry={0.06} fill="#f5a524" />
       <ellipse cx={0.15} cy={0.84} rx={0.13} ry={0.06} fill="#f5a524" />
       <path d="M0,-0.8 C0.4,-0.8 0.52,-0.32 0.5,0.1 C0.48,0.56 0.27,0.82 0,0.82 C-0.27,0.82 -0.48,0.56 -0.5,0.1 C-0.52,-0.32 -0.4,-0.8 0,-0.8Z" fill="#0b1a26" />

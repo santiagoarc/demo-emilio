@@ -6,12 +6,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowUp,
-  BellRing,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   Download,
   MapPinned,
+  Mountain,
   Search,
   SearchX,
   Users,
@@ -32,15 +31,12 @@ import { PeriodPicker } from "@/components/filters/PeriodPicker";
 import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 import { StatusPill, STATUS_COLOR } from "@/components/penguin/StatusPill";
 import { SpeciesPenguinPanel } from "./SpeciesPenguinPanel";
-import { isOpenTask } from "@/logic/tasks";
 
-type SortKey = "id" | "name" | "last" | "water" | "land" | "alerts";
+type SortKey = "id" | "name" | "last" | "water" | "land";
 type ActivityFilter = "water" | "land" | "nodata";
-type AlertFilter = "with" | "without";
 
 const UNASSIGNED = "__none";
 const NO_ZONE = "__none";
-const GAP_COLOR = "rgba(245,184,75,0.8)";
 
 export function SpeciesDetailView() {
   const { id } = useParams<{ id: string }>();
@@ -81,13 +77,12 @@ function useTableState(speciesId: string) {
     zones: list("zone"),
     status: list("st") as LiveStatus[],
     activity: list("act") as ActivityFilter[],
-    alerts: list("al") as AlertFilter[],
     sort: (params.get("sort") as SortKey) || "id",
     dir: (params.get("dir") === "desc" ? "desc" : "asc") as "asc" | "desc",
     sel: params.get("sel"),
   };
 
-  const set = (patch: Partial<Record<"q" | "team" | "zone" | "st" | "act" | "al" | "sort" | "dir" | "sel", string | string[] | number | null>>) => {
+  const set = (patch: Partial<Record<"q" | "team" | "zone" | "st" | "act" | "sort" | "dir" | "sel", string | string[] | number | null>>) => {
     const next = new URLSearchParams(params.toString());
     for (const [k, v] of Object.entries(patch)) {
       const s = Array.isArray(v) ? v.join(",") : v == null ? "" : String(v);
@@ -104,40 +99,34 @@ function useTableState(speciesId: string) {
 }
 
 function Detail({ speciesId }: { speciesId: SpeciesId }) {
-  const { dataset, snapshots, teamOf, range, alerts, tasks, now } = useDemo();
+  const { dataset, snapshots, teamOf, range, now } = useDemo();
   const sp = SPECIES_BY_ID[speciesId];
   const t = useTableState(speciesId);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState(t.q);
   const clearAll = () => {
     setQ("");
-    t.set({ q: null, team: null, zone: null, st: null, act: null, al: null });
+    t.set({ q: null, team: null, zone: null, st: null, act: null });
   };
 
   const all = useMemo(() => dataset.penguins.filter((p) => p.speciesId === speciesId), [dataset, speciesId]);
   const allIds = useMemo(() => all.map((p) => p.id), [all]);
   const agg = useMemo(() => computeActivity(dataset, allIds, range.from, range.to), [dataset, allIds, range]);
 
-  const openAlerts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const a of alerts) if (a.penguinId && a.status !== "resolved") m.set(a.penguinId, (m.get(a.penguinId) ?? 0) + 1);
-    return m;
-  }, [alerts]);
-
   const teamKey = (pid: string) => {
     const tid = teamOf(pid);
     return dataset.teams.some((x) => x.id === tid) ? tid : UNASSIGNED;
   };
 
-  type Row = { id: string; name?: string; snap: Snapshot; b?: Breakdown; alerts: number; team: string; zone: string };
+  type Row = { id: string; name?: string; snap: Snapshot; b?: Breakdown; team: string; zone: string };
   const rowsAll: Row[] = useMemo(
     () =>
       all.map((p) => {
         const snap = snapshots.get(p.id)!;
-        return { id: p.id, name: p.name, snap, b: agg.perPenguin.get(p.id), alerts: openAlerts.get(p.id) ?? 0, team: teamKey(p.id), zone: snap.reading?.zoneId ?? NO_ZONE };
+        return { id: p.id, name: p.name, snap, b: agg.perPenguin.get(p.id), team: teamKey(p.id), zone: snap.reading?.zoneId ?? NO_ZONE };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [all, snapshots, agg, openAlerts, teamOf],
+    [all, snapshots, agg, teamOf],
   );
 
   const filtered = useMemo(() => {
@@ -152,7 +141,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
         const kind: ActivityFilter = !r.b || r.b.readings === 0 ? "nodata" : r.b.water >= r.b.land ? "water" : "land";
         if (!t.activity.includes(kind)) return false;
       }
-      if (t.alerts.length && !t.alerts.includes(r.alerts > 0 ? "with" : "without")) return false;
       return true;
     });
     const val = (r: Row): number | string => {
@@ -165,8 +153,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
           return r.b?.water ?? -1;
         case "land":
           return r.b?.land ?? -1;
-        case "alerts":
-          return r.alerts;
         default:
           return r.id;
       }
@@ -178,7 +164,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
       return c * sign || a.id.localeCompare(b.id);
     });
     return rows;
-  }, [rowsAll, t.q, t.teams, t.zones, t.status, t.activity, t.alerts, t.sort, t.dir, dataset]);
+  }, [rowsAll, t.q, t.teams, t.zones, t.status, t.activity, t.sort, t.dir, dataset]);
 
   const filteredIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
   const isFiltered = filtered.length !== rowsAll.length;
@@ -191,17 +177,16 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
   );
 
   // --- Indicadores (sobre los ejemplares filtrados) ---
-  const recent = filtered.filter((r) => r.snap.recent && r.snap.status !== "offline").length;
+  const inWater = filtered.filter((r) => r.snap.status === "water").length;
+  const onLand = filtered.filter((r) => r.snap.status === "land" || r.snap.status === "resting").length;
   const teamsInUse = new Set(filtered.map((r) => r.team).filter((x) => x !== UNASSIGNED)).size;
-  const alertCount = filtered.reduce((a, r) => a + r.alerts, 0);
 
   // --- Zonas y equipos (sobre toda la especie; sirven de filtro) ---
   const zoneRows = useMemo(() => {
-    const m = new Map<string, { n: number; stale: number; last: number }>();
+    const m = new Map<string, { n: number; last: number }>();
     for (const r of rowsAll) {
-      const e = m.get(r.zone) ?? { n: 0, stale: 0, last: 0 };
+      const e = m.get(r.zone) ?? { n: 0, last: 0 };
       e.n++;
-      if (r.snap.status === "stale" || r.snap.status === "offline") e.stale++;
       e.last = Math.max(e.last, r.snap.reading?.timestamp ?? 0);
       m.set(r.zone, e);
     }
@@ -209,29 +194,26 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
   }, [rowsAll]);
 
   const teamRows = useMemo(() => {
-    const m = new Map<string, { n: number; tasks: number; alerts: number }>();
-    const ids = new Set(allIds);
+    const m = new Map<string, { n: number }>();
     for (const r of rowsAll) {
-      const e = m.get(r.team) ?? { n: 0, tasks: 0, alerts: 0 };
+      const e = m.get(r.team) ?? { n: 0 };
       e.n++;
       m.set(r.team, e);
     }
-    for (const tk of tasks) if (tk.penguinId && ids.has(tk.penguinId) && isOpenTask(tk) && m.has(tk.teamId)) m.get(tk.teamId)!.tasks++;
-    for (const a of alerts) if (a.penguinId && ids.has(a.penguinId) && a.status !== "resolved" && m.has(a.teamId)) m.get(a.teamId)!.alerts++;
     return [...m.entries()].sort((a, b) => b[1].n - a[1].n);
-  }, [rowsAll, allIds, tasks, alerts]);
+  }, [rowsAll]);
 
   const maxH = Math.max(1, ...filtered.map((r) => Math.max(r.b?.water ?? 0, r.b?.land ?? 0)));
 
   const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const sortBy = (k: SortKey) => t.set({ sort: k, dir: t.sort === k && t.dir === "asc" ? "desc" : "asc" });
-  const hasFilters = !!(t.q || t.teams.length || t.zones.length || t.status.length || t.activity.length || t.alerts.length);
+  const hasFilters = !!(t.q || t.teams.length || t.zones.length || t.status.length || t.activity.length);
   const teamName = (k: string) => (k === UNASSIGNED ? "Sin asignar" : dataset.teams.find((x) => x.id === k)?.name ?? k);
   const teamColor = (k: string) => dataset.teams.find((x) => x.id === k)?.color ?? "#56718a";
 
   const exportCsv = () => {
     const rows = checked.size ? filtered.filter((r) => checked.has(r.id)) : filtered;
-    const head = ["Código", "Nombre", "Especie", "Estado", "Zona", "Equipo", "Agua (h)", "Tierra (h)", "Última lectura", "Alertas activas"];
+    const head = ["Código", "Nombre", "Especie", "Estado", "Zona", "Equipo", "Agua (h)", "Tierra (h)", "Última lectura"];
     const lines = rows.map((r) => [
       r.id,
       r.name ?? "",
@@ -242,7 +224,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
       r.b?.readings ? (r.b.water / 3_600_000).toFixed(1) : "",
       r.b?.readings ? (r.b.land / 3_600_000).toFixed(1) : "",
       r.snap.reading ? new Date(r.snap.reading.timestamp).toISOString() : "",
-      String(r.alerts),
     ]);
     const csv = [head, ...lines].map((l) => l.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
@@ -255,12 +236,11 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
 
   const tot = panelAgg.totals;
   const perDay = (v: number, agg = panelAgg) => perPenguinPerDay(v, agg.penguinCount, agg.from, agg.to);
-  const avg = { water: perDay(tot.water), land: perDay(tot.land), gap: perDay(tot.noFix + tot.noComm) };
-  const avgTotal = avg.water + avg.land + avg.gap;
+  const avg = { water: perDay(tot.water), land: perDay(tot.land) };
+  const avgTotal = avg.water + avg.land;
   const prev = prevAgg && {
     water: perDay(prevAgg.totals.water, prevAgg),
     land: perDay(prevAgg.totals.land, prevAgg),
-    gap: perDay(prevAgg.totals.noFix + prevAgg.totals.noComm, prevAgg),
   };
 
   return (
@@ -304,16 +284,12 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
 
       <div className="space-y-5 px-6 lg:px-8">
         {/* Indicadores */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard icon={<PenguinIllustration speciesId={speciesId} size={38} framed={false} />} value={filtered.length} label="Ejemplares registrados" note={isFiltered ? `de ${rowsAll.length} · filtrados` : undefined} />
-          <KpiCard icon={<Waves size={22} />} color="#5cb8ff" value={recent} label="Con ubicación reciente" side={filtered.length ? `${Math.round((recent / filtered.length) * 100)}%` : "—"} sideTone="ok" />
-          <KpiCard icon={<Clock3 size={22} />} color="#f5b84b" value={filtered.length - recent} label="Sin lectura reciente" side={filtered.length ? `${Math.round(((filtered.length - recent) / filtered.length) * 100)}%` : "—"} />
+          <KpiCard icon={<Waves size={22} />} color="#5cb8ff" value={inWater} label="En agua ahora" side={filtered.length ? `${Math.round((inWater / filtered.length) * 100)}%` : "—"} />
+          <KpiCard icon={<Mountain size={22} />} color="#9fb4c7" value={onLand} label="En tierra ahora" side={filtered.length ? `${Math.round((onLand / filtered.length) * 100)}%` : "—"} />
           <KpiCard icon={<Users size={22} />} color="#a78bfa" value={teamsInUse} label="Equipos responsables" />
-          <KpiCard icon={<BellRing size={22} />} color="#ff6b6b" value={alertCount} label="Alertas activas" />
         </div>
-        <p className="-mt-2 text-[11px] text-faint">
-          Ubicación reciente: última lectura de hace menos de una hora. «Sin lectura reciente» no implica inmovilidad ni un problema de salud; solo que no hay posición actualizada.
-        </p>
 
         {/* Paneles */}
         <div className="grid gap-5 xl:grid-cols-12">
@@ -333,7 +309,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                     parts={[
                       { value: avg.water, color: SERIES.water, label: "Agua" },
                       { value: avg.land, color: SERIES.land, label: "Tierra" },
-                      { value: avg.gap, color: GAP_COLOR, label: "Sin lectura" },
                     ]}
                     center={
                       <div>
@@ -347,7 +322,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                       [
                         ["Agua", avg.water, SERIES.water, prev?.water],
                         ["Tierra", avg.land, SERIES.land, prev?.land],
-                        ["Sin lectura", avg.gap, GAP_COLOR, prev?.gap],
                       ] as const
                     ).map(([label, v, color, pv]) => (
                       <div key={label} className="flex items-center gap-2">
@@ -372,12 +346,11 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                     series={[
                       { key: "water", color: SERIES.water, label: "Agua" },
                       { key: "land", color: SERIES.land, label: "Tierra" },
-                      { key: "gap", color: GAP_COLOR, label: "Sin lectura" },
                     ]}
-                    data={panelAgg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land, gap: h.noFix + h.noComm } }))}
+                    data={panelAgg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))}
                   />
                 </div>
-                <p className="mt-3 text-[10px] text-faint">Promedios calculados desde lecturas simuladas. El tiempo sin lectura no se asigna a agua ni a tierra.</p>
+                <p className="mt-3 text-[10px] text-faint">Promedios calculados desde lecturas simuladas.</p>
               </>
             )}
           </Card>
@@ -400,7 +373,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                     </button>
                     <span className="w-[68px] shrink-0 text-right text-[10px] leading-tight text-faint" title="Lectura más reciente de los ejemplares en esta zona">
                       {e.last ? fmtTime(e.last) : "Sin datos"}
-                      {e.stale > 0 && <span className="block text-warn">{e.stale} desact.</span>}
                     </span>
                     {z !== NO_ZONE ? (
                       <Link href={`/map?zone=${z}&species=${speciesId}`} title="Abrir zona en Habitat Map" className="rounded-md p-1 text-faint hover:bg-ink/5 hover:text-accent">
@@ -435,13 +407,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
                         <div className="h-full rounded-full" style={{ width: `${pctv}%`, background: teamColor(k) }} />
                       </div>
-                      {(e.tasks > 0 || e.alerts > 0) && (
-                        <p className="mt-1 text-[10px] text-faint">
-                          {e.tasks > 0 && `${e.tasks} tarea${e.tasks === 1 ? "" : "s"} pendiente${e.tasks === 1 ? "" : "s"}`}
-                          {e.tasks > 0 && e.alerts > 0 && " · "}
-                          {e.alerts > 0 && <span className="text-warn">{e.alerts} alerta{e.alerts === 1 ? "" : "s"}</span>}
-                        </p>
-                      )}
                     </button>
                   </li>
                 );
@@ -500,7 +465,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                 label="Estado"
                 value={t.status}
                 onChange={(v) => t.set({ st: v })}
-                options={(["water", "land", "resting", "stale", "offline", "no_data"] as LiveStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s], color: STATUS_COLOR[s] }))}
+                options={(["water", "land", "resting"] as LiveStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s], color: STATUS_COLOR[s] }))}
               />
               <FilterMenu<ActivityFilter>
                 className="flex-1"
@@ -511,17 +476,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                 options={[
                   { value: "water", label: "Más tiempo en agua", color: SERIES.water },
                   { value: "land", label: "Más tiempo en tierra", color: SERIES.land },
-                  { value: "nodata", label: "Sin lecturas en el periodo", color: "#56718a" },
-                ]}
-              />
-              <FilterMenu<AlertFilter>
-                className="flex-1"
-                label="Alertas"
-                value={t.alerts}
-                onChange={(v) => t.set({ al: v })}
-                options={[
-                  { value: "with", label: "Con alertas activas", color: "#ff6b6b" },
-                  { value: "without", label: "Sin alertas", color: "#3ddc97" },
                 ]}
               />
               {hasFilters && (
@@ -560,14 +514,12 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                     <SortTh k="water" t={t} onSort={sortBy} sub={range.label}>Tiempo en agua</SortTh>
                     <SortTh k="land" t={t} onSort={sortBy} sub={range.label}>Tiempo en tierra</SortTh>
                     <SortTh k="last" t={t} onSort={sortBy}>Última lectura</SortTh>
-                    <SortTh k="alerts" t={t} onSort={sortBy}>Alertas</SortTh>
                     <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((r) => {
                     const sel = t.sel === r.id;
-                    const stale = r.snap.status === "stale" || r.snap.status === "offline";
                     const noData = !r.b || r.b.readings === 0;
                     return (
                       <tr
@@ -601,7 +553,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                           {r.zone === NO_ZONE ? (
                             <span className="text-faint">Sin datos</span>
                           ) : (
-                            <span className={cx("inline-flex rounded-md border px-1.5 py-0.5 text-xs", stale ? "border-warn/30 text-warn" : "border-line-strong text-ink")} title={stale ? "Última ubicación conocida, no actual" : undefined}>
+                            <span className="inline-flex rounded-md border border-line-strong px-1.5 py-0.5 text-xs text-ink">
                               {ZONE_BY_ID[r.zone].name}
                             </span>
                           )}
@@ -614,17 +566,8 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                         </td>
                         <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">Sin datos</span> : <HBar value={r.b!.water} max={maxH} color={SERIES.water} />}</td>
                         <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">Sin datos</span> : <HBar value={r.b!.land} max={maxH} color="#f5b84b" />}</td>
-                        <td className={cx("whitespace-nowrap px-2 py-2 text-xs", stale ? "text-warn" : "text-muted")}>
+                        <td className="whitespace-nowrap px-2 py-2 text-xs text-muted">
                           {r.snap.reading ? fmtDateTime(r.snap.reading.timestamp, now) : "Sin datos"}
-                        </td>
-                        <td className="px-2 py-2">
-                          {r.alerts > 0 ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-danger/12 px-1.5 py-0.5 text-xs font-semibold text-danger">
-                              <BellRing size={11} /> {r.alerts}
-                            </span>
-                          ) : (
-                            <span className="text-faint">–</span>
-                          )}
                         </td>
                         <td className="pr-3">
                           <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Abrir ficha" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-ink/5 hover:text-ink">

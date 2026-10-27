@@ -173,7 +173,7 @@ export function SimulatedTag({ className }: { className?: string }) {
 export function Drawer({ open, onClose, children, width = 420, title }: { open: boolean; onClose: () => void; children: ReactNode; width?: number; title?: ReactNode }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-[60] flex justify-end">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
       <aside className="slide-in relative flex h-full flex-col border-l border-line bg-panel-solid shadow-2xl" style={{ width: `min(${width}px, 100vw)` }}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">

@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
-import { Activity, BellRing, Bird, LayoutDashboard, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, IdCard } from "lucide-react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { Activity, Bird, HeartPulse, LayoutDashboard, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, IdCard } from "lucide-react";
 import { useDemo } from "@/state/DemoProvider";
 import { fmtDateTime } from "@/logic/time";
 import { cx } from "@/components/ui/primitives";
 import { PenguinSearch } from "./PenguinSearch";
 import { ScenarioDrawer } from "./ScenarioDrawer";
 import { LoginScreen } from "./LoginScreen";
+import { PenguinChat } from "@/features/chat/PenguinChat";
+import { ChartTipLayer } from "@/components/charts/Charts";
 
 const SESSION_KEY = "penguin-demo/session";
 
@@ -45,16 +47,15 @@ const NAV = [
   { href: "/species", label: "Species", icon: Bird },
   { href: "/penguins", label: "Penguins", icon: IdCard },
   { href: "/teams", label: "Care Teams", icon: Users },
+  { href: "/health", label: "Health", icon: HeartPulse },
   { href: "/analytics", label: "Activity Analytics", icon: Activity },
-  { href: "/alerts", label: "Alerts & Tasks", icon: BellRing },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { alerts, now } = useDemo();
+  const { now } = useDemo();
   const [searchOpen, setSearchOpen] = useState(false);
   const [scenarioOpen, setScenarioOpen] = useState(false);
-  const pending = alerts.filter((a) => a.status !== "resolved").length;
   const session = useDemoSession();
 
   useEffect(() => {
@@ -108,9 +109,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {active && <span className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-accent" />}
                 <Icon size={17} className={active ? "text-accent" : "text-faint group-hover:text-muted"} />
                 {label}
-                {href === "/alerts" && pending > 0 && (
-                  <span className="num ml-auto rounded-full bg-warn/15 px-1.5 text-[11px] font-semibold text-warn">{pending}</span>
-                )}
               </Link>
             );
           })}
@@ -123,7 +121,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="text-[11px] font-medium text-ink">Demo · Datos simulados</span>
             </div>
             <p className="mt-1 text-[11px] leading-snug text-muted">
-              Escenario ficticio, sin dispositivos conectados. Corte de lecturas: {fmtDateTime(now, now)}.
+              Escenario ficticio con lecturas simuladas. Corte de lecturas: {fmtDateTime(now, now)}.
             </p>
           </div>
           <button
@@ -150,6 +148,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <PenguinSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <ScenarioDrawer open={scenarioOpen} onClose={() => setScenarioOpen(false)} />
+      {/* El chat lee ?penguin= del mapa; useSearchParams pide su propio Suspense. */}
+      <Suspense fallback={null}>
+        <PenguinChat />
+      </Suspense>
+      <ChartTipLayer />
     </div>
   );
 }

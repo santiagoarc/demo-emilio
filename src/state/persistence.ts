@@ -1,5 +1,5 @@
 import type { DemoConfig } from "@/config/demo.config";
-import type { Alert, CareNote, CareTask, CareTeam, Incident, Shift } from "@/domain/types";
+import type { CareNote, CareTeam, HealthCase, Incident, Shift } from "@/domain/types";
 import type { Filters } from "@/logic/filters";
 
 const KEY = "penguin-demo/v1";
@@ -13,9 +13,6 @@ export interface PersistedState {
   savedNow: number;
   config: DemoConfig;
   assignments: Record<string, string>;
-  tasks: CareTask[];
-  alerts: Alert[];
-  reviews: Record<string, number>;
   log: Incident[];
   /** Observaciones registradas en la demo (opcional: no existía en versiones anteriores). */
   userNotes?: CareNote[];
@@ -24,8 +21,9 @@ export interface PersistedState {
   teamEdits?: Record<string, Partial<CareTeam>>;
   teamLog?: { id: string; teamId: string; at: number; by: string; text: string }[];
   shifts?: Shift[];
+  /** Casos de seguimiento de salud (opcional por compatibilidad: si falta, se usan los del escenario). */
+  cases?: HealthCase[];
   filters: Filters;
-  taskSeq: number;
 }
 
 export function loadPersisted(): PersistedState | null {
@@ -64,11 +62,14 @@ export function shiftPersisted(s: PersistedState, delta: number): PersistedState
   const h = <T extends { at: number }>(x: T) => ({ ...x, at: x.at + delta });
   return {
     ...s,
-    tasks: s.tasks.map((t) => ({ ...t, createdAt: t.createdAt + delta, dueAt: t.dueAt + delta, history: t.history.map(h) })),
-    alerts: s.alerts.map((a) => ({ ...a, createdAt: a.createdAt + delta, history: a.history.map(h) })),
-    reviews: Object.fromEntries(Object.entries(s.reviews).map(([k, v]) => [k, v + delta])),
     log: s.log.map(h),
     userNotes: (s.userNotes ?? []).map(h),
     teamLog: (s.teamLog ?? []).map(h),
+    cases: s.cases?.map((c) => ({
+      ...c,
+      openedAt: c.openedAt + delta,
+      closedAt: c.closedAt === undefined ? undefined : c.closedAt + delta,
+      entries: c.entries.map(h),
+    })),
   };
 }

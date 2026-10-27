@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowUpRight, Battery, Radio, X } from "lucide-react";
+import { ArrowUpRight, HeartPulse, Radio, X } from "lucide-react";
 import { ZONE_BY_ID } from "@/domain/habitat";
 import { SPECIES_BY_ID } from "@/domain/species";
 import { SOURCE_SHORT, QUALITY_LABEL, QUALITY_TONE } from "@/logic/labels";
@@ -16,10 +16,12 @@ import { PenguinIllustration } from "./PenguinIllustration";
 import { StatusPill } from "./StatusPill";
 import { MovementHistory } from "./MovementHistory";
 import { TeamReassign } from "./TeamReassign";
+import { InsightCard } from "@/features/health/HealthCards";
 
 /** Panel lateral del mapa: lo esencial de un ejemplar sin salir del mapa. */
 export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId: string; at: number; onClose: () => void; className?: string }) {
-  const { dataset, penguinById, deviceById, config, now } = useDemo();
+  const { dataset, penguinById, deviceById, config, now, cases } = useDemo();
+  const openCase = cases.find((c) => c.penguinId === penguinId && c.status === "open");
   const p = penguinById.get(penguinId);
   const snap = useMemo(() => (p ? snapshotAt(dataset, deviceById, config.rules, p, at) : null), [p, dataset, deviceById, config.rules, at]);
   const today = useMemo(() => computeActivity(dataset, [penguinId], startOfDay(at), at + 1), [dataset, penguinId, at]);
@@ -28,7 +30,6 @@ export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId:
   const sp = SPECIES_BY_ID[p.speciesId];
   const r = snap.reading;
   const zone = r ? ZONE_BY_ID[r.zoneId] : null;
-  const lastKnown = snap.status === "stale" || snap.status === "offline";
   const t = today.totals;
 
   return (
@@ -53,22 +54,34 @@ export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId:
 
       <div className="scroll-thin flex-1 space-y-5 overflow-y-auto p-5">
         <div>
+          <p className="eyebrow mb-2">¿Cómo va?</p>
+          <InsightCard penguinId={penguinId} compact />
+          {openCase && (
+            <Link href={`/penguins/${p.id}#salud`} className="mt-3 flex items-center gap-2 rounded-lg bg-accent/[0.08] px-3 py-2 text-xs text-ink hover:bg-accent/[0.12]">
+              <HeartPulse size={13} className="text-accent" />
+              <span className="min-w-0 flex-1 truncate">En seguimiento: {openCase.title}</span>
+              <ArrowUpRight size={13} className="text-muted" />
+            </Link>
+          )}
+        </div>
+
+        <div>
           <p className="eyebrow mb-2">Equipo responsable</p>
           <TeamReassign key={penguinId} penguinId={penguinId} />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label={lastKnown ? "Última zona conocida" : "Zona actual registrada"}>
+          <Field label="Zona actual registrada">
             {zone ? zone.name : "—"}
           </Field>
-          <Field label={lastKnown ? "Última ubicación conocida" : "Última actualización"}>
+          <Field label="Última actualización">
             {r ? (
               <>
                 {fmtDateTime(r.timestamp, now)}
-                <span className={`block text-[11px] ${lastKnown ? "text-warn" : "text-faint"}`}>{fmtAgo(r.timestamp, at)}</span>
+                <span className="block text-[11px] text-faint">{fmtAgo(r.timestamp, at)}</span>
               </>
             ) : (
-              "Sin lecturas"
+              "—"
             )}
           </Field>
           <Field label="Fuente de la lectura">
@@ -80,15 +93,9 @@ export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId:
           </Field>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-line px-3 py-2 text-xs">
+        <div className="flex items-center rounded-xl border border-line px-3 py-2 text-xs">
           <span className="inline-flex items-center gap-1.5 text-muted">
-            <Radio size={13} /> {snap.device.id}
-          </span>
-          <span className={snap.status === "offline" ? "text-danger" : "text-muted"}>
-            {snap.status === "offline" ? `Sin latido ${fmtAgo(snap.device.lastHeartbeat, at)}` : `Latido ${fmtAgo(Math.min(snap.device.lastHeartbeat, at), at)}`}
-          </span>
-          <span className="inline-flex items-center gap-1 text-muted">
-            <Battery size={13} /> {snap.device.batteryPct}%
+            <Radio size={13} /> Dispositivo {snap.device.id}
           </span>
         </div>
 
@@ -101,8 +108,6 @@ export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId:
             parts={[
               { value: t.water, color: SERIES.water, label: "Agua" },
               { value: t.land, color: SERIES.land, label: "Tierra" },
-              { value: t.noFix, color: SERIES.noFix, label: "Sin posición" },
-              { value: t.noComm, color: SERIES.noComm, label: "Sin comunicación" },
             ]}
           />
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
@@ -114,11 +119,6 @@ export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId:
               <span className="mr-1.5 inline-block h-2 w-2 rounded-sm" style={{ background: SERIES.land }} />
               Tierra <span className="num ml-1 font-semibold text-ink">{fmtHours(t.land)}</span>
             </p>
-            {t.noFix + t.noComm > 0 && (
-              <p className="col-span-2 text-[11px] text-faint">
-                {fmtHours(t.noFix + t.noComm)} sin lectura: no se reparte entre agua y tierra.
-              </p>
-            )}
           </div>
         </div>
 

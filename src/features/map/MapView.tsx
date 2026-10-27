@@ -22,7 +22,6 @@ const LAYER_LABEL: Record<keyof MapLayers, string> = {
   labels: "Nombres y conteos",
   landmarks: "Puntos de referencia",
   markers: "Ejemplares",
-  lastKnown: "Última ubicación conocida",
   restricted: "Áreas restringidas",
   trail: "Recorrido del seleccionado",
 };
@@ -111,7 +110,12 @@ export function MapView() {
     return m;
   }, [dataset, deviceById, config.rules, at, scopedIds, showContext]);
 
-  const isActive = (s: Snapshot) => scopedIds.has(s.penguin.id) && (!filters.zones.length || filters.zones.includes(s.reading?.zoneId ?? ""));
+  // Al picar "En agua", "En tierra" o "Sin movimiento" se resaltan solo esos.
+  const [statusPick, setStatusPick] = useState<LiveStatus | null>(null);
+  const inScope = (s: Snapshot) => scopedIds.has(s.penguin.id) && (!filters.zones.length || filters.zones.includes(s.reading?.zoneId ?? ""));
+  const isActive = (s: Snapshot) => inScope(s) && (!statusPick || s.status === statusPick);
+  // Con algo elegido (estado, especie, equipo, zona o un ejemplar), los que coinciden se ven como pingüino.
+  const highlight = !!statusPick || filters.species.length > 0 || filters.teams.length > 0 || filters.zones.length > 0 || !!filters.penguinId;
 
   const markers: MapMarker[] = useMemo(() => {
     const out: MapMarker[] = [];
@@ -119,8 +123,7 @@ export function MapView() {
       if (!s.reading) continue;
       let x = s.reading.x;
       let y = s.reading.y;
-      // Animación visual entre dos lecturas consecutivas. Si entre ellas hay
-      // un hueco, el punto se queda en la última ubicación conocida.
+      // Animación visual entre dos lecturas consecutivas.
       if (smooth && at < now) {
         const list = dataset.readings.get(s.penguin.id)!;
         const next = list[lastIndexAtOrBefore(list, at) + 1];
@@ -144,9 +147,11 @@ export function MapView() {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snaps, scopedIds, filters.zones, smooth, at, now, slot, dataset]);
+  }, [snaps, scopedIds, filters.zones, statusPick, smooth, at, now, slot, dataset]);
 
-  const active = useMemo(() => [...snaps.values()].filter(isActive), [snaps, scopedIds, filters.zones]); // eslint-disable-line react-hooks/exhaustive-deps
+  const active = useMemo(() => [...snaps.values()].filter(isActive), [snaps, scopedIds, filters.zones, statusPick]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Los conteos por estado no dependen del estado elegido, para poder cambiar de uno a otro.
+  const inScopeList = useMemo(() => [...snaps.values()].filter(inScope), [snaps, scopedIds, filters.zones]); // eslint-disable-line react-hooks/exhaustive-deps
   const zoneCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of active) if (s.reading) m.set(s.reading.zoneId, (m.get(s.reading.zoneId) ?? 0) + 1);
@@ -154,9 +159,9 @@ export function MapView() {
   }, [active]);
   const statusCounts = useMemo(() => {
     const c: Record<LiveStatus, number> = { water: 0, land: 0, resting: 0, stale: 0, offline: 0, no_data: 0 };
-    for (const s of active) c[s.status]++;
+    for (const s of inScopeList) c[s.status]++;
     return c;
-  }, [active]);
+  }, [inScopeList]);
 
   const trail: TrailPoint[] | undefined = useMemo(() => {
     if (!selectedId) return undefined;
@@ -165,7 +170,7 @@ export function MapView() {
     const out: TrailPoint[] = [];
     for (let i = end; i >= 0 && list[i].timestamp > at - 6 * HOUR; i--) {
       const r = list[i];
-      out.push({ x: r.x, y: r.y, t: r.timestamp, quality: r.quality, medium: r.medium });
+      out.push({ x: r.x, y: r.y, t: r.timestamp, quality: r.quality, medium: r.medium, zoneId: r.zoneId });
     }
     return out.reverse();
   }, [selectedId, dataset, at]);
@@ -191,6 +196,7 @@ export function MapView() {
             markers={markers}
             selectedId={selectedId}
             onSelect={select}
+            penguinMarkers={highlight}
             selectedZones={zoneId ? [...filters.zones, zoneId] : filters.zones}
             onZoneClick={(z) => {
               if (ZONE_BY_ID[z].kind === "restricted") return;
@@ -203,7 +209,6 @@ export function MapView() {
             layers={layers}
             focus={focus}
             wheelZoom
-            penguinMarkers={filters.teams.length > 0}
             animate={!playing}
             live={!playing && at >= now}
           />
@@ -305,9 +310,16 @@ export function MapView() {
             }}
           />
           <div className="mt-3 grid grid-cols-2 gap-1.5">
-            <MapStat label="En el mapa" value={active.filter((s) => s.reading).length} sub={`/ ${total}`} />
-            {(["water", "land", "resting", "stale", "offline"] as LiveStatus[]).map((st) => (
-              <MapStat key={st} label={st === "resting" ? "Sin movimiento" : st === "stale" ? "Desactualizada" : STATUS_LABEL[st]} color={STATUS_COLOR[st]} value={statusCounts[st]} />
+            <MapStat label="En el mapa" value={inScopeList.filter((s) => s.reading).length} sub={`/ ${total}`} on={!statusPick} onClick={() => setStatusPick(null)} />
+            {(["water", "land", "resting"] as LiveStatus[]).map((st) => (
+              <MapStat
+                key={st}
+                label={st === "resting" ? "Sin movimiento" : STATUS_LABEL[st]}
+                color={STATUS_COLOR[st]}
+                value={statusCounts[st]}
+                on={statusPick === st}
+                onClick={() => setStatusPick(statusPick === st ? null : st)}
+              />
             ))}
           </div>
         </div>
@@ -474,9 +486,16 @@ function PenguinSearch({ penguins, teamName, onPick }: { penguins: Penguin[]; te
   );
 }
 
-function MapStat({ label, value, sub, color }: { label: string; value: number; sub?: string; color?: string }) {
+function MapStat({ label, value, sub, color, on, onClick }: { label: string; value: number; sub?: string; color?: string; on?: boolean; onClick?: () => void }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-ink/[0.05] px-2.5 py-1.5">
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={cx(
+        "flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-left transition",
+        on ? "border-accent/60 bg-accent/10" : "border-line bg-ink/[0.05] hover:border-line-strong",
+      )}
+    >
       <p className="flex min-w-0 items-center gap-1.5 truncate text-[11px] text-muted">
         {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />}
         {label}
@@ -485,7 +504,7 @@ function MapStat({ label, value, sub, color }: { label: string; value: number; s
         {value}
         {sub && <span className="text-xs font-normal text-faint"> {sub}</span>}
       </p>
-    </div>
+    </button>
   );
 }
 
@@ -494,16 +513,14 @@ function MapLegend() {
     <div>
       <p className="eyebrow mb-2">Leyenda</p>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-muted">
-        <LegendItem icon={<circle cx="7" cy="7" r="5" fill="#9fb4c7" stroke="#03101c" />}>Ubicación reciente</LegendItem>
+        <LegendItem icon={<circle cx="7" cy="7" r="5" fill="#9fb4c7" stroke="#03101c" />}>En tierra</LegendItem>
         <LegendItem icon={<><circle cx="7" cy="7" r="6.3" fill="none" stroke="#4fb3ff" /><circle cx="7" cy="7" r="4" fill="#9fb4c7" /></>}>En agua (precisión de zona)</LegendItem>
-        <LegendItem icon={<circle cx="7" cy="7" r="5" fill="none" stroke="#f5b84b" strokeWidth="1.6" strokeDasharray="2 1.6" />}>Última conocida</LegendItem>
-        <LegendItem icon={<circle cx="7" cy="7" r="5" fill="none" stroke="#ff6b6b" strokeWidth="1.6" strokeDasharray="2 1.6" />}>Sin comunicación</LegendItem>
         <LegendItem icon={<><circle cx="7" cy="7" r="5" fill="#9fb4c7" /><circle cx="7" cy="7" r="1.8" fill="#03101c" /></>}>Sin movimiento registrado</LegendItem>
-        <LegendItem icon={<path d="M1 7 H13" stroke="#2fd8c8" strokeDasharray="2 2" />}>Orden de lecturas (6 h)</LegendItem>
+        <LegendItem icon={<><path d="M1 7 H13" stroke="#0b6f68" strokeWidth="3" strokeLinecap="round" /><circle cx="12" cy="7" r="2.2" fill="#2b7fd0" stroke="#fff" /></>}>Recorrido (últimas 6 h)</LegendItem>
       </div>
       <p className="mt-2 text-[11px] leading-snug text-faint">
         Color del marcador = especie. Las líneas del recorrido solo unen lecturas consecutivas. Al reproducir, el desplazamiento entre dos
-        lecturas es una animación visual; con un hueco de lectura el punto se queda en su última ubicación conocida.
+        lecturas es una animación visual.
       </p>
     </div>
   );

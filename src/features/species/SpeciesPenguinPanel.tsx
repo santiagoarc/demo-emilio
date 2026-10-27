@@ -2,20 +2,17 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, BellRing, Clock3, MapPin, MapPinned, Users, X } from "lucide-react";
+import { ArrowRight, Clock3, MapPin, MapPinned, Users, X } from "lucide-react";
 import { ZONE_BY_ID } from "@/domain/habitat";
 import { SPECIES_BY_ID } from "@/domain/species";
-import { ALERT_TYPE_LABEL } from "@/logic/alertRules";
-import { PRIORITY_LABEL, PRIORITY_TONE, TASK_STATUS_LABEL } from "@/logic/labels";
 import { computeActivity } from "@/logic/metrics";
 import { fmtAgo, fmtDateTime, fmtHours } from "@/logic/time";
 import { useDemo } from "@/state/DemoProvider";
-import { Badge, cx } from "@/components/ui/primitives";
+import { cx } from "@/components/ui/primitives";
 import { SERIES, StackedColumns } from "@/components/charts/Charts";
 import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 import { StatusPill } from "@/components/penguin/StatusPill";
 import { MovementHistory } from "@/components/penguin/MovementHistory";
-import { isOpenTask } from "@/logic/tasks";
 
 type Tab = "summary" | "activity" | "history" | "care";
 const TABS: { id: Tab; label: string }[] = [
@@ -34,7 +31,7 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
   onClose: () => void;
   className?: string;
 }) {
-  const { dataset, penguinById, snapshots, teamOf, alerts, tasks, userNotes, now } = useDemo();
+  const { dataset, penguinById, snapshots, teamOf, userNotes, now } = useDemo();
   const [tab, setTab] = useState<Tab>("summary");
   const p = penguinById.get(penguinId)!;
   const sp = SPECIES_BY_ID[p.speciesId];
@@ -42,13 +39,9 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
   const team = dataset.teams.find((x) => x.id === teamOf(penguinId));
   const agg = useMemo(() => computeActivity(dataset, [penguinId], from, to), [dataset, penguinId, from, to]);
   const b = agg.totals;
-  const gap = b.noFix + b.noComm;
-  const covered = b.water + b.land + gap;
+  const covered = b.water + b.land;
   const pct = (v: number) => (covered ? Math.round((v / covered) * 100) : 0);
   const r = snap.reading;
-  const lastKnown = snap.status === "stale" || snap.status === "offline";
-  const myAlerts = alerts.filter((a) => a.penguinId === penguinId && a.status !== "resolved");
-  const myTasks = tasks.filter((t) => t.penguinId === penguinId && isOpenTask(t)).sort((a, c) => a.dueAt - c.dueAt);
   const notes = [...userNotes, ...dataset.notes].filter((n) => n.penguinId === penguinId).sort((a, c) => c.at - a.at);
 
   return (
@@ -88,35 +81,20 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm">
         {tab === "summary" && (
           <div className="space-y-3">
-            <Line icon={MapPin} k={lastKnown ? "Última zona conocida" : "Zona actual"} v={r ? ZONE_BY_ID[r.zoneId].name : "Sin datos"} warn={lastKnown} />
+            <Line icon={MapPin} k="Zona actual" v={r ? ZONE_BY_ID[r.zoneId].name : "Sin datos"} />
             <Line icon={Users} k="Equipo responsable" v={team?.name ?? "Sin asignar"} />
-            <Line icon={Clock3} k="Última lectura" v={r ? `${fmtDateTime(r.timestamp, now)} · ${fmtAgo(r.timestamp, now)}` : "Sin datos"} warn={lastKnown} />
-            <Line icon={BellRing} k="Alertas activas" v={myAlerts.length ? String(myAlerts.length) : "Ninguna"} warn={myAlerts.length > 0} />
+            <Line icon={Clock3} k="Última lectura" v={r ? `${fmtDateTime(r.timestamp, now)} · ${fmtAgo(r.timestamp, now)}` : "Sin datos"} />
             <div className="space-y-2.5 rounded-xl border border-line p-3">
               <p className="text-[11px] text-muted">Tiempo registrado · {rangeLabel.toLowerCase()}</p>
-              {b.readings === 0 && gap === 0 ? (
+              {b.readings === 0 ? (
                 <p className="text-xs text-faint">Sin datos en el periodo.</p>
               ) : (
                 <>
                   <Meter label="En agua" value={b.water} pct={pct(b.water)} color={SERIES.water} />
                   <Meter label="En tierra" value={b.land} pct={pct(b.land)} color="#f5b84b" />
-                  <Meter label="Sin lectura" value={gap} pct={pct(gap)} color="#56718a" />
                 </>
               )}
             </div>
-            {lastKnown && <p className="text-[11px] text-warn">La ubicación mostrada es la última conocida, no una posición actual.</p>}
-            {myAlerts.length > 0 && (
-              <ul className="space-y-1.5">
-                {myAlerts.map((a) => (
-                  <li key={a.id}>
-                    <Link href={`/alerts?alert=${a.id}`} className="flex items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-xs hover:bg-ink/[0.03]">
-                      <Badge tone={PRIORITY_TONE[a.priority]}>{PRIORITY_LABEL[a.priority]}</Badge>
-                      <span className="truncate">{ALERT_TYPE_LABEL[a.type]}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         )}
 
@@ -130,15 +108,12 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
               series={[
                 { key: "water", color: SERIES.water, label: "Agua" },
                 { key: "land", color: SERIES.land, label: "Tierra" },
-                { key: "gap", color: SERIES.noFix, label: "Sin lectura" },
               ]}
-              data={agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land, gap: h.noFix + h.noComm } }))}
+              data={agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))}
             />
             <dl className="mt-4 space-y-1.5 text-xs">
               <Pair k="Lecturas en el periodo" v={String(b.readings)} />
               <Pair k="Sin movimiento registrado (en tierra)" v={fmtHours(b.stationary)} />
-              <Pair k="Sin posición" v={fmtHours(b.noFix)} />
-              <Pair k="Sin comunicación" v={fmtHours(b.noComm)} />
             </dl>
             <p className="mt-3 text-[10px] text-faint">Agua o tierra según el sensor de inmersión (simulado). Una diferencia de actividad no indica por sí sola un problema de salud.</p>
           </div>
@@ -148,23 +123,6 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
 
         {tab === "care" && (
           <div className="space-y-4">
-            <div>
-              <p className="eyebrow mb-1.5">Tareas abiertas</p>
-              {myTasks.length === 0 ? (
-                <p className="text-xs text-faint">Sin tareas abiertas.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {myTasks.slice(0, 4).map((tk) => (
-                    <li key={tk.id} className="rounded-lg border border-line px-2.5 py-1.5 text-xs">
-                      <p>{tk.title}</p>
-                      <p className={cx("text-[11px]", tk.dueAt < now ? "text-danger" : "text-faint")}>
-                        {TASK_STATUS_LABEL[tk.status]} · vence {fmtDateTime(tk.dueAt, now)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
             <div>
               <p className="eyebrow mb-1.5">Observaciones recientes</p>
               {notes.length === 0 ? (
@@ -204,12 +162,12 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
   );
 }
 
-function Line({ icon: Icon, k, v, warn }: { icon: typeof MapPin; k: string; v: string; warn?: boolean }) {
+function Line({ icon: Icon, k, v }: { icon: typeof MapPin; k: string; v: string }) {
   return (
     <div className="flex items-center gap-2.5">
       <Icon size={15} className="shrink-0 text-faint" />
       <span className="flex-1 text-xs text-muted">{k}</span>
-      <span className={cx("text-right text-xs font-medium", warn ? "text-warn" : "text-ink")}>{v}</span>
+      <span className="text-right text-xs font-medium text-ink">{v}</span>
     </div>
   );
 }

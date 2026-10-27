@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { HABITAT } from "@/domain/habitat";
 import type { CareTeam } from "@/domain/types";
-import { isOpenTask, taskCompliance } from "@/logic/tasks";
 import { PERMISSIONS, useDemo, type TeamInput } from "@/state/DemoProvider";
 import { Button, Drawer, cx } from "@/components/ui/primitives";
 
@@ -57,25 +56,17 @@ export function ActiveBadge({ team }: { team: CareTeam }) {
 export interface TeamStats {
   team: CareTeam;
   penguinIds: string[];
-  recent: number;
-  openTasks: number;
-  urgentTasks: number;
-  openAlerts: number;
-  highAlerts: number;
-  compliance: { done: number; total: number; pct: number | null };
+  inWater: number;
   zones: [string, number][];
 }
 
 /** Indicadores de cada equipo, calculados desde la asignación vigente (un equipo por ejemplar). */
 export function useTeamStats(): TeamStats[] {
-  const { dataset, teamOf, snapshots, tasks, alerts, range, now } = useDemo();
+  const { dataset, teamOf, snapshots } = useDemo();
   return useMemo(
     () =>
       dataset.teams.map((team) => {
         const penguinIds = dataset.penguins.filter((p) => teamOf(p.id) === team.id).map((p) => p.id);
-        const myTasks = tasks.filter((t) => t.teamId === team.id);
-        const open = myTasks.filter(isOpenTask);
-        const myAlerts = alerts.filter((a) => a.teamId === team.id && a.status !== "resolved");
         const zones = new Map<string, number>();
         for (const id of penguinIds) {
           const z = snapshots.get(id)?.reading?.zoneId;
@@ -84,19 +75,11 @@ export function useTeamStats(): TeamStats[] {
         return {
           team,
           penguinIds,
-          recent: penguinIds.filter((id) => {
-            const s = snapshots.get(id)!;
-            return s.recent && s.status !== "offline";
-          }).length,
-          openTasks: open.length,
-          urgentTasks: open.filter((t) => t.dueAt < now).length,
-          openAlerts: myAlerts.length,
-          highAlerts: myAlerts.filter((a) => a.priority === "high").length,
-          compliance: taskCompliance(myTasks, range.from, range.to, now),
+          inWater: penguinIds.filter((id) => snapshots.get(id)!.status === "water").length,
           zones: [...zones.entries()].sort((a, b) => b[1] - a[1]),
         };
       }),
-    [dataset, teamOf, snapshots, tasks, alerts, range, now],
+    [dataset, teamOf, snapshots],
   );
 }
 

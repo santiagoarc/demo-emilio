@@ -14,26 +14,19 @@ export interface DemoConfig {
   /** Cada cuánto llega una lectura simulada. */
   slotMinutes: number;
   speciesCounts: Record<SpeciesId, number>;
-  /** Proporción de dispositivos con cada perfil de conectividad. */
-  deviceMix: { intermittent: number; offline: number };
   /** Proporción de ejemplares asignados al equipo veterinario. */
   vetShare: number;
-  rules: AlertRulesConfig;
+  rules: RulesConfig;
 }
 
-export interface AlertRulesConfig {
+/** Umbrales del estado de cada ejemplar y del intervalo de revisión de rutina. */
+export interface RulesConfig {
   /** Una ubicación es "reciente" si la última lectura tiene menos de esto. */
   recentLocationMinutes: number;
-  /** Sin lectura por más de esto (con dispositivo comunicando) → alerta. */
-  staleLocationMinutes: number;
-  /** Sin latido del dispositivo por más de esto → alerta. */
+  /** Sin latido del dispositivo por más de esto → sin comunicación. */
   deviceOfflineMinutes: number;
   /** Días máximos entre revisiones de rutina. */
   careReviewIntervalDays: number;
-  /** Días de atraso de revisión a partir de los cuales sube a prioridad alta. */
-  careReviewHighAfterDays: number;
-  /** Horas de atraso de una tarea a partir de las cuales sube a prioridad alta. */
-  taskOverdueHighAfterHours: number;
 }
 
 export const DEFAULT_CONFIG: DemoConfig = {
@@ -48,14 +41,10 @@ export const DEFAULT_CONFIG: DemoConfig = {
     macaroni: 26,
     adelie: 36,
   },
-  deviceMix: { intermittent: 0.05, offline: 0.025 },
   vetShare: 0.05,
   rules: {
     recentLocationMinutes: 60,
-    staleLocationMinutes: 90,
     deviceOfflineMinutes: 360,
     careReviewIntervalDays: 10,
-    careReviewHighAfterDays: 3,
-    taskOverdueHighAfterHours: 24,
   },
 };

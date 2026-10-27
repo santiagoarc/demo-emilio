@@ -5,7 +5,6 @@ import { RotateCcw } from "lucide-react";
 import { DEFAULT_CONFIG, type DemoConfig } from "@/config/demo.config";
 import { SPECIES } from "@/domain/species";
 import type { SpeciesId } from "@/domain/types";
-import { describeRules, ALERT_TYPE_LABEL } from "@/logic/alertRules";
 import { useDemo } from "@/state/DemoProvider";
 import { Button, Drawer } from "@/components/ui/primitives";
 import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
@@ -24,7 +23,6 @@ function ScenarioForm({ onDone }: { onDone: () => void }) {
   const [seed, setSeed] = useState(config.seed);
   const [confirm, setConfirm] = useState(false);
   const total = Object.values(counts).reduce((a, b) => a + (Number(b) || 0), 0);
-  const rules = describeRules(config.rules);
 
   const apply = (cfg: DemoConfig) => {
     resetDemo(cfg);
@@ -84,22 +82,9 @@ function ScenarioForm({ onDone }: { onDone: () => void }) {
         </Button>
       </div>
 
-      <div>
-        <p className="eyebrow mb-2">Reglas de alerta configuradas</p>
-        <ul className="space-y-2">
-          {(Object.keys(rules) as (keyof typeof rules)[]).map((k) => (
-            <li key={k} className="rounded-xl border border-line px-3 py-2">
-              <p className="text-xs font-medium text-ink">{ALERT_TYPE_LABEL[k]}</p>
-              <p className="mt-0.5 text-[11px] leading-snug text-muted">{rules[k]}</p>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-2 text-[11px] text-faint">Se editan en src/config/demo.config.ts.</p>
-      </div>
-
       <div className="border-t border-line pt-5">
         <p className="eyebrow mb-2">Reiniciar</p>
-        <p className="mb-3 text-xs text-muted">Descarta reasignaciones, cambios de tareas y alertas, y vuelve al escenario inicial.</p>
+        <p className="mb-3 text-xs text-muted">Descarta reasignaciones, observaciones y cambios de equipos, y vuelve al escenario inicial.</p>
         {confirm ? (
           <div className="flex gap-2">
             <Button variant="danger" onClick={() => apply(DEFAULT_CONFIG)}>

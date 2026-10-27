@@ -20,10 +20,8 @@ import { DEFAULT_TEAM_BY_SPECIES, TEAMS } from "@/domain/teams";
 import type {
   ActivityRecord,
   CareNote,
-  CareTask,
   Dataset,
   DeviceProfile,
-  GapKind,
   Incident,
   LocationReading,
   Penguin,
@@ -35,7 +33,7 @@ import type {
 } from "@/domain/types";
 import { bbox, pointInPolygon, shrink, type Pt } from "@/logic/geometry";
 import { between, chance, hashSeed, mulberry32, pick, type Rng } from "@/logic/rng";
-import { DAY, HOUR, MIN } from "@/logic/time";
+import { DAY, MIN } from "@/logic/time";
 
 interface Behavior {
   land: string[];
@@ -130,7 +128,6 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
   const activity = new Map<string, ActivityRecord[]>();
   const notes: CareNote[] = [];
   const incidents: Incident[] = [];
-  const reviewFlags: Dataset["reviewFlags"] = [];
   const vetPenguins: string[] = [];
 
   for (const sp of SPECIES) {
@@ -152,11 +149,11 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
       const teamId = isVet ? "vet" : DEFAULT_TEAM_BY_SPECIES[sp.id];
       if (isVet) vetPenguins.push(id);
 
-      const r = rng();
-      const profile: DeviceProfile =
-        r < config.deviceMix.offline ? "offline" : r < config.deviceMix.offline + config.deviceMix.intermittent ? "intermittent" : "stable";
-      const offlineAt = Math.floor((now - between(rng, 7, 40) * HOUR) / slot) * slot;
-      const staleTail = profile === "intermittent" ? Math.round(between(rng, 1.8, 5) * HOUR / slot) : 0;
+      // En la demo todos los dispositivos funcionan. Los sorteos se conservan para que
+      // el resto del escenario (nombres, trayectorias) no cambie.
+      rng();
+      const profile: DeviceProfile = "stable";
+      between(rng, 7, 40);
 
       const lastReviewAt = isVet
         ? now - between(rng, 0.2, 3) * DAY
@@ -167,7 +164,7 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
         name: names[i - 1],
         speciesId: sp.id,
         registeredAt,
-        recordStatus: recent ? "recent" : profile === "offline" ? "incomplete" : "active",
+        recordStatus: recent ? "recent" : "active",
         deviceId,
         bandColor: pick(rng, BAND_COLORS),
         lastReviewAt,
@@ -178,16 +175,12 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
         id: deviceId,
         penguinId: id,
         profile,
-        lastHeartbeat:
-          profile === "offline" ? offlineAt : now - between(rng, profile === "stable" ? 0.5 : 2, profile === "stable" ? 8 : 25) * MIN,
-        batteryPct: Math.round(
-          profile === "offline" ? between(rng, 4, 15) : profile === "intermittent" ? between(rng, 18, 60) : between(rng, 45, 98),
-        ),
+        lastHeartbeat: now - between(rng, 0.5, 8) * MIN,
+        batteryPct: Math.round(between(rng, 45, 98)),
       });
 
       // --- Trayectoria simulada ---
       const list: LocationReading[] = [];
-      const gapList: ReadingGap[] = [];
       let medium: "water" | "land" = "land";
       let zoneId = pick(rng, beh.land);
       let restZone = zoneId;
@@ -195,19 +188,6 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
       let restPos = pos;
       let reported: Pt = pos;
       const firstSlot = Math.max(0, Math.ceil((registeredAt - windowStart) / slot));
-      let openGap: ReadingGap | null = null;
-
-      const closeGap = () => {
-        if (openGap) gapList.push(openGap);
-        openGap = null;
-      };
-      const markGap = (t: number, kind: GapKind) => {
-        if (openGap && openGap.kind === kind && openGap.end === t) openGap.end = t + slot;
-        else {
-          closeGap();
-          openGap = { penguinId: id, start: t, end: t + slot, kind };
-        }
-      };
 
       for (let s = firstSlot; s < slots; s++) {
         const t = windowStart + s * slot;
@@ -262,21 +242,9 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
           pos = jitterIn(rng, zoneId, pos, medium === "water" ? 90 : 30);
         }
 
-        // --- ¿Hay lectura en este intervalo? ---
-        let missing: GapKind | null = null;
-        if (profile === "offline" && t > offlineAt) missing = "no_comm";
-        else if (profile === "intermittent") {
-          if (s >= slots - staleTail) missing = "no_fix";
-          else if (chance(rng, 0.16)) missing = medium === "water" || chance(rng, 0.5) ? "no_fix" : "no_comm";
-        } else {
-          if (zoneId === "deep-dive" && chance(rng, 0.1)) missing = "no_fix";
-          else if (chance(rng, 0.015)) missing = "no_fix";
-        }
-        if (missing) {
-          markGap(t, missing);
-          continue;
-        }
-        closeGap();
+        // Cada intervalo tiene lectura: los dispositivos no fallan en la demo.
+        if (zoneId === "deep-dive") chance(rng, 0.1);
+        chance(rng, 0.015);
 
         const zone = ZONE_BY_ID[zoneId];
         let source: ReadingSource;
@@ -313,9 +281,8 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
           simulated: true,
         });
       }
-      closeGap();
       readings.set(id, list);
-      gaps.set(id, gapList);
+      gaps.set(id, []);
       activity.set(id, buildActivity(list, slot));
 
       // --- Registros ficticios de cuidado ---
@@ -327,10 +294,7 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
       }
       incidents.push({ id: `INC-${id}-reg`, penguinId: id, at: registeredAt, kind: "registry", text: "Alta en el registro de la demo." });
       incidents.push({ id: `INC-${id}-rev`, penguinId: id, at: lastReviewAt, kind: "care", text: "Revisión de rutina completada." });
-      if (profile === "offline") incidents.push({ id: `INC-${id}-off`, penguinId: id, at: offlineAt, kind: "device", text: `El dispositivo ${deviceId} dejó de comunicar.` });
-      if (profile === "intermittent") incidents.push({ id: `INC-${id}-int`, penguinId: id, at: now - between(rng, 2, 6) * DAY, kind: "device", text: `Comunicación intermitente de ${deviceId}.` });
-      if (!recent && chance(rng, 0.12)) incidents.push({ id: `INC-${id}-rep`, penguinId: id, at: now - between(rng, 20, 200) * DAY, kind: "device", text: "Dispositivo reemplazado por mantenimiento." });
-      if (chance(rng, 0.035)) reviewFlags.push({ penguinId: id, at: now - between(rng, 1, 40) * HOUR, by: pick(rng, TEAMS.find((t) => t.id === teamId)!.members) });
+      if (!recent && chance(rng, 0.12)) between(rng, 20, 200);
     }
   }
 
@@ -352,8 +316,6 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
     activity,
     notes,
     incidents,
-    tasks: generateTasks(config, now, penguins, devices, reviewFlags),
-    reviewFlags,
   };
 }
 
@@ -375,136 +337,4 @@ function buildActivity(list: LocationReading[], slot: number): ActivityRecord[] 
   }
   if (cur) out.push(cur);
   return out;
-}
-
-function generateTasks(
-  config: DemoConfig,
-  now: number,
-  penguins: Penguin[],
-  devices: TrackingDevice[],
-  flags: Dataset["reviewFlags"],
-): CareTask[] {
-  const rng = mulberry32(hashSeed(config.seed, "tasks"));
-  const tasks: CareTask[] = [];
-  const teamOf = (p: Penguin) => TEAMS.find((t) => t.id === p.initialTeamId)!;
-  let n = 1;
-  const nextId = () => `TSK-${String(n++).padStart(4, "0")}`;
-  const interval = config.rules.careReviewIntervalDays * DAY;
-
-  for (const p of penguins) {
-    const due = p.lastReviewAt + interval;
-    if (due <= now + DAY) {
-      const team = teamOf(p);
-      const overdue = due < now;
-      const status = overdue && chance(rng, 0.3) ? "in_progress" : "pending";
-      tasks.push({
-        id: nextId(),
-        kind: "routine_review",
-        title: "Revisión de rutina",
-        penguinId: p.id,
-        teamId: team.id,
-        createdAt: due - 2 * DAY,
-        dueAt: due,
-        status,
-        history: [
-          { at: due - 2 * DAY, by: "Programación automática", text: `Programada cada ${config.rules.careReviewIntervalDays} días.` },
-          ...(status === "in_progress" ? [{ at: Math.min(now - HOUR, due + HOUR), by: team.lead, text: "Tomada por el equipo." }] : []),
-        ],
-      });
-    }
-  }
-
-  for (const d of devices) {
-    if (d.profile === "stable") continue;
-    const p = penguins.find((x) => x.id === d.penguinId)!;
-    const team = teamOf(p);
-    const createdAt = d.profile === "offline" ? d.lastHeartbeat + 6 * HOUR : now - between(rng, 6, 30) * HOUR;
-    tasks.push({
-      id: nextId(),
-      kind: "device_check",
-      title: `Verificar dispositivo ${d.id}`,
-      penguinId: p.id,
-      teamId: team.id,
-      createdAt,
-      dueAt: d.profile === "offline" ? createdAt + 8 * HOUR : now + between(rng, 3, 30) * HOUR,
-      status: "pending",
-      history: [{ at: createdAt, by: "Regla de conectividad", text: d.profile === "offline" ? "Creada al detectar dispositivo sin comunicación." : "Creada por comunicación intermitente." }],
-    });
-  }
-
-  for (const f of flags) {
-    const p = penguins.find((x) => x.id === f.penguinId)!;
-    tasks.push({
-      id: nextId(),
-      kind: "observation_followup",
-      title: "Seguimiento de observación",
-      penguinId: p.id,
-      teamId: p.initialTeamId,
-      createdAt: f.at,
-      dueAt: f.at + DAY,
-      status: chance(rng, 0.4) ? "in_progress" : "pending",
-      notes: "Registro ficticio: el equipo pidió una revisión de rutina adicional.",
-      history: [{ at: f.at, by: f.by, text: "Ejemplar marcado para revisión por el equipo." }],
-    });
-  }
-
-  for (let k = 0; k < 12; k++) {
-    const p = pick(rng, penguins);
-    const createdAt = now - between(rng, 1, 4) * DAY;
-    tasks.push({
-      id: nextId(),
-      kind: "weighing",
-      title: "Pesaje programado",
-      penguinId: p.id,
-      teamId: p.initialTeamId,
-      zoneId: "care-bay",
-      createdAt,
-      dueAt: now + between(rng, -0.8, 3) * DAY,
-      status: "pending",
-      history: [{ at: createdAt, by: teamOf(p).lead, text: "Programado por el equipo." }],
-    });
-  }
-
-  for (const team of TEAMS) {
-    for (const zoneId of team.zoneIds.slice(0, 2)) {
-      const createdAt = now - between(rng, 0.5, 3) * DAY;
-      tasks.push({
-        id: nextId(),
-        kind: "zone_maintenance",
-        title: `Mantenimiento de ${ZONE_BY_ID[zoneId].name}`,
-        teamId: team.id,
-        zoneId,
-        createdAt,
-        dueAt: now + between(rng, -1.2, 2) * DAY,
-        status: chance(rng, 0.3) ? "in_progress" : "pending",
-        history: [{ at: createdAt, by: team.lead, text: "Programado por el equipo." }],
-      });
-    }
-  }
-
-  // Tareas ya cerradas, para que haya historial de actividad.
-  for (let k = 0; k < 30; k++) {
-    const p = pick(rng, penguins);
-    const team = teamOf(p);
-    const createdAt = now - between(rng, 1, 10) * DAY;
-    const doneAt = createdAt + between(rng, 2, 30) * HOUR;
-    if (doneAt > now) continue;
-    const kind = pick(rng, ["routine_review", "weighing", "observation_followup"] as const);
-    tasks.push({
-      id: nextId(),
-      kind,
-      title: kind === "routine_review" ? "Revisión de rutina" : kind === "weighing" ? "Pesaje programado" : "Seguimiento de observación",
-      penguinId: p.id,
-      teamId: team.id,
-      createdAt,
-      dueAt: createdAt + DAY,
-      status: "done",
-      history: [
-        { at: createdAt, by: team.lead, text: "Programado por el equipo." },
-        { at: doneAt, by: pick(rng, team.members), text: "Completada." },
-      ],
-    });
-  }
-
-  return tasks;
 }

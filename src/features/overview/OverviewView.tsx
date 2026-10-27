@@ -5,10 +5,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
-  BellRing,
   Bird,
-  ClipboardList,
-  CloudOff,
   Droplets,
   ExternalLink,
   Map as MapIcon,
@@ -21,42 +18,24 @@ import {
 } from "lucide-react";
 import { PENGUIN_ZONES, ZONE_BY_ID, ZONE_KIND_LABEL } from "@/domain/habitat";
 import { SPECIES, SPECIES_BY_ID } from "@/domain/species";
-import { ALERT_TYPE_LABEL } from "@/logic/alertRules";
 import { RANGE_LABEL, type RangePreset } from "@/logic/filters";
-import { TASK_KIND_LABEL } from "@/logic/labels";
 import { computeActivity, type Breakdown } from "@/logic/metrics";
-import type { LiveStatus, Snapshot } from "@/logic/status";
+import type { Snapshot } from "@/logic/status";
 import { fmtAgo, fmtTime } from "@/logic/time";
 import { useDemo } from "@/state/DemoProvider";
 import { Donut, SERIES, StackedColumns } from "@/components/charts/Charts";
 import { HabitatMap, type MapMarker } from "@/components/map/HabitatMap";
 import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
-import { StatusPill, STATUS_COLOR } from "@/components/penguin/StatusPill";
+import { StatusPill } from "@/components/penguin/StatusPill";
 import { Segmented, cx } from "@/components/ui/primitives";
-import { isOpenTask } from "@/logic/tasks";
-
-/** Estado actual agrupado como se lee en el Overview. */
-type StatusGroup = "water" | "land" | "no_recent";
-const STATUS_GROUP: Record<LiveStatus, StatusGroup> = {
-  water: "water",
-  land: "land",
-  resting: "land",
-  stale: "no_recent",
-  offline: "no_recent",
-  no_data: "no_recent",
-};
-
-type Category = "location" | "device" | "care";
-const CATEGORY_LABEL: Record<Category, string> = { location: "Ubicación", device: "Dispositivo", care: "Cuidado" };
 
 const RANGES: RangePreset[] = ["today", "24h", "7d", "14d"];
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
 export function OverviewView() {
-  const { dataset, visible, snapshots, teamOf, alerts, tasks, range, filters, setFilters, now } = useDemo();
+  const { dataset, visible, snapshots, teamOf, range, filters, setFilters, now } = useDemo();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoneId, setZoneId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Category | "all">("all");
 
   // Ejemplares que pasan los filtros globales.
   const shown = useMemo(() => visible.map((p) => snapshots.get(p.id)!), [visible, snapshots]);
@@ -64,61 +43,12 @@ export function OverviewView() {
   const idSet = useMemo(() => new Set(ids), [ids]);
   const zoneSet = useMemo(() => new Set(filters.zones), [filters.zones]);
   const teamName = (id: string) => dataset.teams.find((t) => t.id === id)?.name ?? "—";
-  const teamColor = (id: string) => dataset.teams.find((t) => t.id === id)?.color ?? "var(--muted)";
 
   const total = shown.length;
-  const count = (g: StatusGroup) => shown.filter((s) => STATUS_GROUP[s.status] === g).length;
-  const inWater = count("water");
-  const onLand = count("land");
-  const noRecent = count("no_recent");
+  // "Sin movimiento" cuenta como en tierra.
+  const inWater = shown.filter((s) => s.status === "water").length;
+  const onLand = shown.filter((s) => s.status === "land" || s.status === "resting").length;
   const teamsActive = new Set(ids.map(teamOf)).size;
-
-  // Alertas abiertas y tareas sin alerta propia (una tarea vencida ya tiene la suya).
-  const teamFilter = filters.teams.length ? new Set(filters.teams) : null;
-  const inScope = (penguinId: string | undefined, teamId: string) => (penguinId ? idSet.has(penguinId) : !teamFilter || teamFilter.has(teamId));
-  const openAlerts = alerts.filter((a) => a.status !== "resolved" && inScope(a.penguinId, a.teamId));
-  const alertedTasks = new Set(openAlerts.map((a) => a.taskId).filter(Boolean));
-  const openTasks = tasks.filter((t) => isOpenTask(t) && !alertedTasks.has(t.id) && inScope(t.penguinId, t.teamId));
-
-  const pending = useMemo(() => {
-    const taskById = new Map(tasks.map((t) => [t.id, t]));
-    const rank = { high: 0, medium: 1, low: 2 } as const;
-    const items: PendingItem[] = [
-      ...openAlerts.map((a): PendingItem => {
-        const kind = a.taskId ? taskById.get(a.taskId)?.kind : undefined;
-        return {
-          key: a.id,
-          href: `/alerts?alert=${a.id}`,
-          title: ALERT_TYPE_LABEL[a.type],
-          penguinId: a.penguinId,
-          zoneId: a.taskId ? taskById.get(a.taskId)?.zoneId : undefined,
-          teamId: a.teamId,
-          priority: a.priority,
-          category: a.type === "stale_location" ? "location" : a.type === "device_offline" || kind === "device_check" ? "device" : "care",
-          sort: rank[a.priority],
-          since: a.createdAt,
-          time: fmtAgo(a.createdAt, now).replace("hace ", ""),
-          late: false,
-        };
-      }),
-      ...openTasks.map((t): PendingItem => ({
-        key: t.id,
-        href: `/alerts?tab=tasks&task=${t.id}`,
-        title: t.title || TASK_KIND_LABEL[t.kind],
-        penguinId: t.penguinId,
-        zoneId: t.zoneId,
-        teamId: t.teamId,
-        priority: null,
-        category: t.kind === "device_check" ? "device" : "care",
-        sort: 3,
-        since: t.dueAt,
-        time: t.dueAt < now ? `venció ${fmtAgo(t.dueAt, now).replace("hace ", "")}` : `vence ${fmtAgo(t.dueAt, now)}`,
-        late: t.dueAt < now,
-      })),
-    ];
-    return items.sort((a, b) => a.sort - b.sort || a.since - b.since);
-  }, [openAlerts, openTasks, tasks, now]);
-  const pendingShown = tab === "all" ? pending : pending.filter((p) => p.category === tab);
 
   // Actividad del periodo y del periodo anterior de la misma duración.
   const agg = useMemo(() => computeActivity(dataset, ids, range.from, range.to, zoneSet), [dataset, ids, range, zoneSet]);
@@ -154,9 +84,7 @@ export function OverviewView() {
     { label: "Pingüinos registrados", value: total, icon: Bird, color: "var(--ice)", href: "/penguins" },
     { label: "En agua", value: inWater, share: pct(inWater, total), icon: Droplets, color: SERIES.water, href: "/map" },
     { label: "En tierra", value: onLand, share: pct(onLand, total), icon: Mountain, color: SERIES.land, href: "/map" },
-    { label: "Sin ubicación reciente", value: noRecent, share: pct(noRecent, total), icon: CloudOff, color: "var(--warn)", href: "/penguins" },
     { label: "Equipos activos", value: teamsActive, icon: Users, color: "#a78bfa", href: "/teams" },
-    { label: "Alertas pendientes", value: openAlerts.length, icon: BellRing, color: "var(--danger)", href: "/alerts" },
   ];
 
   return (
@@ -181,16 +109,15 @@ export function OverviewView() {
       </div>
 
       {/* Indicadores */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+      {/* Cuatro indicadores: dos por fila en pantallas chicas, una sola fila en grandes. */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map((k) => (
           <Link key={k.label} href={k.href} className="panel group flex items-center gap-3 px-4 py-3 transition hover:border-line-strong">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: `color-mix(in srgb, ${k.color} 14%, transparent)`, color: k.color }}>
               <k.icon size={20} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="num text-[24px] font-semibold leading-none" style={k.label === "Alertas pendientes" && k.value > 0 ? { color: k.color } : undefined}>
-                {k.value}
-              </p>
+              <p className="num text-[24px] font-semibold leading-none">{k.value}</p>
               <p className="mt-1 flex items-baseline justify-between gap-2 text-[11px] text-muted">
                 <span className="truncate">{k.label}</span>
                 {k.share !== undefined && <span className="num text-faint">{k.share}%</span>}
@@ -227,6 +154,7 @@ export function OverviewView() {
                 if (id) setZoneId(null);
               }}
               selectedZones={zone ? [zone.id] : []}
+              penguinMarkers={filters.species.length > 0 || filters.teams.length > 0 || filters.zones.length > 0}
               onZoneClick={(z) => {
                 if (ZONE_BY_ID[z].kind === "restricted") return;
                 setZoneId(z === zoneId ? null : z);
@@ -235,8 +163,7 @@ export function OverviewView() {
               zoneCounts={zoneCounts}
               labelScale={1.35}
               live
-              penguinMarkers={filters.teams.length > 0}
-              layers={{ zones: true, labels: true, landmarks: false, markers: true, lastKnown: true, restricted: true, trail: false }}
+              layers={{ zones: true, labels: true, landmarks: false, markers: true, restricted: true, trail: false }}
             />
             {selected && <PenguinCard s={selected} team={teamName(teamOf(selected.penguin.id))} now={now} onClose={() => setSelectedId(null)} />}
             {!selected && zone && (
@@ -271,8 +198,6 @@ export function OverviewView() {
             <span className="mx-1 hidden h-3 w-px bg-line-strong sm:block" />
             <LegendMark ring color={SERIES.water} label="En agua" />
             <LegendMark color={SERIES.land} label="En tierra" />
-            <LegendMark dashed color={STATUS_COLOR.stale} label="Sin posición reciente" />
-            <LegendMark dashed color={STATUS_COLOR.offline} label="Sin comunicación" />
             <span className="ml-auto text-faint">Clic en un ejemplar o una zona para ver su detalle</span>
           </div>
         </section>
@@ -312,7 +237,6 @@ export function OverviewView() {
             <ul className="space-y-2.5">
               {dataset.teams.map((t) => {
                 const n = ids.filter((id) => teamOf(id) === t.id).length;
-                const work = pending.filter((p) => p.teamId === t.id).length;
                 return (
                   <li key={t.id} className="flex items-center gap-2.5">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: `${t.color}22`, color: t.color }}>
@@ -327,7 +251,7 @@ export function OverviewView() {
                         <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct(n, total)}%`, background: t.color }} />
                       </div>
                       <p className="mt-0.5 text-[11px] text-muted">
-                        <span className="num">{n}</span> pingüinos · <span className="num">{work}</span> pendientes
+                        <span className="num">{n}</span> pingüinos · <span className="num">{t.zoneIds.length}</span> zonas
                       </p>
                     </div>
                   </li>
@@ -339,7 +263,7 @@ export function OverviewView() {
       </div>
 
       {/* Sección inferior */}
-      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-2">
         <ActivityPanel agg={agg.totals} prev={prevAgg?.totals ?? null} daily={agg} rangeLabel={range.label} zonesFiltered={filters.zones.length > 0} />
 
         <Panel title="Pingüinos por zona del hábitat" icon={MapPinned} href="/map" linkLabel="Ver en el mapa">
@@ -349,102 +273,33 @@ export function OverviewView() {
             <span className="text-right">Ejempl.</span>
             <span className="text-right">%</span>
           </div>
-          <ul className="scroll-thin max-h-[236px] overflow-y-auto pr-1">
-            {PENGUIN_ZONES.map((z) => ({ z, n: zoneCounts.get(z.id) ?? 0 }))
-              .sort((a, b) => b.n - a.n)
-              .map(({ z, n }) => (
-                <li key={z.id}>
-                  <Link
-                    href={`/map?zone=${z.id}`}
-                    title="Abrir la zona en Habitat Map"
-                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_36px_40px] items-center gap-x-3 rounded-md py-1 text-[12px] hover:bg-ink/[0.03]"
-                  >
-                    <span className="truncate">{z.name}</span>
-                    <span className="h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
-                      <span className="block h-full rounded-full" style={{ width: `${pct(n, Math.max(1, ...zoneCounts.values()))}%`, background: zoneColor(z.id) }} />
-                    </span>
-                    <span className="num text-right">{n}</span>
-                    <span className="num text-right text-faint">{pct(n, located)}%</span>
-                  </Link>
-                </li>
-              ))}
-          </ul>
-        </Panel>
-
-        <Panel title="Alertas y tareas pendientes" icon={ClipboardList} href="/alerts" linkLabel="Ver todas" className="lg:col-span-2 xl:col-span-1">
-          <div className="mb-2 flex flex-wrap gap-1">
-            {(["all", "location", "device", "care"] as const).map((c) => {
-              const n = c === "all" ? pending.length : pending.filter((p) => p.category === c).length;
-              return (
-                <button
-                  key={c}
-                  onClick={() => setTab(c)}
-                  className={cx(
-                    "h-7 rounded-lg border px-2.5 text-[11px] transition",
-                    tab === c ? "border-accent/50 bg-accent/10 text-ink" : "border-line text-muted hover:text-ink",
-                  )}
-                >
-                  {c === "all" ? "Todas" : CATEGORY_LABEL[c]} <span className="num">({n})</span>
-                </button>
-              );
-            })}
-          </div>
-          {pendingShown.length === 0 ? (
-            <p className="py-8 text-center text-xs text-muted">Nada pendiente con estos filtros.</p>
-          ) : (
-            <ul className="scroll-thin max-h-[222px] divide-y divide-line overflow-y-auto pr-1">
-              {pendingShown.map((p) => (
-                <li key={p.key} className="flex items-center gap-2.5 py-1.5 text-[12px]">
-                  <span
-                    title={p.priority ? `Prioridad ${p.priority === "high" ? "alta" : p.priority === "medium" ? "media" : "baja"}` : "Tarea abierta"}
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ background: p.priority === "high" ? "var(--danger)" : p.priority === "medium" ? "var(--warn)" : p.priority === "low" ? "var(--muted)" : "var(--accent-2)" }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <Link href={p.href} className="block truncate hover:text-accent">
-                      {p.title}
-                    </Link>
-                    <p className="truncate text-[11px] text-faint">
-                      {p.penguinId ? (
-                        <Link href={`/penguins/${p.penguinId}`} className="font-mono text-muted hover:text-accent">
-                          {p.penguinId}
-                        </Link>
-                      ) : p.zoneId ? (
-                        ZONE_BY_ID[p.zoneId]?.name
-                      ) : (
-                        "General"
-                      )}
-                      <span className="mx-1">·</span>
-                      <span className="inline-flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: teamColor(p.teamId) }} />
-                        {teamName(p.teamId)}
+          {/* En pantalla ancha la lista toma el alto del panel de actividad a su lado y se desplaza dentro. */}
+          <div className="lg:relative lg:min-h-[180px] lg:flex-1">
+            <ul className="scroll-thin max-h-[236px] overflow-y-auto pr-1 lg:absolute lg:inset-0 lg:max-h-none">
+              {PENGUIN_ZONES.map((z) => ({ z, n: zoneCounts.get(z.id) ?? 0 }))
+                .sort((a, b) => b.n - a.n)
+                .map(({ z, n }) => (
+                  <li key={z.id}>
+                    <Link
+                      href={`/map?zone=${z.id}`}
+                      title="Abrir la zona en Habitat Map"
+                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_36px_40px] items-center gap-x-3 rounded-md py-1 text-[12px] hover:bg-ink/[0.03]"
+                    >
+                      <span className="truncate">{z.name}</span>
+                      <span className="h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
+                        <span className="block h-full rounded-full" style={{ width: `${pct(n, Math.max(1, ...zoneCounts.values()))}%`, background: zoneColor(z.id) }} />
                       </span>
-                    </p>
-                  </div>
-                  <span className={cx("whitespace-nowrap text-right text-[11px]", p.late ? "text-danger" : "text-muted")}>{p.time}</span>
-                </li>
-              ))}
+                      <span className="num text-right">{n}</span>
+                      <span className="num text-right text-faint">{pct(n, located)}%</span>
+                    </Link>
+                  </li>
+                ))}
             </ul>
-          )}
+          </div>
         </Panel>
       </div>
     </div>
   );
-}
-
-interface PendingItem {
-  key: string;
-  href: string;
-  title: string;
-  penguinId?: string;
-  zoneId?: string;
-  teamId: string;
-  priority: "high" | "medium" | "low" | null;
-  category: Category;
-  sort: number;
-  since: number;
-  time: string;
-  late: boolean;
 }
 
 function zoneColor(id: string) {
@@ -476,12 +331,12 @@ function Panel({ title, icon: Icon, href, linkLabel, className, children }: {
   );
 }
 
-function LegendMark({ color, label, ring, dashed }: { color: string; label: string; ring?: boolean; dashed?: boolean }) {
+function LegendMark({ color, label, ring }: { color: string; label: string; ring?: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <span
         className="h-2.5 w-2.5 rounded-full"
-        style={dashed ? { border: `1.5px dashed ${color}` } : ring ? { background: "#9fb3c8", boxShadow: `0 0 0 2px var(--panel-solid), 0 0 0 3px ${color}` } : { background: color }}
+        style={ring ? { background: "#9fb3c8", boxShadow: `0 0 0 2px var(--panel-solid), 0 0 0 3px ${color}` } : { background: color }}
       />
       {label}
     </span>
@@ -517,7 +372,7 @@ function PenguinCard({ s, team, now, onClose }: { s: Snapshot; team: string; now
         <dt className="text-faint">Zona</dt>
         <dd className="truncate text-right">{s.reading ? ZONE_BY_ID[s.reading.zoneId].name : "—"}</dd>
         <dt className="text-faint">Última lectura</dt>
-        <dd className="text-right">{s.reading ? fmtAgo(s.reading.timestamp, now) : "sin lecturas"}</dd>
+        <dd className="text-right">{s.reading ? fmtAgo(s.reading.timestamp, now) : "—"}</dd>
         <dt className="text-faint">Equipo</dt>
         <dd className="truncate text-right">{team}</dd>
       </dl>
@@ -540,15 +395,15 @@ function ActivityPanel({ agg, prev, daily, rangeLabel, zonesFiltered }: {
   rangeLabel: string;
   zonesFiltered: boolean;
 }) {
-  // Reparto del tiempo esperado del periodo; lo que no tiene lectura va aparte.
-  const share = (b: Breakdown, k: "water" | "land" | "gap") => {
-    const v = k === "gap" ? b.noFix + b.noComm : b[k];
-    return b.expected > 0 ? (v / b.expected) * 100 : 0;
+  // Reparto del tiempo registrado del periodo; "sin movimiento" es parte del tiempo en tierra.
+  const share = (b: Breakdown, k: "water" | "land" | "stationary") => {
+    const tot = b.water + b.land;
+    return tot > 0 ? (b[k] / tot) * 100 : 0;
   };
   const rings = [
     { k: "water" as const, label: "En agua", color: SERIES.water },
     { k: "land" as const, label: "En tierra", color: SERIES.land },
-    { k: "gap" as const, label: "Sin lectura", color: SERIES.noFix },
+    { k: "stationary" as const, label: "Sin movimiento", color: SERIES.stationary },
   ];
   const multiDay = daily.daily.length > 2;
   return (
@@ -585,12 +440,11 @@ function ActivityPanel({ agg, prev, daily, rangeLabel, zonesFiltered }: {
           series={[
             { key: "water", color: SERIES.water, label: "Agua" },
             { key: "land", color: SERIES.land, label: "Tierra" },
-            { key: "gap", color: SERIES.noFix, label: "Sin lectura" },
           ]}
           data={(multiDay ? daily.daily : daily.hourly).map((b: Breakdown & { day?: number }, i) => {
-            const tot = b.water + b.land + b.noFix + b.noComm || 1;
+            const tot = b.water + b.land || 1;
             const label = multiDay && b.day !== undefined ? new Date(b.day).toLocaleDateString("es-MX", { day: "numeric", month: "short" }) : `${String(i).padStart(2, "0")}h`;
-            return { label, values: { water: b.water / tot, land: b.land / tot, gap: (b.noFix + b.noComm) / tot } };
+            return { label, values: { water: b.water / tot, land: b.land / tot } };
           })}
         />
       </div>

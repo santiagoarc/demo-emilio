@@ -4,15 +4,84 @@
  * Gráficas propias en SVG/HTML. Reciben datos ya agregados; no calculan nada
  * por su cuenta, así siempre reflejan los filtros activos.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "@/components/ui/primitives";
+
+/* ───────────── Tooltip flotante compartido ─────────────
+ * Un solo cuadro para todas las gráficas: sigue al cursor, se coloca a un lado
+ * (nunca encima de lo que se señala), cambia de lado cerca de los bordes y no
+ * recibe el mouse, así no tapa ni bloquea otras tarjetas.
+ */
+export interface Tip {
+  title: ReactNode;
+  rows?: { color?: string; label: ReactNode; value: ReactNode }[];
+  note?: ReactNode;
+}
+
+type TipState = { tip: Tip; x: number; y: number } | null;
+let setTipState: ((s: TipState) => void) | null = null;
+
+export function showTip(e: { clientX: number; clientY: number }, tip: Tip) {
+  setTipState?.({ tip, x: e.clientX, y: e.clientY });
+}
+export function hideTip() {
+  setTipState?.(null);
+}
+
+/** Se monta una vez en la app (AppShell). */
+export function ChartTipLayer() {
+  const [state, setState] = useState<TipState>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: -9999, top: -9999 });
+
+  useEffect(() => {
+    setTipState = setState;
+    const hide = () => setState(null);
+    window.addEventListener("scroll", hide, true);
+    return () => {
+      setTipState = null;
+      window.removeEventListener("scroll", hide, true);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!state || !box.current) return;
+    const { width, height } = box.current.getBoundingClientRect();
+    const gap = 16;
+    // A la derecha del cursor; si no cabe, a la izquierda. Verticalmente centrado y dentro de la pantalla.
+    const left = state.x + gap + width <= window.innerWidth - 8 ? state.x + gap : Math.max(8, state.x - gap - width);
+    const top = Math.min(window.innerHeight - height - 8, Math.max(8, state.y - height / 2));
+    setPos({ left, top });
+  }, [state]);
+
+  if (!state) return null;
+  const { tip } = state;
+  return (
+    <div
+      ref={box}
+      role="tooltip"
+      className="pointer-events-none fixed z-[100] min-w-[150px] max-w-[280px] rounded-xl border border-line-strong bg-panel-solid/95 px-3 py-2 text-[11px] shadow-[0_8px_24px_rgba(11,36,64,0.18)] backdrop-blur"
+      style={pos}
+    >
+      <p className="font-medium text-ink">{tip.title}</p>
+      {tip.rows?.map((r, i) => (
+        <p key={i} className="mt-1 flex items-center justify-between gap-3 text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            {r.color && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: r.color }} />}
+            {r.label}
+          </span>
+          <span className="num text-ink">{r.value}</span>
+        </p>
+      ))}
+      {tip.note && <p className="mt-1.5 text-[10px] text-faint">{tip.note}</p>}
+    </div>
+  );
+}
 
 export const SERIES = {
   water: "#4fb3ff",
   land: "#9fb4c7",
   stationary: "#8aa0b6",
-  noFix: "#f5b84b",
-  noComm: "#ff6b6b",
 };
 
 export function Legend({ items, className }: { items: { color: string; label: string; dashed?: boolean }[]; className?: string }) {
@@ -49,6 +118,8 @@ export function BarList({ items, format = (v) => String(v), max, onSelect, selec
             <button
               disabled={!onSelect}
               onClick={() => onSelect?.(i.key)}
+              onMouseMove={(e) => showTip(e, { title: i.label, rows: [{ color: i.color ?? "var(--accent)", label: "Valor", value: format(i.value) }], note: i.hint })}
+              onMouseLeave={hideTip}
               className={cx("group w-full text-left", onSelect && "cursor-pointer")}
             >
               <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
@@ -73,16 +144,21 @@ export function BarList({ items, format = (v) => String(v), max, onSelect, selec
 }
 
 /** Barra apilada al 100%. */
-export function SplitBar({ parts, height = 10, className }: { parts: { value: number; color: string; label: string }[]; height?: number; className?: string }) {
+export function SplitBar({ parts, height = 10, className, title = "Distribución" }: { parts: { value: number; color: string; label: string }[]; height?: number; className?: string; title?: ReactNode }) {
   const total = parts.reduce((a, p) => a + p.value, 0);
+  const tip: Tip = { title, rows: parts.map((p) => ({ color: p.color, label: p.label, value: total ? `${Math.round((p.value / total) * 100)}%` : "—" })) };
   return (
-    <div className={cx("flex w-full overflow-hidden rounded-full bg-ink/[0.05]", className)} style={{ height }}>
+    <div
+      className={cx("flex w-full overflow-hidden rounded-full bg-ink/[0.05]", className)}
+      style={{ height }}
+      onMouseMove={(e) => showTip(e, tip)}
+      onMouseLeave={hideTip}
+    >
       {total > 0 &&
         parts.map((p) =>
           p.value > 0 ? (
             <div
               key={p.label}
-              title={`${p.label}: ${Math.round((p.value / total) * 100)}%`}
               className="h-full transition-[width] duration-500"
               style={{ width: `${(p.value / total) * 100}%`, background: p.color }}
             />
@@ -117,9 +193,9 @@ export function Donut({ parts, size = 132, thickness = 14, center }: { parts: { 
                 strokeDashoffset={-acc}
                 strokeLinecap="butt"
                 className="transition-all duration-500"
-              >
-                <title>{`${p.label}: ${Math.round((p.value / total) * 100)}%`}</title>
-              </circle>
+                onMouseMove={(e) => showTip(e, { title: p.label, rows: parts.map((x) => ({ color: x.color, label: x.label, value: `${Math.round((x.value / total) * 100)}%` })) })}
+                onMouseLeave={hideTip}
+              />
             );
             acc += len;
             return el;
@@ -141,15 +217,30 @@ export function StackedColumns({ data, series, height = 180, labelEvery = 1, for
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...data.map((d) => series.reduce((a, s) => a + (d.values[s.key] ?? 0), 0)));
-  const W = 100 / Math.max(1, data.length);
   const h = hover ?? null;
+  const tipFor = (d: (typeof data)[number]): Tip => ({
+    title: d.tooltip ?? d.label,
+    rows: series.map((s) => ({ color: s.color, label: s.label, value: format(d.values[s.key] ?? 0) })),
+  });
   return (
     <div className="relative">
-      <div className="flex items-end gap-[3px]" style={{ height }} onMouseLeave={() => setHover(null)}>
+      <div
+        className="flex items-end gap-[3px]"
+        style={{ height }}
+        onMouseLeave={() => {
+          setHover(null);
+          hideTip();
+        }}
+      >
         {data.map((d, i) => {
           const total = series.reduce((a, s) => a + (d.values[s.key] ?? 0), 0);
           return (
-            <div key={i} className="relative flex h-full flex-1 cursor-default flex-col justify-end" onMouseEnter={() => setHover(i)}>
+            <div
+              key={i}
+              className="relative flex h-full flex-1 cursor-default flex-col justify-end"
+              onMouseEnter={() => setHover(i)}
+              onMouseMove={(e) => showTip(e, tipFor(d))}
+            >
               <div
                 className={cx("flex w-full flex-col-reverse overflow-hidden rounded-t-[4px] transition-opacity", h !== null && h !== i && "opacity-45")}
                 style={{ height: `${(total / max) * 100}%`, outline: highlight === i ? "1px solid var(--accent)" : undefined }}
@@ -169,23 +260,6 @@ export function StackedColumns({ data, series, height = 180, labelEvery = 1, for
           </div>
         ))}
       </div>
-      {h !== null && data[h] && (
-        <div
-          className="pointer-events-none absolute -top-2 z-10 min-w-[150px] -translate-x-1/2 -translate-y-full rounded-xl border border-line-strong bg-panel-solid/95 px-3 py-2 text-[11px] shadow-xl"
-          style={{ left: `${(h + 0.5) * W}%` }}
-        >
-          <p className="mb-1 font-medium text-ink">{data[h].tooltip ?? data[h].label}</p>
-          {series.map((s) => (
-            <p key={s.key} className="flex items-center justify-between gap-3 text-muted">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />
-                {s.label}
-              </span>
-              <span className="num text-ink">{format(data[h].values[s.key] ?? 0)}</span>
-            </p>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -209,7 +283,16 @@ export function LineChart({ data, series, height = 200, format = (v) => String(v
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height }} preserveAspectRatio="none" onMouseLeave={() => setHover(null)}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        style={{ height }}
+        preserveAspectRatio="none"
+        onMouseLeave={() => {
+          setHover(null);
+          hideTip();
+        }}
+      >
         <defs>
           {series.map((s) => (
             <linearGradient key={s.key} id={`lc-${s.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -254,7 +337,15 @@ export function LineChart({ data, series, height = 200, format = (v) => String(v
         })}
         {data.map((d, i) => (
           <g key={i}>
-            <rect x={x(i) - (W - padL - padR) / Math.max(1, data.length) / 2} y={padT} width={(W - padL - padR) / Math.max(1, data.length)} height={H - padT - padB} fill="transparent" onMouseEnter={() => setHover(i)} />
+            <rect x={x(i) - (W - padL - padR) / Math.max(1, data.length) / 2} y={padT} width={(W - padL - padR) / Math.max(1, data.length)} height={H - padT - padB} fill="transparent"
+              onMouseEnter={() => setHover(i)}
+              onMouseMove={(e) =>
+                showTip(e, {
+                  title: d.label,
+                  rows: series.map((s) => ({ color: s.color, label: s.label, value: d.values[s.key] == null ? "sin datos" : format(d.values[s.key]!) })),
+                })
+              }
+            />
             {i % labelEvery === 0 && (
               <text x={x(i)} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--faint)">
                 {d.label}
@@ -271,61 +362,63 @@ export function LineChart({ data, series, height = 200, format = (v) => String(v
           </g>
         )}
       </svg>
-      {hover !== null && (
-        <div
-          className="pointer-events-none absolute top-0 z-10 min-w-[150px] -translate-x-1/2 rounded-xl border border-line-strong bg-panel-solid/95 px-3 py-2 text-[11px] shadow-xl"
-          style={{ left: `${(x(hover) / W) * 100}%` }}
-        >
-          <p className="mb-1 font-medium text-ink">{data[hover].label}</p>
-          {series.map((s) => (
-            <p key={s.key} className="flex items-center justify-between gap-3 text-muted">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />
-                {s.label}
-              </span>
-              <span className="num text-ink">{data[hover].values[s.key] == null ? "sin datos" : format(data[hover].values[s.key]!)}</span>
-            </p>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
 /** Matriz origen → destino. */
-export function Matrix({ rows, cols, value, format = (v) => String(v), rowLabel, colLabel }: {
+export function Matrix({ rows, cols, value, format = (v) => String(v), rowLabel, colLabel, colShort }: {
   rows: string[];
   cols: string[];
   value: (r: string, c: string) => number;
   format?: (v: number) => string;
   rowLabel: (k: string) => ReactNode;
   colLabel: (k: string) => string;
+  /** Etiqueta corta de columna: la tabla ocupa el ancho disponible y el nombre completo queda en el título. */
+  colShort?: (k: string) => string;
 }) {
   const max = Math.max(1, ...rows.flatMap((r) => cols.map((c) => value(r, c))));
   return (
     <div className="scroll-thin overflow-x-auto">
-      <table className="border-separate border-spacing-[3px] text-[11px]">
+      <table className={cx("border-separate border-spacing-[3px] text-[11px]", colShort && "w-full table-fixed")}>
+        {colShort && (
+          <colgroup>
+            <col className="w-[148px]" />
+          </colgroup>
+        )}
         <thead>
           <tr>
             <th className="text-left text-[10px] font-normal text-faint">desde ↓ / hacia →</th>
-            {cols.map((c) => (
-              <th key={c} className="h-36 w-9 align-bottom font-normal text-muted">
-                <div className="mx-auto w-4 [writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-left">{colLabel(c)}</div>
-              </th>
-            ))}
+            {cols.map((c) =>
+              colShort ? (
+                <th key={c} onMouseMove={(e) => showTip(e, { title: colLabel(c) })} onMouseLeave={hideTip} className="pb-1 text-center align-bottom text-[10px] font-medium text-muted">
+                  {colShort(c)}
+                </th>
+              ) : (
+                <th key={c} className="h-36 w-9 align-bottom font-normal text-muted">
+                  <div className="mx-auto w-4 [writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-left">{colLabel(c)}</div>
+                </th>
+              ),
+            )}
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r}>
-              <td className="whitespace-nowrap pr-2 text-muted">{rowLabel(r)}</td>
+              <td className={cx("whitespace-nowrap pr-2 text-muted", colShort && "truncate")}>
+                {rowLabel(r)}
+                {colShort && <span className="ml-1 text-[10px] text-faint">{colShort(r)}</span>}
+              </td>
               {cols.map((c) => {
                 const v = value(r, c);
                 return (
                   <td
                     key={c}
-                    title={`${rowLabel(r)} → ${colLabel(c)}: ${format(v)}`}
-                    className="num h-8 w-9 rounded-md text-center text-[10px]"
+                    onMouseMove={(e) =>
+                      showTip(e, { title: <>{rowLabel(r)} → {colLabel(c)}</>, rows: [{ color: "rgba(47,216,200,0.8)", label: "Movimientos", value: r === c ? "—" : format(v) }] })
+                    }
+                    onMouseLeave={hideTip}
+                    className={cx("num h-8 rounded-md text-center text-[10px]", !colShort && "w-9")}
                     style={{
                       background: r === c ? "rgba(11,36,64,0.02)" : v ? `rgba(47,216,200,${0.08 + (v / max) * 0.72})` : "rgba(11,36,64,0.03)",
                       color: v / max > 0.5 ? "#032a2a" : "var(--muted)",
@@ -372,7 +465,8 @@ export function Heatmap({ rows, cols, value, color = "47,216,200", format = (v) 
               return (
                 <div
                   key={c}
-                  title={`${rowLabel(r)} ${colLabel(c)} · ${v == null ? "sin datos" : format(v)}`}
+                  onMouseMove={(e) => showTip(e, { title: `${rowLabel(r)} · ${colLabel(c)}`, rows: [{ color: `rgb(${color})`, label: "Valor", value: v == null ? "sin datos" : format(v) }] })}
+                  onMouseLeave={hideTip}
                   className="h-5 rounded-[4px]"
                   style={{
                     background: v == null ? "repeating-linear-gradient(45deg, rgba(11,36,64,0.04) 0 3px, transparent 3px 6px)" : `rgba(${color},${0.06 + (v / max) * 0.85})`,

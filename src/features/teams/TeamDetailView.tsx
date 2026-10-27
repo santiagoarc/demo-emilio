@@ -8,15 +8,12 @@ import {
   ArrowRight,
   ArrowRightLeft,
   ArrowUp,
-  BellRing,
   CalendarClock,
   ChevronLeft,
   ChevronRight,
-  ClipboardList,
-  Clock3,
-  Gauge,
   History,
   MapPinned,
+  Mountain,
   Pencil,
   Plus,
   Search,
@@ -27,40 +24,33 @@ import {
   Waves,
   X,
 } from "lucide-react";
-import { HABITAT, ZONE_BY_ID } from "@/domain/habitat";
+import { ZONE_BY_ID } from "@/domain/habitat";
 import { SPECIES, SPECIES_BY_ID } from "@/domain/species";
-import type { CareTask, Shift, SpeciesId, TaskKind, TaskStatus } from "@/domain/types";
-import { ALERT_TYPE_LABEL } from "@/logic/alertRules";
-import { ALERT_STATUS_LABEL, PRIORITY_LABEL, PRIORITY_TONE, TASK_KIND_LABEL, TASK_STATUS_LABEL } from "@/logic/labels";
+import type { Shift, SpeciesId } from "@/domain/types";
 import { computeActivity, type Breakdown } from "@/logic/metrics";
 import { STATUS_LABEL, type LiveStatus, type Snapshot } from "@/logic/status";
-import { ALERT_FAMILY, ALERT_FAMILY_LABEL, isOpenTask, taskCompliance, taskPriority, taskUpdatedAt } from "@/logic/tasks";
-import { DAY, HOUR, fmtAgo, fmtDate, fmtDateTime, fmtHours, fmtWeekday } from "@/logic/time";
+import { HOUR, fmtDate, fmtDateTime, fmtHours, fmtWeekday } from "@/logic/time";
 import { PERMISSIONS, useDemo } from "@/state/DemoProvider";
-import { Badge, Button, Card, Drawer, EmptyState, Select, SimulatedTag, cx } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Select, SimulatedTag, cx } from "@/components/ui/primitives";
 import { SERIES, StackedColumns } from "@/components/charts/Charts";
 import { FilterMenu } from "@/components/filters/FilterMenu";
 import { DayPicker, PeriodPicker } from "@/components/filters/PeriodPicker";
 import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 import { StatusPill, STATUS_COLOR } from "@/components/penguin/StatusPill";
-import { TaskStatusControl } from "@/features/alerts/TaskStatusControl";
 import { SpeciesPenguinPanel } from "@/features/species/SpeciesPenguinPanel";
 import { ActiveBadge, Avatars, TeamFormDrawer, initials, isActive } from "./shared";
 
-type Tab = "resumen" | "pinguinos" | "tareas" | "alertas" | "horario" | "personal";
+type Tab = "resumen" | "pinguinos" | "horario" | "personal";
 const TABS: { id: Tab; label: string }[] = [
   { id: "resumen", label: "Resumen" },
   { id: "pinguinos", label: "Pingüinos" },
-  { id: "tareas", label: "Tareas" },
-  { id: "alertas", label: "Alertas" },
   { id: "horario", label: "Horario" },
   { id: "personal", label: "Personal" },
 ];
-const GAP_COLOR = "rgba(245,184,75,0.8)";
 const WEEKDAYS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const AVAIL_LABEL: Record<Shift["availability"], string> = { available: "Disponible", partial: "Parcial", unavailable: "No disponible" };
 
-type SortKey = "id" | "name" | "last" | "water" | "land" | "alerts";
+type SortKey = "id" | "name" | "last" | "water" | "land";
 type ActivityFilter = "water" | "land" | "nodata";
 interface TableState {
   q: string;
@@ -95,7 +85,7 @@ function Detail({ teamId }: { teamId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const { dataset, teamOf, snapshots, tasks, alerts, range, now } = useDemo();
+  const { dataset, teamOf, snapshots, range } = useDemo();
   const team = dataset.teams.find((t) => t.id === teamId)!;
   const tab = (TABS.some((t) => t.id === params.get("tab")) ? params.get("tab") : "resumen") as Tab;
   const sel = params.get("sel");
@@ -114,21 +104,13 @@ function Detail({ teamId }: { teamId: string }) {
   const penguins = useMemo(() => dataset.penguins.filter((p) => teamOf(p.id) === teamId), [dataset, teamOf, teamId]);
   const ids = useMemo(() => penguins.map((p) => p.id), [penguins]);
   const agg = useMemo(() => computeActivity(dataset, ids, range.from, range.to), [dataset, ids, range]);
-  const myTasks = useMemo(() => tasks.filter((t) => t.teamId === teamId), [tasks, teamId]);
-  const myAlerts = useMemo(() => alerts.filter((a) => a.teamId === teamId), [alerts, teamId]);
-  const openAlertsBy = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const a of alerts) if (a.penguinId && a.status !== "resolved") m.set(a.penguinId, (m.get(a.penguinId) ?? 0) + 1);
-    return m;
-  }, [alerts]);
 
-  const recent = ids.filter((id) => {
-    const s = snapshots.get(id)!;
-    return s.recent && s.status !== "offline";
+  const inWater = ids.filter((id) => snapshots.get(id)!.status === "water").length;
+  const onLand = ids.filter((id) => {
+    const st = snapshots.get(id)!.status;
+    return st === "land" || st === "resting";
   }).length;
-  const openTasks = myTasks.filter(isOpenTask);
-  const activeAlerts = myAlerts.filter((a) => a.status !== "resolved");
-  const compliance = taskCompliance(myTasks, range.from, range.to, now);
+  const share = (n: number) => (penguins.length ? `${Math.round((n / penguins.length) * 100)}% del equipo` : "Sin datos");
   const total = dataset.penguins.length;
 
   return (
@@ -205,25 +187,16 @@ function Detail({ teamId }: { teamId: string }) {
 
       <div className="mt-4 space-y-4 px-6 lg:px-8">
         {/* Indicadores */}
-        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-3">
           <Kpi icon={Users} color={team.color} value={String(penguins.length)} label="Pingüinos asignados" sub={`${Math.round((penguins.length / Math.max(1, total)) * 100)}% del total`} />
-          <Kpi icon={Waves} color="#2fd8c8" value={String(recent)} label="Con ubicación reciente" sub={penguins.length ? `${Math.round((recent / penguins.length) * 100)}%` : "Sin datos"} />
-          <Kpi icon={Clock3} color="#f5b84b" value={String(penguins.length - recent)} label="Sin lectura reciente" sub="No implica un problema de salud" />
-          <Kpi icon={ClipboardList} color="#f5b84b" value={String(openTasks.length)} label="Tareas pendientes" sub={`${openTasks.filter((t) => t.dueAt < now).length} vencidas`} />
-          <Kpi icon={BellRing} color="#ff6b6b" value={String(activeAlerts.length)} label="Alertas activas" sub={`${activeAlerts.filter((a) => a.priority === "high").length} de prioridad alta`} />
-          <Kpi
-            icon={Gauge}
-            color="#3ddc97"
-            value={compliance.pct === null ? "Sin datos" : `${compliance.pct}%`}
-            label="Cumplimiento de tareas"
-            sub={compliance.total ? `${compliance.done} de ${compliance.total} que vencían en el periodo` : "Ninguna vencía en el periodo"}
-          />
+          <Kpi icon={Waves} color="#2fd8c8" value={String(inWater)} label="En agua ahora" sub={share(inWater)} />
+          <Kpi icon={Mountain} color="#9fb4c7" value={String(onLand)} label="En tierra ahora" sub={share(onLand)} />
         </div>
 
         {/* Pestañas */}
         <div className="panel flex gap-1 overflow-x-auto p-1">
           {TABS.map((t) => {
-            const count = t.id === "pinguinos" ? penguins.length : t.id === "tareas" ? openTasks.length : t.id === "alertas" ? activeAlerts.length : t.id === "personal" ? team.members.length : null;
+            const count = t.id === "pinguinos" ? penguins.length : t.id === "personal" ? team.members.length : null;
             return (
               <button
                 key={t.id}
@@ -238,30 +211,24 @@ function Detail({ teamId }: { teamId: string }) {
         </div>
 
         {tab === "resumen" && (
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="min-w-0 space-y-4">
-              <div className="grid gap-4 lg:grid-cols-2">
-                <ZonePanel teamId={teamId} ids={ids} />
-                <ActivityPanel agg={agg} label={range.label} span={range.to - range.from} />
-              </div>
-              <PenguinTable
-                teamId={teamId}
-                ids={ids}
-                perPenguin={agg.perPenguin}
-                openAlertsBy={openAlertsBy}
-                state={table}
-                setState={setTable}
-                selected={null}
-                onSelect={(id) => setParams({ tab: "pinguinos", sel: id })}
-                compact
-                rangeLabel={range.label}
-              />
+          <div className="space-y-4">
+            {/* Tres tarjetas a la misma altura; en dos columnas el horario ocupa la fila completa. */}
+            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              <ZonePanel teamId={teamId} ids={ids} />
+              <ActivityPanel agg={agg} label={range.label} span={range.to - range.from} />
+              <ScheduleSide teamId={teamId} onAll={() => setParams({ tab: "horario" })} className="lg:col-span-2 xl:col-span-1" />
             </div>
-            <div className="space-y-4">
-              <TasksSide tasks={myTasks} onAll={() => setParams({ tab: "tareas" })} />
-              <AlertsSide alerts={activeAlerts} onAll={() => setParams({ tab: "alertas" })} />
-              <ScheduleSide teamId={teamId} onAll={() => setParams({ tab: "horario" })} />
-            </div>
+            <PenguinTable
+              teamId={teamId}
+              ids={ids}
+              perPenguin={agg.perPenguin}
+              state={table}
+              setState={setTable}
+              selected={null}
+              onSelect={(id) => setParams({ tab: "pinguinos", sel: id })}
+              compact
+              rangeLabel={range.label}
+            />
           </div>
         )}
 
@@ -271,7 +238,6 @@ function Detail({ teamId }: { teamId: string }) {
               teamId={teamId}
               ids={ids}
               perPenguin={agg.perPenguin}
-              openAlertsBy={openAlertsBy}
               state={table}
               setState={setTable}
               selected={sel}
@@ -287,8 +253,6 @@ function Detail({ teamId }: { teamId: string }) {
           </div>
         )}
 
-        {tab === "tareas" && <TasksTab teamId={teamId} ids={ids} />}
-        {tab === "alertas" && <AlertsTab teamId={teamId} />}
         {tab === "horario" && <ScheduleTab teamId={teamId} />}
         {tab === "personal" && <StaffTab teamId={teamId} />}
       </div>
@@ -303,7 +267,7 @@ function Detail({ teamId }: { teamId: string }) {
 function ZonePanel({ teamId, ids }: { teamId: string; ids: string[] }) {
   const { snapshots } = useDemo();
   const rows = useMemo(() => {
-    const m = new Map<string, { n: number; stale: number }>();
+    const m = new Map<string, { n: number }>();
     let none = 0;
     for (const id of ids) {
       const s = snapshots.get(id)!;
@@ -312,9 +276,8 @@ function ZonePanel({ teamId, ids }: { teamId: string; ids: string[] }) {
         none++;
         continue;
       }
-      const e = m.get(z) ?? { n: 0, stale: 0 };
+      const e = m.get(z) ?? { n: 0 };
       e.n++;
-      if (s.status === "stale" || s.status === "offline") e.stale++;
       m.set(z, e);
     }
     return { list: [...m.entries()].sort((a, b) => b[1].n - a[1].n), none };
@@ -338,7 +301,6 @@ function ZonePanel({ teamId, ids }: { teamId: string; ids: string[] }) {
                 <span className="num w-9 text-right text-[11px] text-faint">{Math.round((e.n / ids.length) * 100)}%</span>
                 <MapPinned size={12} className="text-faint" />
               </Link>
-              {e.stale > 0 && <p className="-mt-1 pl-1.5 text-[10px] text-warn">{e.stale} con ubicación desactualizada</p>}
             </li>
           ))}
         </ul>
@@ -363,18 +325,16 @@ function ActivityPanel({ agg, label, span }: { agg: ReturnType<typeof computeAct
             series={[
               { key: "water", color: SERIES.water, label: "Agua" },
               { key: "land", color: SERIES.land, label: "Tierra" },
-              { key: "gap", color: GAP_COLOR, label: "Sin lectura" },
             ]}
             data={
               byHour
-                ? agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land, gap: h.noFix + h.noComm } }))
-                : agg.daily.map((d) => ({ label: fmtDate(d.day).split(" ")[0], tooltip: fmtWeekday(d.day), values: { water: d.water, land: d.land, gap: d.noFix + d.noComm } }))
+                ? agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))
+                : agg.daily.map((d) => ({ label: fmtDate(d.day).split(" ")[0], tooltip: fmtWeekday(d.day), values: { water: d.water, land: d.land } }))
             }
           />
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
             <Dot color={SERIES.water}>Agua</Dot>
             <Dot color={SERIES.land}>Tierra</Dot>
-            <Dot color={GAP_COLOR}>Sin lectura (no es inactividad)</Dot>
           </div>
         </>
       )}
@@ -382,94 +342,14 @@ function ActivityPanel({ agg, label, span }: { agg: ReturnType<typeof computeAct
   );
 }
 
-function TasksSide({ tasks, onAll }: { tasks: CareTask[]; onAll: () => void }) {
-  const { now, dataset } = useDemo();
-  const [filter, setFilter] = useState<"open" | "pending" | "in_progress">("open");
-  const rows = tasks
-    .filter((t) => (filter === "open" ? isOpenTask(t) : t.status === filter))
-    .sort((a, b) => a.dueAt - b.dueAt)
-    .slice(0, 6);
-  return (
-    <Card title={`Tareas del equipo (${tasks.filter(isOpenTask).length})`} icon={ClipboardList} action={<button onClick={onAll} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">Ver todas <ArrowRight size={12} /></button>}>
-      <div className="-mt-1 mb-2 flex gap-1">
-        {(
-          [
-            ["open", "Abiertas"],
-            ["pending", "Pendientes"],
-            ["in_progress", "En proceso"],
-          ] as const
-        ).map(([k, l]) => (
-          <button key={k} onClick={() => setFilter(k)} className={cx("rounded-lg border px-2 py-0.5 text-[11px]", filter === k ? "border-accent/50 bg-accent/10 text-ink" : "border-line text-muted hover:text-ink")}>
-            {l}
-          </button>
-        ))}
-      </div>
-      {rows.length === 0 ? (
-        <p className="py-3 text-center text-xs text-muted">Sin tareas.</p>
-      ) : (
-        <ul className="space-y-1">
-          {rows.map((t) => {
-            const pr = taskPriority(t, now);
-            const p = t.penguinId ? dataset.penguins.find((x) => x.id === t.penguinId) : undefined;
-            return (
-              <li key={t.id}>
-                <Link href={`/alerts?tab=tasks&task=${t.id}`} className="flex items-start gap-2 rounded-lg px-1.5 py-1.5 hover:bg-ink/[0.04]">
-                  <span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", pr === "high" ? "bg-danger" : pr === "medium" ? "bg-warn" : "bg-faint")} title={`Prioridad ${PRIORITY_LABEL[pr].toLowerCase()}`} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px]">{t.title}</span>
-                    <span className="block truncate text-[11px] text-faint">
-                      {t.assignee ?? "Sin responsable"} · {p ? (p.name ?? p.id) : t.zoneId ? ZONE_BY_ID[t.zoneId]?.name : "—"}
-                    </span>
-                  </span>
-                  <span className={cx("whitespace-nowrap text-[11px]", t.dueAt < now ? "text-danger" : "text-muted")}>{fmtDateTime(t.dueAt, now)}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-function AlertsSide({ alerts, onAll }: { alerts: ReturnType<typeof useDemo>["alerts"]; onAll: () => void }) {
-  const { now, dataset } = useDemo();
-  const rows = [...alerts].sort((a, b) => ({ high: 0, medium: 1, low: 2 })[a.priority] - ({ high: 0, medium: 1, low: 2 })[b.priority] || b.createdAt - a.createdAt).slice(0, 5);
-  return (
-    <Card title={`Alertas del equipo (${alerts.length})`} icon={BellRing} action={<button onClick={onAll} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">Ver todas <ArrowRight size={12} /></button>}>
-      {rows.length === 0 ? (
-        <p className="py-3 text-center text-xs text-muted">Sin alertas activas.</p>
-      ) : (
-        <ul className="space-y-1">
-          {rows.map((a) => {
-            const p = a.penguinId ? dataset.penguins.find((x) => x.id === a.penguinId) : undefined;
-            return (
-              <li key={a.id}>
-                <Link href={`/alerts?alert=${a.id}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-ink/[0.04]">
-                  <span className={cx("h-2 w-2 shrink-0 rounded-full", a.priority === "high" ? "bg-danger" : a.priority === "medium" ? "bg-warn" : "bg-faint")} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px]">{p ? `${p.id}${p.name ? ` · ${p.name}` : ""}` : "Sin ejemplar"}</span>
-                    <span className="block truncate text-[11px] text-faint">{ALERT_FAMILY_LABEL[ALERT_FAMILY[a.type]]}</span>
-                  </span>
-                  <span className="whitespace-nowrap text-[11px] text-muted">{fmtAgo(a.createdAt, now)}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-function ScheduleSide({ teamId, onAll }: { teamId: string; onAll: () => void }) {
+function ScheduleSide({ teamId, onAll, className }: { teamId: string; onAll: () => void; className?: string }) {
   const { shifts, now } = useDemo();
   const weekday = new Date(now).getDay();
   const today = shifts.filter((s) => s.teamId === teamId && s.weekday === weekday).sort((a, b) => a.start.localeCompare(b.start));
   return (
-    <Card title="Horario del equipo (hoy)" icon={CalendarClock} action={<button onClick={onAll} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">Ver horario <ArrowRight size={12} /></button>}>
+    <Card className={className} title="Horario del equipo (hoy)" icon={CalendarClock} action={<button onClick={onAll} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">Ver horario <ArrowRight size={12} /></button>}>
       {today.length === 0 ? (
-        <div className="py-2 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center py-2 text-center">
           <p className="text-xs text-muted">{shifts.some((s) => s.teamId === teamId) ? "Sin turnos configurados para hoy." : "No hay turnos configurados para este equipo."}</p>
           {PERMISSIONS.manageTeams && (
             <button onClick={onAll} className="mt-2 text-xs text-accent hover:underline">
@@ -490,7 +370,6 @@ function PenguinTable({
   teamId,
   ids,
   perPenguin,
-  openAlertsBy,
   state: t,
   setState,
   selected,
@@ -501,7 +380,6 @@ function PenguinTable({
   teamId: string;
   ids: string[];
   perPenguin: Map<string, Breakdown>;
-  openAlertsBy: Map<string, number>;
   state: TableState;
   setState: (s: TableState) => void;
   selected: string | null;
@@ -512,15 +390,15 @@ function PenguinTable({
   const { dataset, snapshots, now } = useDemo();
   const set = (patch: Partial<TableState>) => setState({ ...t, page: "page" in patch ? patch.page! : 1, ...patch });
 
-  type Row = { id: string; name?: string; species: SpeciesId; snap: Snapshot; b?: Breakdown; alerts: number; zone: string };
+  type Row = { id: string; name?: string; species: SpeciesId; snap: Snapshot; b?: Breakdown; zone: string };
   const all: Row[] = useMemo(
     () =>
       ids.map((id) => {
         const p = dataset.penguins.find((x) => x.id === id)!;
         const snap = snapshots.get(id)!;
-        return { id, name: p.name, species: p.speciesId, snap, b: perPenguin.get(id), alerts: openAlertsBy.get(id) ?? 0, zone: snap.reading?.zoneId ?? "" };
+        return { id, name: p.name, species: p.speciesId, snap, b: perPenguin.get(id), zone: snap.reading?.zoneId ?? "" };
       }),
-    [ids, dataset, snapshots, perPenguin, openAlertsBy],
+    [ids, dataset, snapshots, perPenguin],
   );
   const zoneOptions = [...new Set(all.map((r) => r.zone).filter(Boolean))].map((z) => ({ value: z, label: ZONE_BY_ID[z].name }));
   const speciesOptions = SPECIES.filter((s) => all.some((r) => r.species === s.id)).map((s) => ({ value: s.id, label: s.nameEs, color: s.color }));
@@ -540,7 +418,7 @@ function PenguinTable({
       return true;
     });
     const val = (r: Row): number | string =>
-      t.sort === "name" ? (r.name ?? "￿") : t.sort === "last" ? (r.snap.reading?.timestamp ?? 0) : t.sort === "water" ? (r.b?.water ?? -1) : t.sort === "land" ? (r.b?.land ?? -1) : t.sort === "alerts" ? r.alerts : r.id;
+      t.sort === "name" ? (r.name ?? "￿") : t.sort === "last" ? (r.snap.reading?.timestamp ?? 0) : t.sort === "water" ? (r.b?.water ?? -1) : t.sort === "land" ? (r.b?.land ?? -1) : r.id;
     const sign = t.dir === "desc" ? -1 : 1;
     out.sort((a, b) => {
       const x = val(a), y = val(b);
@@ -572,7 +450,7 @@ function PenguinTable({
           label="Estado"
           value={t.status}
           onChange={(v) => set({ status: v })}
-          options={(["water", "land", "resting", "stale", "offline", "no_data"] as LiveStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s], color: STATUS_COLOR[s] }))}
+          options={(["water", "land", "resting"] as LiveStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s], color: STATUS_COLOR[s] }))}
         />
         {!compact && (
           <FilterMenu<ActivityFilter>
@@ -584,7 +462,6 @@ function PenguinTable({
             options={[
               { value: "water", label: "Más tiempo en agua", color: SERIES.water },
               { value: "land", label: "Más tiempo en tierra", color: SERIES.land },
-              { value: "nodata", label: "Sin lecturas en el periodo", color: "#56718a" },
             ]}
           />
         )}
@@ -607,13 +484,11 @@ function PenguinTable({
               <SortTh k="water" t={t} onSort={sortBy} sub={rangeLabel}>En agua</SortTh>
               <SortTh k="land" t={t} onSort={sortBy} sub={rangeLabel}>En tierra</SortTh>
               <SortTh k="last" t={t} onSort={sortBy}>Última lectura</SortTh>
-              <SortTh k="alerts" t={t} onSort={sortBy}>Alertas</SortTh>
               <th className="w-10" />
             </tr>
           </thead>
           <tbody>
             {pageRows.map((r) => {
-              const stale = r.snap.status === "stale" || r.snap.status === "offline";
               const noData = !r.b || r.b.readings === 0;
               return (
                 <tr
@@ -627,7 +502,7 @@ function PenguinTable({
                   <td className="px-2 py-2 text-xs text-muted">{SPECIES_BY_ID[r.species].nameEs}</td>
                   <td className="px-2 py-2">
                     {r.zone ? (
-                      <span className={cx("inline-flex rounded-md border px-1.5 py-0.5 text-xs", stale ? "border-warn/30 text-warn" : "border-line-strong")} title={stale ? "Última ubicación conocida, no actual" : undefined}>
+                      <span className="inline-flex rounded-md border border-line-strong px-1.5 py-0.5 text-xs">
                         {ZONE_BY_ID[r.zone].name}
                       </span>
                     ) : (
@@ -637,14 +512,7 @@ function PenguinTable({
                   <td className="px-2 py-2"><StatusPill status={r.snap.status} compact /></td>
                   <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">Sin datos</span> : <HBar value={r.b!.water} max={maxH} color={SERIES.water} />}</td>
                   <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">Sin datos</span> : <HBar value={r.b!.land} max={maxH} color="#f5b84b" />}</td>
-                  <td className={cx("whitespace-nowrap px-2 py-2 text-xs", stale ? "text-warn" : "text-muted")}>{r.snap.reading ? fmtDateTime(r.snap.reading.timestamp, now) : "Sin datos"}</td>
-                  <td className="px-2 py-2">
-                    {r.alerts > 0 ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-danger/12 px-1.5 py-0.5 text-xs font-semibold text-danger"><BellRing size={11} /> {r.alerts}</span>
-                    ) : (
-                      <span className="text-faint">–</span>
-                    )}
-                  </td>
+                  <td className="whitespace-nowrap px-2 py-2 text-xs text-muted">{r.snap.reading ? fmtDateTime(r.snap.reading.timestamp, now) : "Sin datos"}</td>
                   <td className="pr-3">
                     <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Abrir ficha" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-ink/5 hover:text-ink">
                       <ChevronRight size={15} />
@@ -719,7 +587,7 @@ function ReassignBox({ penguinId, onDone }: { penguinId: string; onDone: () => v
             <ArrowRight size={13} className="text-accent" />
             <span className="rounded-md bg-accent/15 px-1.5 py-0.5 text-ink">{to.name}</span>
           </p>
-          <p className="mt-1.5 text-[11px] text-faint">Sus tareas y alertas abiertas pasan al nuevo equipo. Queda en el historial y se refleja en Species, Penguins y Habitat Map.</p>
+          <p className="mt-1.5 text-[11px] text-faint">Queda en el historial y se refleja en Species, Penguins y Habitat Map.</p>
           <div className="mt-2 flex gap-2">
             <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>Cancelar</Button>
             <Button
@@ -736,266 +604,6 @@ function ReassignBox({ penguinId, onDone }: { penguinId: string; onDone: () => v
         </div>
       )}
     </div>
-  );
-}
-
-/* ───────────── Tareas ───────────── */
-
-function TasksTab({ teamId, ids }: { teamId: string; ids: string[] }) {
-  const { tasks, dataset, now } = useDemo();
-  const team = dataset.teams.find((t) => t.id === teamId)!;
-  const [status, setStatus] = useState<"open" | TaskStatus | "all">("open");
-  const [editing, setEditing] = useState<CareTask | "new" | null>(null);
-  const rows = tasks
-    .filter((t) => t.teamId === teamId && (status === "all" || (status === "open" ? isOpenTask(t) : t.status === status)))
-    .sort((a, b) => Number(!isOpenTask(a)) - Number(!isOpenTask(b)) || a.dueAt - b.dueAt);
-  const count = (s: "open" | TaskStatus | "all") => tasks.filter((t) => t.teamId === teamId && (s === "all" || (s === "open" ? isOpenTask(t) : t.status === s))).length;
-
-  return (
-    <section className="panel overflow-hidden">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
-        {(
-          [
-            ["open", "Abiertas"],
-            ["pending", "Pendientes"],
-            ["in_progress", "En proceso"],
-            ["done", "Completadas"],
-            ["cancelled", "Canceladas"],
-            ["all", "Todas"],
-          ] as const
-        ).map(([k, l]) => (
-          <button key={k} onClick={() => setStatus(k)} className={cx("h-8 rounded-xl border px-3 text-xs", status === k ? "border-accent/50 bg-accent/10 text-ink" : "border-line text-muted hover:text-ink")}>
-            {l} <span className="num text-faint">{count(k)}</span>
-          </button>
-        ))}
-        <span className="ml-auto text-[11px] text-faint">Se sincronizan con Alerts & Tasks. Prioridad según vencimiento.</span>
-        {PERMISSIONS.manageTasks && (
-          <Button variant="primary" size="sm" onClick={() => setEditing("new")}>
-            <Plus size={14} /> Nueva tarea
-          </Button>
-        )}
-      </div>
-      <div className="scroll-thin overflow-x-auto">
-        <table className="w-full min-w-[1100px] text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-[11px] text-muted">
-              <th className="px-3 py-2.5 font-medium">Prioridad</th>
-              <th className="px-2 py-2.5 font-medium">Tarea</th>
-              <th className="px-2 py-2.5 font-medium">Pingüino o zona</th>
-              <th className="px-2 py-2.5 font-medium">Responsable</th>
-              <th className="px-2 py-2.5 font-medium">Vencimiento</th>
-              <th className="px-2 py-2.5 font-medium">Estado</th>
-              <th className="px-2 py-2.5 font-medium">Última actualización</th>
-              <th className="px-2 py-2.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((t) => {
-              const pr = taskPriority(t, now);
-              const p = t.penguinId ? dataset.penguins.find((x) => x.id === t.penguinId) : undefined;
-              const last = t.history[t.history.length - 1];
-              return (
-                <tr key={t.id} className={cx("border-b border-line/70 last:border-0", !isOpenTask(t) && "opacity-70")}>
-                  <td className="px-3 py-2">{isOpenTask(t) ? <Badge tone={PRIORITY_TONE[pr]}>{PRIORITY_LABEL[pr]}</Badge> : <span className="text-xs text-faint">—</span>}</td>
-                  <td className="max-w-[300px] px-2 py-2">
-                    <Link href={`/alerts?tab=tasks&task=${t.id}`} className="block truncate hover:underline">{t.title}</Link>
-                    <span className="block truncate text-[11px] text-faint">{t.notes || TASK_KIND_LABEL[t.kind]} · {t.id}</span>
-                  </td>
-                  <td className="px-2 py-2 text-xs text-muted">{p ? <Link href={`/penguins/${p.id}`} className="hover:underline">{p.id}{p.name ? ` · ${p.name}` : ""}</Link> : t.zoneId ? ZONE_BY_ID[t.zoneId]?.name : "—"}</td>
-                  <td className="px-2 py-2 text-xs">{t.assignee ?? <span className="text-faint">Sin responsable</span>}</td>
-                  <td className={cx("whitespace-nowrap px-2 py-2 text-xs", isOpenTask(t) && t.dueAt < now ? "text-danger" : "text-muted")}>{fmtDateTime(t.dueAt, now)}</td>
-                  <td className="px-2 py-2">{PERMISSIONS.manageTasks ? <TaskStatusControl task={t} /> : <Badge>{TASK_STATUS_LABEL[t.status]}</Badge>}</td>
-                  <td className="px-2 py-2 text-[11px] text-muted">
-                    {fmtAgo(taskUpdatedAt(t), now)}
-                    {last && <span className="block max-w-[180px] truncate text-faint" title={last.text}>{last.by}: {last.text}</span>}
-                  </td>
-                  <td className="px-2 py-2">
-                    {PERMISSIONS.manageTasks && (
-                      <button onClick={() => setEditing(t)} className="rounded-lg p-1.5 text-faint hover:bg-ink/5 hover:text-ink" title="Editar">
-                        <Pencil size={14} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {rows.length === 0 && <p className="py-8 text-center text-xs text-muted">Sin tareas en este estado.</p>}
-      </div>
-      <Drawer open={!!editing} onClose={() => setEditing(null)} width={480} title={editing === "new" ? `Nueva tarea · ${team.name}` : editing ? `Editar ${editing.id}` : ""}>
-        {editing && <TaskForm key={editing === "new" ? "new" : editing.id} teamId={teamId} ids={ids} task={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />}
-      </Drawer>
-    </section>
-  );
-}
-
-function TaskForm({ teamId, ids, task, onClose }: { teamId: string; ids: string[]; task?: CareTask; onClose: () => void }) {
-  const { dataset, createTask, updateTask, setTaskStatus, now } = useDemo();
-  const team = dataset.teams.find((t) => t.id === teamId)!;
-  const toLocal = (ts: number) => {
-    const d = new Date(ts - new Date(ts).getTimezoneOffset() * 60_000);
-    return d.toISOString().slice(0, 16);
-  };
-  const [title, setTitle] = useState(task?.title ?? "");
-  const [notes, setNotes] = useState(task?.notes ?? "");
-  const [kind, setKind] = useState<TaskKind>(task?.kind ?? "observation_followup");
-  const [assignee, setAssignee] = useState(task?.assignee ?? "");
-  const [due, setDue] = useState(toLocal(task?.dueAt ?? now + DAY));
-  const [penguinId, setPenguinId] = useState(task?.penguinId ?? "");
-  const [zoneId, setZoneId] = useState(task?.zoneId ?? "");
-  const field = "mt-1 w-full rounded-xl border border-line-strong bg-ink/[0.05] px-3 py-2 text-sm outline-none focus:border-accent/60";
-
-  const save = () => {
-    const dueAt = new Date(due).getTime();
-    if (task) updateTask(task.id, { title: title.trim(), notes: notes.trim(), assignee: assignee || undefined, dueAt, penguinId: penguinId || undefined, zoneId: zoneId || undefined });
-    else createTask({ kind, title: title.trim(), teamId, dueAt, notes: notes.trim() || undefined, assignee: assignee || undefined, penguinId: penguinId || undefined, zoneId: zoneId || undefined });
-    onClose();
-  };
-
-  return (
-    <form className="space-y-4 p-5" onSubmit={(e) => (e.preventDefault(), title.trim() && save())}>
-      {!task && (
-        <label className="block text-xs text-muted">
-          Tipo
-          <select value={kind} onChange={(e) => setKind(e.target.value as TaskKind)} className={field}>
-            {(Object.keys(TASK_KIND_LABEL) as TaskKind[]).map((k) => <option key={k} value={k} className="bg-panel-solid">{TASK_KIND_LABEL[k]}</option>)}
-          </select>
-        </label>
-      )}
-      <label className="block text-xs text-muted">
-        Nombre
-        <input value={title} onChange={(e) => setTitle(e.target.value)} className={field} />
-      </label>
-      <label className="block text-xs text-muted">
-        Descripción
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={cx(field, "resize-none")} />
-      </label>
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block text-xs text-muted">
-          Responsable
-          <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className={field}>
-            <option value="" className="bg-panel-solid">Sin responsable</option>
-            {team.members.map((m) => <option key={m} value={m} className="bg-panel-solid">{m}</option>)}
-          </select>
-        </label>
-        <label className="block text-xs text-muted">
-          Vencimiento
-          <input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className={cx(field, "[color-scheme:dark]")} />
-        </label>
-        <label className="block text-xs text-muted">
-          Pingüino
-          <select value={penguinId} onChange={(e) => setPenguinId(e.target.value)} className={field}>
-            <option value="" className="bg-panel-solid">Ninguno</option>
-            {ids.map((id) => {
-              const p = dataset.penguins.find((x) => x.id === id)!;
-              return <option key={id} value={id} className="bg-panel-solid">{id}{p.name ? ` · ${p.name}` : ""}</option>;
-            })}
-          </select>
-        </label>
-        <label className="block text-xs text-muted">
-          Zona
-          <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className={field}>
-            <option value="" className="bg-panel-solid">Ninguna</option>
-            {HABITAT.zones.filter((z) => z.kind !== "restricted").map((z) => <option key={z.id} value={z.id} className="bg-panel-solid">{z.name}</option>)}
-          </select>
-        </label>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
-        <div className="flex gap-2">
-          {task && isOpenTask(task) && (
-            <>
-              <Button type="button" size="sm" variant="outline" onClick={() => (setTaskStatus(task.id, "done"), onClose())}>Completar</Button>
-              <Button type="button" size="sm" variant="danger" onClick={() => (setTaskStatus(task.id, "cancelled"), onClose())}>Cancelar tarea</Button>
-            </>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" variant="ghost" onClick={onClose}>Cerrar</Button>
-          <Button type="submit" variant="primary" disabled={!title.trim()}>{task ? "Guardar" : "Crear tarea"}</Button>
-        </div>
-      </div>
-    </form>
-  );
-}
-
-/* ───────────── Alertas ───────────── */
-
-function AlertsTab({ teamId }: { teamId: string }) {
-  const { alerts, dataset, setAlertStatus, assignAlert, now } = useDemo();
-  const [status, setStatus] = useState<"active" | "resolved" | "all">("active");
-  const rows = alerts
-    .filter((a) => a.teamId === teamId && (status === "all" || (status === "active") === (a.status !== "resolved")))
-    .sort((a, b) => ({ high: 0, medium: 1, low: 2 })[a.priority] - ({ high: 0, medium: 1, low: 2 })[b.priority] || b.createdAt - a.createdAt);
-
-  return (
-    <section className="panel overflow-hidden">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
-        {(
-          [
-            ["active", "Activas"],
-            ["resolved", "Resueltas"],
-            ["all", "Todas"],
-          ] as const
-        ).map(([k, l]) => (
-          <button key={k} onClick={() => setStatus(k)} className={cx("h-8 rounded-xl border px-3 text-xs", status === k ? "border-accent/50 bg-accent/10 text-ink" : "border-line text-muted hover:text-ink")}>
-            {l}
-          </button>
-        ))}
-        <span className="ml-auto text-[11px] text-faint">Sincronizadas con Alerts & Tasks. Reglas automáticas; no son diagnósticos.</span>
-      </div>
-      <div className="scroll-thin overflow-x-auto">
-        <table className="w-full min-w-[1050px] text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-[11px] text-muted">
-              <th className="px-3 py-2.5 font-medium">Prioridad</th>
-              <th className="px-2 py-2.5 font-medium">Tipo</th>
-              <th className="px-2 py-2.5 font-medium">Ejemplar</th>
-              <th className="px-2 py-2.5 font-medium">Fecha y hora</th>
-              <th className="px-2 py-2.5 font-medium">Equipo responsable</th>
-              <th className="px-2 py-2.5 font-medium">Estado</th>
-              <th className="px-2 py-2.5 font-medium">Desde su creación</th>
-              <th className="px-2 py-2.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((a) => {
-              const p = a.penguinId ? dataset.penguins.find((x) => x.id === a.penguinId) : undefined;
-              return (
-                <tr key={a.id} className={cx("border-b border-line/70 last:border-0", a.status === "resolved" && "opacity-70")}>
-                  <td className="px-3 py-2"><Badge tone={PRIORITY_TONE[a.priority]}>{PRIORITY_LABEL[a.priority]}</Badge></td>
-                  <td className="px-2 py-2">
-                    <span className="block text-[13px]">{ALERT_FAMILY_LABEL[ALERT_FAMILY[a.type]]}</span>
-                    <span className="block text-[11px] text-faint">{ALERT_TYPE_LABEL[a.type]}</span>
-                  </td>
-                  <td className="px-2 py-2 text-xs">{p ? <Link href={`/penguins/${p.id}`} className="hover:underline">{p.id}{p.name ? ` · ${p.name}` : ""}</Link> : "—"}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-xs text-muted">{fmtDateTime(a.createdAt, now)}</td>
-                  <td className="px-2 py-2">
-                    {PERMISSIONS.manageAlerts && a.status !== "resolved" ? (
-                      <Select value={a.teamId} onChange={(e) => assignAlert(a.id, e.target.value)} className="h-8 text-xs">
-                        {dataset.teams.filter((t) => isActive(t) || t.id === a.teamId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </Select>
-                    ) : (
-                      <span className="text-xs text-muted">{dataset.teams.find((t) => t.id === a.teamId)?.name}</span>
-                    )}
-                  </td>
-                  <td className="px-2 py-2"><Badge tone={a.status === "resolved" ? "ok" : a.status === "following" ? "info" : "warn"}>{ALERT_STATUS_LABEL[a.status]}</Badge></td>
-                  <td className="whitespace-nowrap px-2 py-2 text-xs text-muted">{fmtAgo(a.createdAt, now)}</td>
-                  <td className="px-2 py-2">
-                    <div className="flex justify-end gap-1.5">
-                      <Link href={`/alerts?alert=${a.id}`} className="inline-flex h-8 items-center rounded-xl border border-line-strong px-2.5 text-xs hover:border-accent/50">Abrir</Link>
-                      {PERMISSIONS.manageAlerts && a.status === "pending" && <Button size="sm" variant="outline" onClick={() => setAlertStatus(a.id, "following")}>Seguimiento</Button>}
-                      {PERMISSIONS.manageAlerts && a.status !== "resolved" && <Button size="sm" variant="primary" onClick={() => setAlertStatus(a.id, "resolved")}>Resolver</Button>}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {rows.length === 0 && <p className="py-8 text-center text-xs text-muted">Sin alertas en este estado.</p>}
-      </div>
-    </section>
   );
 }
 
@@ -1187,7 +795,7 @@ function ShiftForm({ team, weekday, onAdd, onClose }: { team: ReturnType<typeof 
 /* ───────────── Personal ───────────── */
 
 function StaffTab({ teamId }: { teamId: string }) {
-  const { dataset, tasks, shifts, teamLog, updateTeam, now } = useDemo();
+  const { dataset, shifts, teamLog, updateTeam, now } = useDemo();
   const team = dataset.teams.find((t) => t.id === teamId)!;
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState("");
@@ -1206,7 +814,6 @@ function StaffTab({ teamId }: { teamId: string }) {
                 <th className="px-2 py-2.5 font-medium">Rol</th>
                 <th className="px-2 py-2.5 font-medium">Asignación</th>
                 <th className="px-2 py-2.5 font-medium">Turno configurado</th>
-                <th className="px-2 py-2.5 font-medium">Tareas asignadas</th>
                 <th className="px-2 py-2.5" />
               </tr>
             </thead>
@@ -1214,7 +821,6 @@ function StaffTab({ teamId }: { teamId: string }) {
               {team.members.map((m) => {
                 const isLead = m === team.lead;
                 const myShifts = shifts.filter((s) => s.teamId === teamId && s.member === m);
-                const myTasks = tasks.filter((t) => t.teamId === teamId && t.assignee === m && isOpenTask(t)).length;
                 return (
                   <tr key={m} className="border-b border-line/60 last:border-0">
                     <td className="px-4 py-2">
@@ -1241,7 +847,6 @@ function StaffTab({ teamId }: { teamId: string }) {
                     <td className="px-2 py-2 text-xs text-muted">
                       {myShifts.length ? myShifts.map((s) => `${WEEKDAYS[s.weekday].slice(0, 3)} ${s.start}–${s.end}`).join(" · ") : <span className="text-faint">Sin turno configurado</span>}
                     </td>
-                    <td className="num px-2 py-2 text-xs">{myTasks || <span className="text-faint">0</span>}</td>
                     <td className="px-2 py-2 text-right">
                       {can && !isLead &&
                         (removing === m ? (

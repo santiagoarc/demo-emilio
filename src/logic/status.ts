@@ -1,4 +1,4 @@
-import type { AlertRulesConfig } from "@/config/demo.config";
+import type { RulesConfig } from "@/config/demo.config";
 import type { Dataset, LocationReading, Penguin, TrackingDevice } from "@/domain/types";
 import { MIN } from "./time";
 
@@ -54,7 +54,7 @@ export function firstIndexAtOrAfter(list: { timestamp: number }[], t: number): n
   return lo;
 }
 
-export function snapshotAt(ds: Dataset, deviceById: Map<string, TrackingDevice>, rules: AlertRulesConfig, p: Penguin, at: number): Snapshot {
+export function snapshotAt(ds: Dataset, deviceById: Map<string, TrackingDevice>, rules: RulesConfig, p: Penguin, at: number): Snapshot {
   const list = ds.readings.get(p.id) ?? [];
   const idx = lastIndexAtOrBefore(list, at);
   const device = deviceById.get(p.deviceId)!;

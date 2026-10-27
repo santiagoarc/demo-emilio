@@ -2,15 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DEFAULT_CONFIG, type DemoConfig } from "@/config/demo.config";
+import { seedHealthCases } from "@/data/healthCases";
 import { createSimulatedSource } from "@/data/source";
-import { ZONE_BY_ID } from "@/domain/habitat";
-import type { Alert, AlertStatus, CareNote, CareTask, CareTeam, Dataset, Incident, Penguin, Shift, TaskKind, TaskStatus, TrackingDevice } from "@/domain/types";
-import { evaluateAlertRules } from "@/logic/alertRules";
+import { penguinInsight, speciesBaselines, type PenguinInsight } from "@/logic/insights";
+import type { CareNote, CareTeam, Dataset, HealthCase, HealthReason, Incident, Penguin, Shift, TrackingDevice } from "@/domain/types";
 import { EMPTY_FILTERS, resolveRange, type Filters, type ResolvedRange } from "@/logic/filters";
 import { snapshotAt, type Snapshot } from "@/logic/status";
 import { MIN } from "@/logic/time";
 import { clearPersisted, loadPersisted, savePersisted, shiftPersisted } from "./persistence";
-import { isOpenTask } from "@/logic/tasks";
 
 export const CURRENT_USER = "Usuario demo";
 
@@ -22,8 +21,6 @@ export const PERMISSIONS = {
   role: "Coordinación de cuidado (demo)",
   reassignTeam: true,
   addObservation: true,
-  manageAlerts: true,
-  manageTasks: true,
   manageTeams: true,
 };
 
@@ -52,28 +49,23 @@ interface CoreState {
   config: DemoConfig;
   dataset: Dataset;
   assignments: Record<string, string>;
-  tasks: CareTask[];
-  alerts: Alert[];
-  reviews: Record<string, number>;
   log: Incident[];
   userNotes: CareNote[];
   customTeams: CareTeam[];
   teamEdits: Record<string, Partial<CareTeam>>;
   teamLog: TeamLogEntry[];
   shifts: Shift[];
+  cases: HealthCase[];
   filters: Filters;
-  taskSeq: number;
 }
 
-export interface NewTaskInput {
-  kind: TaskKind;
+export interface NewCaseInput {
+  penguinId: string;
+  reason: HealthReason;
   title: string;
-  teamId: string;
-  dueAt: number;
-  penguinId?: string;
-  zoneId?: string;
-  notes?: string;
-  assignee?: string;
+  owner: string;
+  text: string;
+  weightKg?: number;
 }
 
 export interface DemoContextValue extends CoreState {
@@ -85,6 +77,8 @@ export interface DemoContextValue extends CoreState {
   teamOf: (penguinId: string) => string;
   lastReviewOf: (penguinId: string) => number;
   snapshots: Map<string, Snapshot>;
+  /** "¿Cómo va?" de cada ejemplar en las últimas 24 h, contra su especie y contra sí mismo. */
+  insights: Map<string, PenguinInsight>;
   /** Ejemplares que pasan especie/equipo/ejemplar (sin el filtro de zona). */
   scoped: Penguin[];
   /** Además filtrados por la zona actual registrada. */
@@ -92,17 +86,14 @@ export interface DemoContextValue extends CoreState {
   setFilters: (patch: Partial<Filters>) => void;
   clearFilters: () => void;
   reassign: (penguinId: string, teamId: string) => void;
-  setTaskStatus: (taskId: string, status: TaskStatus, note?: string) => void;
-  assignTask: (taskId: string, teamId: string) => void;
-  createTask: (input: NewTaskInput) => string;
-  setAlertStatus: (alertId: string, status: AlertStatus, note?: string) => void;
-  assignAlert: (alertId: string, teamId: string) => void;
   addNote: (penguinId: string, text: string) => void;
-  updateTask: (taskId: string, patch: Partial<Pick<CareTask, "title" | "notes" | "assignee" | "dueAt" | "penguinId" | "zoneId">>) => void;
   addTeam: (input: TeamInput) => string;
   updateTeam: (teamId: string, patch: Partial<TeamInput>) => void;
   addShift: (shift: Omit<Shift, "id">) => void;
   removeShift: (shiftId: string) => void;
+  openCase: (input: NewCaseInput) => string;
+  addCaseEntry: (caseId: string, text: string, weightKg?: number) => void;
+  closeCase: (caseId: string, text: string) => void;
   resetDemo: (config?: DemoConfig) => void;
 }
 
@@ -115,9 +106,7 @@ function roundNow(slotMinutes: number) {
 
 function freshState(config: DemoConfig, filters: Filters = EMPTY_FILTERS): CoreState {
   const dataset = createSimulatedSource(config).load(roundNow(config.slotMinutes));
-  const initialTeam = new Map(dataset.penguins.map((p) => [p.id, p.initialTeamId]));
-  const alerts = evaluateAlertRules(dataset, dataset.tasks, (id) => initialTeam.get(id)!, config.rules);
-  return { config, dataset, assignments: {}, tasks: dataset.tasks, alerts, reviews: {}, log: [], userNotes: [], customTeams: [], teamEdits: {}, teamLog: [], shifts: [], filters, taskSeq: 1 };
+  return { config, dataset, assignments: {}, log: [], userNotes: [], customTeams: [], teamEdits: {}, teamLog: [], shifts: [], cases: seedHealthCases(dataset, config.seed), filters };
 }
 
 function restoreState(): CoreState {
@@ -131,17 +120,14 @@ function restoreState(): CoreState {
     config: s.config,
     dataset,
     assignments: Object.fromEntries(Object.entries(s.assignments).filter(([id]) => ids.has(id))),
-    tasks: s.tasks,
-    alerts: s.alerts,
-    reviews: s.reviews,
     log: s.log,
     userNotes: s.userNotes ?? [],
     customTeams: s.customTeams ?? [],
     teamEdits: s.teamEdits ?? {},
     teamLog: s.teamLog ?? [],
     shifts: s.shifts ?? [],
+    cases: s.cases ? s.cases.filter((c) => ids.has(c.penguinId)) : seedHealthCases(dataset, s.config.seed),
     filters: { ...EMPTY_FILTERS, ...s.filters },
-    taskSeq: s.taskSeq ?? 1,
   };
 }
 
@@ -171,17 +157,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         savedNow: state.dataset.now,
         config: state.config,
         assignments: state.assignments,
-        tasks: state.tasks,
-        alerts: state.alerts,
-        reviews: state.reviews,
         log: state.log,
         userNotes: state.userNotes,
         customTeams: state.customTeams,
         teamEdits: state.teamEdits,
         teamLog: state.teamLog,
         shifts: state.shifts,
+        cases: state.cases,
         filters: state.filters,
-        taskSeq: state.taskSeq,
       });
     }, 250);
     return () => window.clearTimeout(id);
@@ -200,7 +183,7 @@ function DemoContextInner({
   setState: React.Dispatch<React.SetStateAction<CoreState>>;
   children: ReactNode;
 }) {
-  const { dataset: baseDataset, assignments, reviews, filters, config, customTeams, teamEdits } = state;
+  const { dataset: baseDataset, assignments, filters, config, customTeams, teamEdits } = state;
   const clock = useActionClock(baseDataset.now);
 
   // Equipos vigentes: los del escenario con sus ediciones, más los creados en la demo.
@@ -212,13 +195,20 @@ function DemoContextInner({
   const penguinById = useMemo(() => new Map(dataset.penguins.map((p) => [p.id, p])), [dataset]);
   const deviceById = useMemo(() => new Map(dataset.devices.map((d) => [d.id, d])), [dataset]);
   const teamOf = useCallback((id: string) => assignments[id] ?? penguinById.get(id)?.initialTeamId ?? "", [assignments, penguinById]);
-  const lastReviewOf = useCallback((id: string) => reviews[id] ?? penguinById.get(id)?.lastReviewAt ?? 0, [reviews, penguinById]);
+  const lastReviewOf = useCallback((id: string) => penguinById.get(id)?.lastReviewAt ?? 0, [penguinById]);
 
   const snapshots = useMemo(() => {
     const m = new Map<string, Snapshot>();
     for (const p of dataset.penguins) m.set(p.id, snapshotAt(dataset, deviceById, config.rules, p, dataset.now));
     return m;
   }, [dataset, deviceById, config.rules]);
+
+  const insights = useMemo(() => {
+    const base = speciesBaselines(dataset);
+    const m = new Map<string, PenguinInsight>();
+    for (const p of dataset.penguins) m.set(p.id, penguinInsight(dataset, p, base.get(p.speciesId)));
+    return m;
+  }, [dataset]);
 
   const scoped = useMemo(
     () =>
@@ -251,110 +241,7 @@ function DemoContextInner({
         return {
           ...s,
           assignments: { ...s.assignments, [penguinId]: teamId },
-          tasks: s.tasks.map((t) =>
-            t.penguinId === penguinId && isOpenTask(t)
-              ? { ...t, teamId, history: [...t.history, { at, by: CURRENT_USER, text: `Tarea movida a ${teamName(teamId)} por reasignación del ejemplar.` }] }
-              : t,
-          ),
-          alerts: s.alerts.map((a) =>
-            a.penguinId === penguinId && a.status !== "resolved"
-              ? { ...a, teamId, history: [...a.history, { at, by: CURRENT_USER, text: `Alerta movida a ${teamName(teamId)} por reasignación del ejemplar.` }] }
-              : a,
-          ),
           log: [{ id: `LOG-${at}-${penguinId}`, penguinId, at, kind: "assignment", text }, ...s.log],
-        };
-      }),
-    [setState, clock, teamName],
-  );
-
-  const setTaskStatus = useCallback(
-    (taskId: string, status: TaskStatus, note?: string) =>
-      setState((s) => {
-        const task = s.tasks.find((t) => t.id === taskId);
-        if (!task || task.status === status) return s;
-        const at = clock();
-        const label = status === "done" ? "Completada" : status === "in_progress" ? "En proceso" : status === "cancelled" ? "Cancelada" : "Regresada a pendiente";
-        const tasks = s.tasks.map((t) =>
-          t.id === taskId ? { ...t, status, history: [...t.history, { at, by: CURRENT_USER, text: note ? `${label}: ${note}` : `${label}.` }] } : t,
-        );
-        let { reviews, alerts } = s;
-        if (status === "cancelled") {
-          alerts = alerts.map((a) =>
-            a.status !== "resolved" && a.taskId === taskId ? { ...a, status: "resolved", history: [...a.history, { at, by: CURRENT_USER, text: `Cerrada al cancelar ${taskId}.` }] } : a,
-          );
-        }
-        if (status === "done") {
-          if (task.kind === "routine_review" && task.penguinId) reviews = { ...reviews, [task.penguinId]: at };
-          alerts = alerts.map((a) => {
-            const linked =
-              a.status !== "resolved" &&
-              (a.taskId === taskId || (task.kind === "routine_review" && a.type === "care_review_pending" && a.penguinId === task.penguinId));
-            return linked ? { ...a, status: "resolved", history: [...a.history, { at, by: CURRENT_USER, text: `Resuelta al completar ${taskId}.` }] } : a;
-          });
-        }
-        return { ...s, tasks, reviews, alerts };
-      }),
-    [setState, clock],
-  );
-
-  const assignTask = useCallback(
-    (taskId: string, teamId: string) =>
-      setState((s) => {
-        const at = clock();
-        return {
-          ...s,
-          tasks: s.tasks.map((t) =>
-            t.id === taskId && t.teamId !== teamId ? { ...t, teamId, history: [...t.history, { at, by: CURRENT_USER, text: `Asignada a ${teamName(teamId)}.` }] } : t,
-          ),
-        };
-      }),
-    [setState, clock, teamName],
-  );
-
-  const createTask = useCallback(
-    (input: NewTaskInput) => {
-      const id = `TSK-U${String(state.taskSeq).padStart(3, "0")}`;
-      setState((s) => {
-        const at = clock();
-        const zoneName = input.zoneId ? ZONE_BY_ID[input.zoneId]?.name : undefined;
-        const task: CareTask = {
-          id,
-          ...input,
-          createdAt: at,
-          status: "pending",
-          history: [{ at, by: CURRENT_USER, text: `Creada y asignada a ${teamName(input.teamId)}${zoneName ? ` · ${zoneName}` : ""}.` }],
-        };
-        return { ...s, tasks: [task, ...s.tasks], taskSeq: s.taskSeq + 1 };
-      });
-      return id;
-    },
-    [setState, clock, teamName, state.taskSeq],
-  );
-
-  const setAlertStatus = useCallback(
-    (alertId: string, status: AlertStatus, note?: string) =>
-      setState((s) => {
-        const at = clock();
-        const label = status === "resolved" ? "Resuelta" : status === "following" ? "En seguimiento" : "Reabierta";
-        return {
-          ...s,
-          alerts: s.alerts.map((a) =>
-            a.id === alertId && a.status !== status ? { ...a, status, history: [...a.history, { at, by: CURRENT_USER, text: note ? `${label}: ${note}` : `${label}.` }] } : a,
-          ),
-        };
-      }),
-    [setState, clock],
-  );
-
-  const assignAlert = useCallback(
-    (alertId: string, teamId: string) =>
-      setState((s) => {
-        const at = clock();
-        return {
-          ...s,
-          alerts: s.alerts.map((a) =>
-            a.id === alertId && a.teamId !== teamId ? { ...a, teamId, history: [...a.history, { at, by: CURRENT_USER, text: `Asignada a ${teamName(teamId)}.` }] } : a,
-          ),
         };
       }),
     [setState, clock, teamName],
@@ -370,24 +257,38 @@ function DemoContextInner({
     [setState, clock],
   );
 
-  const updateTask = useCallback(
-    (taskId: string, patch: Partial<Pick<CareTask, "title" | "notes" | "assignee" | "dueAt" | "penguinId" | "zoneId">>) =>
+  const openCase = useCallback(
+    (input: NewCaseInput) => {
+      const id = `HC-U${Date.now().toString(36)}-${input.penguinId}`;
+      setState((s) => {
+        const at = clock();
+        const entry = { id: `${id}-0`, at, by: CURRENT_USER, text: input.text, weightKg: input.weightKg };
+        const hc: HealthCase = { id, penguinId: input.penguinId, reason: input.reason, title: input.title, owner: input.owner, openedAt: at, status: "open", entries: [entry], simulated: false };
+        return { ...s, cases: [hc, ...s.cases] };
+      });
+      return id;
+    },
+    [setState, clock],
+  );
+
+  const addCaseEntry = useCallback(
+    (caseId: string, text: string, weightKg?: number) =>
+      setState((s) => {
+        const at = clock();
+        return { ...s, cases: s.cases.map((c) => (c.id === caseId ? { ...c, entries: [{ id: `${caseId}-${at}`, at, by: CURRENT_USER, text, weightKg }, ...c.entries] } : c)) };
+      }),
+    [setState, clock],
+  );
+
+  const closeCase = useCallback(
+    (caseId: string, text: string) =>
       setState((s) => {
         const at = clock();
         return {
           ...s,
-          tasks: s.tasks.map((t) => {
-            if (t.id !== taskId) return t;
-            const changes: string[] = [];
-            if (patch.title !== undefined && patch.title !== t.title) changes.push("nombre");
-            if (patch.notes !== undefined && patch.notes !== (t.notes ?? "")) changes.push("descripción");
-            if ("assignee" in patch && patch.assignee !== t.assignee) changes.push(patch.assignee ? `responsable: ${patch.assignee}` : "sin responsable");
-            if (patch.dueAt !== undefined && patch.dueAt !== t.dueAt) changes.push("vencimiento");
-            if ("penguinId" in patch && patch.penguinId !== t.penguinId) changes.push("ejemplar");
-            if ("zoneId" in patch && patch.zoneId !== t.zoneId) changes.push("zona");
-            if (!changes.length) return t;
-            return { ...t, ...patch, history: [...t.history, { at, by: CURRENT_USER, text: `Editada (${changes.join(", ")}).` }] };
-          }),
+          cases: s.cases.map((c) =>
+            c.id === caseId ? { ...c, status: "closed" as const, closedAt: at, entries: [{ id: `${caseId}-${at}`, at, by: CURRENT_USER, text: text || "Caso cerrado." }, ...c.entries] } : c,
+          ),
         };
       }),
     [setState, clock],
@@ -505,14 +406,12 @@ function DemoContextInner({
     visible,
     setFilters,
     clearFilters,
+    insights,
     reassign,
-    setTaskStatus,
-    assignTask,
-    createTask,
-    setAlertStatus,
-    assignAlert,
     addNote,
-    updateTask,
+    openCase,
+    addCaseEntry,
+    closeCase,
     addTeam,
     updateTeam,
     addShift,

@@ -7,12 +7,10 @@ import {
   Activity,
   ArrowLeft,
   ArrowRightLeft,
-  Battery,
-  BellRing,
   ChevronDown,
   ChevronRight,
-  ClipboardList,
   Droplets,
+  HeartPulse,
   History,
   ListOrdered,
   MapPin,
@@ -28,8 +26,7 @@ import {
 import { ZONE_BY_ID } from "@/domain/habitat";
 import { SPECIES_BY_ID } from "@/domain/species";
 import type { LocationReading } from "@/domain/types";
-import { ALERT_TYPE_LABEL } from "@/logic/alertRules";
-import { ALERT_STATUS_LABEL, PRIORITY_LABEL, PRIORITY_TONE, QUALITY_LABEL, QUALITY_TONE, RECORD_STATUS_LABEL, SOURCE_LABEL, SOURCE_SHORT, TASK_KIND_LABEL, TASK_STATUS_LABEL } from "@/logic/labels";
+import { QUALITY_LABEL, QUALITY_TONE, RECORD_STATUS_LABEL, SOURCE_LABEL, SOURCE_SHORT } from "@/logic/labels";
 import { computeActivity } from "@/logic/metrics";
 import { firstIndexAtOrAfter, lastIndexAtOrBefore } from "@/logic/status";
 import { DAY, HOUR, MIN, fmtAgo, fmtDate, fmtDateTime, fmtHours, fmtWeekday, fromDateInput, startOfDay, toDateInput } from "@/logic/time";
@@ -42,20 +39,17 @@ import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 import { StatusPill } from "@/components/penguin/StatusPill";
 import { MovementHistory } from "@/components/penguin/MovementHistory";
 import { TeamReassign } from "@/components/penguin/TeamReassign";
-import { TaskStatusControl } from "@/features/alerts/TaskStatusControl";
-import { isOpenTask } from "@/logic/tasks";
-
-const PROFILE_LABEL = { stable: "Comunicación estable", intermittent: "Comunicación intermitente", offline: "Sin comunicación" } as const;
+import { PenguinHealth } from "@/features/health/HealthCards";
 
 const SECTIONS = [
   { id: "resumen", label: "Resumen" },
+  { id: "salud", label: "Salud" },
   { id: "localizacion", label: "Localización" },
   { id: "actividad", label: "Actividad" },
   { id: "lecturas", label: "Lecturas" },
   { id: "equipo", label: "Equipo" },
-  { id: "cuidado", label: "Cuidado" },
-  { id: "alertas", label: "Alertas" },
   { id: "historial", label: "Historial" },
+  { id: "cuidado", label: "Cuidado" },
 ];
 
 export function PenguinProfileView() {
@@ -77,7 +71,7 @@ export function PenguinProfileView() {
 }
 
 function Profile({ penguinId }: { penguinId: string }) {
-  const { dataset, penguinById, snapshots, teamOf, alerts, range, now } = useDemo();
+  const { dataset, penguinById, snapshots, teamOf, range, now } = useDemo();
   const p = penguinById.get(penguinId)!;
   const sp = SPECIES_BY_ID[p.speciesId];
   const snap = snapshots.get(penguinId)!;
@@ -86,8 +80,6 @@ function Profile({ penguinId }: { penguinId: string }) {
 
   const agg = useMemo(() => computeActivity(dataset, [penguinId], from, to), [dataset, penguinId, from, to]);
   const r = snap.reading;
-  const lastKnown = snap.status === "stale" || snap.status === "offline";
-  const openAlerts = alerts.filter((a) => a.penguinId === penguinId && a.status !== "resolved");
   const t = agg.totals;
   const title = p.name ?? p.id;
 
@@ -127,10 +119,9 @@ function Profile({ penguinId }: { penguinId: string }) {
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-ink/[0.05] px-2 py-0.5 text-[11px] text-muted">
                   <span className="h-2 w-2 rounded-full" style={{ background: team?.color ?? "#56718a" }} /> {team?.name ?? "Sin asignar"}
                 </span>
-                <span className={cx("inline-flex items-center gap-1.5 rounded-md bg-ink/[0.05] px-2 py-0.5 text-[11px]", lastKnown ? "text-warn" : "text-muted")}>
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-ink/[0.05] px-2 py-0.5 text-[11px] text-muted">
                   <MapPin size={11} />
                   {r ? `${ZONE_BY_ID[r.zoneId].name} · ${fmtDateTime(r.timestamp, now)}` : "Sin ubicación registrada"}
-                  {lastKnown && " · desactualizada"}
                 </span>
                 <SimulatedTag />
               </div>
@@ -176,28 +167,29 @@ function Profile({ penguinId }: { penguinId: string }) {
 
       <div className="mt-5 space-y-5 px-6 lg:px-8">
         {/* 2. Indicadores */}
-        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          <Kpi label={lastKnown ? "Última ubicación conocida" : "Última ubicación"} value={r ? ZONE_BY_ID[r.zoneId].name : "Sin datos"} sub={r ? (lastKnown ? "Desactualizada" : "Reciente") : undefined} warn={lastKnown} small />
+        {/* Cuatro indicadores: dos por fila en pantallas medianas, una sola fila en grandes. */}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Kpi label="Última ubicación" value={r ? ZONE_BY_ID[r.zoneId].name : "Sin datos"} sub={r ? `Precisión ±${r.accuracyM} m` : undefined} small />
           <Kpi label="Tiempo en agua" value={t.readings ? fmtHours(t.water) : "Sin datos"} sub={range.label} color={SERIES.water} />
           <Kpi label="Tiempo en tierra" value={t.readings ? fmtHours(t.land) : "Sin datos"} sub={range.label} color="#f5b84b" />
-          <Kpi label="Sin lectura" value={fmtHours(t.noFix + t.noComm)} sub={range.label} color="#56718a" />
-          <Kpi label="Última lectura" value={r ? fmtDateTime(r.timestamp, now) : "Sin datos"} sub={r ? fmtAgo(r.timestamp, now) : undefined} warn={lastKnown} small />
-          <Kpi label="Alertas activas" value={String(openAlerts.length)} sub={openAlerts.length ? "Ver sección Alertas" : "Ninguna"} warn={openAlerts.length > 0} />
+          <Kpi label="Última lectura" value={r ? fmtDateTime(r.timestamp, now) : "Sin datos"} sub={r ? fmtAgo(r.timestamp, now) : undefined} small />
         </div>
+
+        <Card title={<span id="salud" className="scroll-mt-20">Salud</span>} icon={HeartPulse}>
+          <PenguinHealth penguinId={penguinId} />
+        </Card>
 
         <LocationSection penguinId={penguinId} />
         <ActivitySection penguinId={penguinId} />
         <ReadingsSection penguinId={penguinId} />
 
+        {/* El historial toma el alto de la tarjeta de equipo; cuidado va completo debajo. */}
         <div className="grid gap-5 xl:grid-cols-12">
           <TeamSection penguinId={penguinId} className="xl:col-span-5" />
-          <CareSection penguinId={penguinId} className="xl:col-span-7" />
-        </div>
-
-        <div className="grid gap-5 xl:grid-cols-12">
-          <AlertsSection penguinId={penguinId} className="xl:col-span-5" />
           <TimelineSection penguinId={penguinId} className="xl:col-span-7" />
         </div>
+
+        <CareSection penguinId={penguinId} />
       </div>
     </div>
   );
@@ -211,14 +203,13 @@ function LocationSection({ penguinId }: { penguinId: string }) {
   const sp = SPECIES_BY_ID[p.speciesId];
   const snap = snapshots.get(penguinId)!;
   const r = snap.reading;
-  const lastKnown = snap.status === "stale" || snap.status === "offline";
 
   const trail: TrailPoint[] = useMemo(() => {
     const list = dataset.readings.get(penguinId) ?? [];
     const out: TrailPoint[] = [];
     for (let i = lastIndexAtOrBefore(list, now); i >= 0 && list[i].timestamp > now - 24 * HOUR; i--) {
       const q = list[i];
-      out.push({ x: q.x, y: q.y, t: q.timestamp, quality: q.quality, medium: q.medium });
+      out.push({ x: q.x, y: q.y, t: q.timestamp, quality: q.quality, medium: q.medium, zoneId: q.zoneId });
     }
     return out.reverse();
   }, [dataset, penguinId, now]);
@@ -250,38 +241,19 @@ function LocationSection({ penguinId }: { penguinId: string }) {
               selectedId={p.id}
               trail={trail}
               focus={trailFocus}
-              layers={{ zones: true, labels: true, landmarks: false, markers: true, lastKnown: true, restricted: true, trail: true }}
+              layers={{ zones: true, labels: true, landmarks: false, markers: true, restricted: true, trail: true }}
             />
           ) : (
-            <EmptyState icon={MapPinned} title="Sin lecturas de ubicación" />
+            <EmptyState icon={MapPinned} title="Sin ubicación registrada" />
           )}
         </div>
         <dl className="space-y-2.5 text-sm">
-          <Row k={lastKnown ? "Última zona conocida" : "Última zona registrada"} v={r ? ZONE_BY_ID[r.zoneId].name : "Sin datos"} />
-          <Row k="Fecha y hora" v={r ? <span className={lastKnown ? "text-warn" : ""}>{fmtDateTime(r.timestamp, now)} · {fmtAgo(r.timestamp, now)}</span> : "Sin datos"} />
+          <Row k="Última zona registrada" v={r ? ZONE_BY_ID[r.zoneId].name : "Sin datos"} />
+          <Row k="Fecha y hora" v={r ? `${fmtDateTime(r.timestamp, now)} · ${fmtAgo(r.timestamp, now)}` : "Sin datos"} />
           <Row k="Fuente" v={r ? SOURCE_LABEL[r.source] : "Sin datos"} />
           <Row k="Calidad / precisión" v={r ? <><Badge tone={QUALITY_TONE[r.quality]}>{QUALITY_LABEL[r.quality]}</Badge> <span className="text-[11px] text-faint">±{r.accuracyM} m</span></> : "Sin datos"} />
-          <Row k="Estado de actualización" v={<StatusPill status={snap.status} compact />} />
-          <Row
-            k="Dispositivo"
-            v={
-              <span className={snap.device.profile === "offline" ? "text-danger" : snap.device.profile === "intermittent" ? "text-warn" : ""}>
-                <span className="font-mono">{p.deviceId}</span>
-                <span className="block text-[11px]">
-                  <Radio size={11} className="mr-1 inline" />
-                  {PROFILE_LABEL[snap.device.profile]}
-                </span>
-                <span className="block text-[11px] text-faint">
-                  Último latido {fmtAgo(snap.device.lastHeartbeat, now)} · <Battery size={11} className="inline" /> {snap.device.batteryPct}%
-                </span>
-              </span>
-            }
-          />
-          {lastKnown && (
-            <p className="rounded-lg border border-warn/30 bg-warn/10 px-2.5 py-2 text-[11px] text-warn">
-              {snap.status === "offline" ? "El dispositivo no comunica." : "El dispositivo comunica pero no hay posición reciente."} La zona mostrada es la última conocida, no una posición actual.
-            </p>
-          )}
+          <Row k="Estado actual" v={<StatusPill status={snap.status} compact />} />
+          <Row k="Dispositivo" v={<span className="font-mono">{p.deviceId}</span>} />
         </dl>
         <div>
           <p className="mb-2 text-xs font-medium">Cambios entre zonas · {range.label.toLowerCase()}</p>
@@ -312,28 +284,33 @@ function ActivitySection({ penguinId }: { penguinId: string }) {
     return n;
   }, [dataset, penguinId, from, to]);
   const t = agg.totals;
-  const days = span / DAY;
+  // La proporción por día muestra siempre la última semana, sin importar el periodo elegido.
+  const byDay = useMemo(
+    () =>
+      computeActivity(dataset, [penguinId], Math.max(dataset.windowStart, startOfDay(dataset.now) - 6 * DAY), dataset.now)
+        .daily.filter((d) => d.water + d.land > 0)
+        .map((d) => ({ day: d.day, share: d.water / (d.water + d.land) })),
+    [dataset, penguinId],
+  );
 
   return (
     <Card
       title={<span id="actividad" className="scroll-mt-20">Actividad</span>}
       icon={Activity}
-      subtitle={`${range.label} · horas registradas por las lecturas. Lo que no tiene lectura se muestra aparte.`}
+      subtitle={`${range.label} · horas registradas por las lecturas.`}
       action={<SimulatedTag />}
     >
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <MetricBlock label="En agua · observado" value={t.readings ? fmtHours(t.water) : "Sin datos"} sub="Sensor de inmersión del dispositivo (simulado)" color={SERIES.water} />
-        <MetricBlock label="En tierra · observado" value={t.readings ? fmtHours(t.land) : "Sin datos"} sub={`Incluye ${fmtHours(t.stationary)} sin movimiento registrado (inferido)`} color={SERIES.land} />
-        <MetricBlock label="Sin lectura · sin datos" value={fmtHours(t.noFix + t.noComm)} sub={`${fmtHours(t.noFix)} sin posición · ${fmtHours(t.noComm)} sin comunicación`} color={SERIES.noFix} />
-        <MetricBlock label="Cambios agua ↔ tierra" value={String(changes)} sub="Entre tramos consecutivos sin hueco" color="#a78bfa" />
+        <MetricBlock label="En tierra · observado" value={t.readings ? fmtHours(t.land) : "Sin datos"} sub="Lecturas en tierra, con o sin desplazamiento" color={SERIES.land} />
+        <MetricBlock label="Sin movimiento · inferido" value={t.readings ? fmtHours(t.stationary) : "Sin datos"} sub="Parte del tiempo en tierra con posiciones repetidas" color={SERIES.stationary} />
+        <MetricBlock label="Cambios agua ↔ tierra" value={String(changes)} sub="Entre tramos consecutivos" color="#a78bfa" />
       </div>
       <SplitBar
         className="mt-4"
         parts={[
           { value: t.water, color: SERIES.water, label: "Agua" },
           { value: t.land, color: SERIES.land, label: "Tierra" },
-          { value: t.noFix, color: SERIES.noFix, label: "Sin posición" },
-          { value: t.noComm, color: SERIES.noComm, label: "Sin comunicación" },
         ]}
       />
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -346,23 +323,28 @@ function ActivitySection({ penguinId }: { penguinId: string }) {
             series={[
               { key: "water", color: SERIES.water, label: "Agua" },
               { key: "land", color: SERIES.land, label: "Tierra" },
-              { key: "gap", color: SERIES.noFix, label: "Sin lectura" },
             ]}
-            data={agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land, gap: h.noFix + h.noComm } }))}
+            data={agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))}
           />
         </div>
         <div>
-          <p className="mb-3 text-xs text-muted">Comparación por día · horas registradas</p>
+          <p className="mb-3 flex justify-between gap-2 text-xs text-muted">
+            <span>% del tiempo en agua por día · últimos {byDay.length} días</span>
+            {byDay.length > 0 && (
+              <span>
+                promedio <b className="num font-semibold text-ink">{Math.round((byDay.reduce((a, d) => a + d.share, 0) / byDay.length) * 100)}%</b> en agua
+              </span>
+            )}
+          </p>
           <StackedColumns
             height={140}
-            labelEvery={days > 8 ? 2 : 1}
-            format={fmtHours}
+            labelEvery={byDay.length > 8 ? 2 : 1}
+            format={(v) => `${Math.round(v * 100)}%`}
             series={[
               { key: "water", color: SERIES.water, label: "Agua" },
               { key: "land", color: SERIES.land, label: "Tierra" },
-              { key: "gap", color: SERIES.noFix, label: "Sin lectura" },
             ]}
-            data={agg.daily.map((d) => ({ label: fmtDate(d.day).split(" ")[0], tooltip: fmtWeekday(d.day), values: { water: d.water, land: d.land, gap: d.noFix + d.noComm } }))}
+            data={byDay.map((d) => ({ label: fmtDate(d.day).split(" ")[0], tooltip: fmtWeekday(d.day), values: { water: d.share, land: 1 - d.share } }))}
           />
         </div>
       </div>
@@ -372,13 +354,13 @@ function ActivitySection({ penguinId }: { penguinId: string }) {
           <div className="grid grid-cols-3 gap-4 text-sm">
             <Compare label="Agua" cur={t.water} prev={prev.water} />
             <Compare label="Tierra" cur={t.land} prev={prev.land} />
-            <Compare label="Sin lectura" cur={t.noFix + t.noComm} prev={prev.noFix + prev.noComm} />
+            <Compare label="Sin movimiento" cur={t.stationary} prev={prev.stationary} />
           </div>
         ) : (
           <p className="text-xs text-muted">Sin datos suficientes: el escenario no guarda un periodo anterior completo.</p>
         )}
         <p className="mt-2 text-[11px] text-faint">
-          Observado: lo indica una lectura. Inferido: «sin movimiento» se deduce de posiciones repetidas. Sin datos: no hubo lectura. Una diferencia de actividad no implica por sí misma ningún estado de salud.
+          Observado: lo indica una lectura. Inferido: «sin movimiento» se deduce de posiciones repetidas. Una diferencia de actividad no implica por sí misma ningún estado de salud.
         </p>
       </div>
     </Card>
@@ -387,18 +369,15 @@ function ActivitySection({ penguinId }: { penguinId: string }) {
 
 /* ───────────── 5. Historial de lecturas ───────────── */
 
-type ReadingFlag = "repeated" | "low" | "after_gap" | "last_known";
+type ReadingFlag = "repeated" | "low";
 const FLAG_LABEL: Record<ReadingFlag, string> = {
   repeated: "Posición repetida",
   low: "Precisión baja",
-  after_gap: "Tras hueco",
-  last_known: "Última conocida",
 };
 
 function ReadingsSection({ penguinId }: { penguinId: string }) {
-  const { dataset, penguinById, snapshots, range, now } = useDemo();
+  const { dataset, penguinById, range, now } = useDemo();
   const p = penguinById.get(penguinId)!;
-  const snap = snapshots.get(penguinId)!;
   const slot = dataset.slotMinutes * MIN;
   const [fromDay, setFromDay] = useState(toDateInput(range.from));
   const [toDay, setToDay] = useState(toDateInput(now));
@@ -409,21 +388,17 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
     const list = dataset.readings.get(penguinId) ?? [];
     const a = Math.max(fromDateInput(fromDay), dataset.windowStart);
     const b = fromDateInput(toDay) + DAY;
-    const lastIdx = lastIndexAtOrBefore(list, now);
-    const out: { r: LocationReading; flags: ReadingFlag[]; gapMin: number }[] = [];
+    const out: { r: LocationReading; flags: ReadingFlag[] }[] = [];
     for (let i = firstIndexAtOrAfter(list, a); i < list.length && list[i].timestamp < b && list[i].timestamp <= now; i++) {
       const r = list[i];
       const prev = list[i - 1];
       const flags: ReadingFlag[] = [];
-      const gapMin = prev ? (r.timestamp - prev.timestamp) / MIN : 0;
       if (prev && prev.x === r.x && prev.y === r.y && r.timestamp - prev.timestamp <= slot) flags.push("repeated");
       if (r.quality === "low") flags.push("low");
-      if (prev && r.timestamp - prev.timestamp > slot) flags.push("after_gap");
-      if (i === lastIdx && (snap.status === "stale" || snap.status === "offline")) flags.push("last_known");
-      out.push({ r, flags, gapMin });
+      out.push({ r, flags });
     }
     return newest ? out.reverse() : out;
-  }, [dataset, penguinId, fromDay, toDay, newest, slot, now, snap.status]);
+  }, [dataset, penguinId, fromDay, toDay, newest, slot, now]);
 
   const minDay = toDateInput(dataset.windowStart);
   const maxDay = toDateInput(now);
@@ -463,7 +438,7 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, limit).map(({ r, flags, gapMin }) => (
+            {rows.slice(0, limit).map(({ r, flags }) => (
               <tr key={r.timestamp} className="border-b border-line/60 last:border-0">
                 <td className="whitespace-nowrap py-2 pr-3 text-xs">{fmtDateTime(r.timestamp, now)}</td>
                 <td className="py-2 pr-3 text-xs">
@@ -483,7 +458,7 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
                   <Badge tone={QUALITY_TONE[r.quality]}>{QUALITY_LABEL[r.quality]}</Badge>
                   <span className="ml-1 text-[10px] text-faint">±{r.accuracyM} m</span>
                 </td>
-                <td className="py-2 pr-3 font-mono text-[11px] text-muted" title="El estado del dispositivo no llega en cada lectura">{p.deviceId}</td>
+                <td className="py-2 pr-3 font-mono text-[11px] text-muted">{p.deviceId}</td>
                 <td className="py-2 text-[11px]">
                   {flags.length === 0 ? (
                     <span className="text-faint">–</span>
@@ -492,7 +467,6 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
                       {flags.map((f) => (
                         <Badge key={f} tone={f === "repeated" ? "neutral" : "warn"}>
                           {FLAG_LABEL[f]}
-                          {f === "after_gap" ? ` de ${Math.round(gapMin)} min` : ""}
                         </Badge>
                       ))}
                     </span>
@@ -502,14 +476,14 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
             ))}
           </tbody>
         </table>
-        {rows.length === 0 && <p className="py-6 text-center text-xs text-muted">Sin lecturas en este rango.</p>}
+        {rows.length === 0 && <p className="py-6 text-center text-xs text-muted">No hay registros en este rango.</p>}
       </div>
       {rows.length > limit && (
         <button onClick={() => setLimit((l) => l + 50)} className="mt-3 inline-flex items-center gap-1 text-xs text-accent hover:underline">
           <ChevronDown size={13} /> Mostrar más ({rows.length - limit} restantes)
         </button>
       )}
-      <p className="mt-2 text-[10px] text-faint">El estado del dispositivo no viene en cada lectura; se muestra el actual en Localización. Lecturas simuladas.</p>
+      <p className="mt-2 text-[10px] text-faint">Lecturas simuladas.</p>
     </Card>
   );
 }
@@ -517,12 +491,11 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
 /* ───────────── 6. Equipo ───────────── */
 
 function TeamSection({ penguinId, className }: { penguinId: string; className?: string }) {
-  const { dataset, penguinById, teamOf, tasks, log, now } = useDemo();
+  const { dataset, penguinById, teamOf, log, now } = useDemo();
   const p = penguinById.get(penguinId)!;
   const team = dataset.teams.find((t) => t.id === teamOf(penguinId));
   const initial = dataset.teams.find((t) => t.id === p.initialTeamId);
   const changes = log.filter((l) => l.penguinId === penguinId && l.kind === "assignment").sort((a, b) => b.at - a.at);
-  const pending = tasks.filter((t) => t.penguinId === penguinId && isOpenTask(t)).sort((a, b) => a.dueAt - b.dueAt);
 
   return (
     <Card className={className} title={<span id="equipo" className="scroll-mt-20">Equipo responsable</span>} icon={Users}>
@@ -550,33 +523,12 @@ function TeamSection({ penguinId, className }: { penguinId: string; className?: 
 
       {PERMISSIONS.reassignTeam ? (
         <div className="mt-4">
-          <p className="mb-1.5 text-[11px] text-muted">Reasignar (actualiza tareas y alertas abiertas en toda la plataforma)</p>
+          <p className="mb-1.5 text-[11px] text-muted">Reasignar (el cambio se refleja en toda la plataforma)</p>
           <TeamReassign key={penguinId} penguinId={penguinId} compact />
         </div>
       ) : (
         <p className="mt-4 text-[11px] text-faint">Tu perfil no permite reasignar ejemplares.</p>
       )}
-
-      <div className="mt-5">
-        <p className="eyebrow mb-2">Tareas pendientes</p>
-        {pending.length === 0 ? (
-          <p className="text-xs text-muted">Sin tareas pendientes.</p>
-        ) : (
-          <ul className="space-y-2">
-            {pending.slice(0, 5).map((tk) => (
-              <li key={tk.id} className="flex items-center gap-3 rounded-xl border border-line px-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">{tk.title}</p>
-                  <p className={cx("text-[11px]", tk.dueAt < now ? "text-danger" : "text-faint")}>
-                    {TASK_KIND_LABEL[tk.kind]} · {tk.dueAt < now ? "vencida" : "vence"} {fmtDateTime(tk.dueAt, now)}
-                  </p>
-                </div>
-                <TaskStatusControl task={tk} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
 
       <div className="mt-5">
         <p className="eyebrow mb-2">Historial de asignaciones</p>
@@ -606,19 +558,13 @@ function TeamSection({ penguinId, className }: { penguinId: string; className?: 
 /* ───────────── 7. Cuidado y observaciones ───────────── */
 
 function CareSection({ penguinId, className }: { penguinId: string; className?: string }) {
-  const { dataset, tasks, userNotes, log, lastReviewOf, config, addNote, now } = useDemo();
+  const { dataset, userNotes, log, lastReviewOf, config, addNote, now } = useDemo();
   const [text, setText] = useState("");
   const notes = [...userNotes, ...dataset.notes].filter((n) => n.penguinId === penguinId).sort((a, b) => b.at - a.at);
-  const reviews = [
-    ...dataset.incidents.filter((i) => i.penguinId === penguinId && i.kind === "care").map((i) => ({ id: i.id, at: i.at, text: i.text, by: "Equipo de cuidado" })),
-    ...tasks
-      .filter((t) => t.penguinId === penguinId && t.status === "done")
-      .map((t) => {
-        const last = t.history[t.history.length - 1];
-        return { id: `done-${t.id}`, at: last?.at ?? t.dueAt, text: `${t.title} completada (${t.id}).`, by: last?.by ?? "Sin datos" };
-      }),
-  ].sort((a, b) => b.at - a.at);
-  const upcoming = tasks.filter((t) => t.penguinId === penguinId && isOpenTask(t)).sort((a, b) => a.dueAt - b.dueAt);
+  const reviews = dataset.incidents
+    .filter((i) => i.penguinId === penguinId && i.kind === "care")
+    .map((i) => ({ id: i.id, at: i.at, text: i.text, by: "Equipo de cuidado" }))
+    .sort((a, b) => b.at - a.at);
   const routineDue = lastReviewOf(penguinId) + config.rules.careReviewIntervalDays * DAY;
   const incidents = [
     ...dataset.incidents.filter((i) => i.penguinId === penguinId && i.kind !== "care"),
@@ -690,21 +636,9 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
             )}
           </div>
           <div>
-            <p className="eyebrow mb-2">Próximas tareas programadas</p>
-            <ul className="space-y-1.5 text-xs">
-              {upcoming.slice(0, 3).map((t) => (
-                <li key={t.id}>
-                  <Link href={`/alerts?tab=tasks&task=${t.id}`} className="hover:underline">{t.title}</Link>
-                  <p className={cx("text-[11px]", t.dueAt < now ? "text-danger" : "text-faint")}>
-                    {TASK_STATUS_LABEL[t.status]} · {t.dueAt < now ? "vencida" : "vence"} {fmtDateTime(t.dueAt, now)}
-                  </p>
-                </li>
-              ))}
-              <li>
-                <p>Revisión de rutina</p>
-                <p className="text-[11px] text-faint">Según el intervalo de {config.rules.careReviewIntervalDays} días · {fmtDateTime(routineDue, now)}</p>
-              </li>
-            </ul>
+            <p className="eyebrow mb-2">Próxima revisión de rutina</p>
+            <p className="text-xs">{fmtDateTime(routineDue, now)}</p>
+            <p className="text-[11px] text-faint">Según el intervalo de {config.rules.careReviewIntervalDays} días</p>
           </div>
           <div>
             <p className="eyebrow mb-2">Incidencias relacionadas</p>
@@ -736,108 +670,30 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
   );
 }
 
-/* ───────────── 8. Alertas ───────────── */
+/* ───────────── 8. Historial de cambios ───────────── */
 
-function AlertsSection({ penguinId, className }: { penguinId: string; className?: string }) {
-  const { dataset, alerts, setAlertStatus, now } = useDemo();
-  const [open, setOpen] = useState<string | null>(null);
-  const mine = alerts
-    .filter((a) => a.penguinId === penguinId)
-    .sort((a, b) => Number(a.status === "resolved") - Number(b.status === "resolved") || b.createdAt - a.createdAt);
-
-  return (
-    <Card className={className} title={<span id="alertas" className="scroll-mt-20">Alertas e incidencias</span>} icon={BellRing} subtitle="El estado se comparte con Alerts & Tasks.">
-      {mine.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-ink/[0.03]">
-            <ShieldCheck size={20} className="text-ok" />
-          </span>
-          <p className="text-sm">Sin alertas para este ejemplar</p>
-          <p className="max-w-xs text-xs text-muted">Las alertas se abren solas cuando una regla se cumple (ubicación desactualizada, dispositivo sin comunicación, revisión pendiente…).</p>
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {mine.map((a) => {
-            const team = dataset.teams.find((t) => t.id === a.teamId);
-            const expanded = open === a.id;
-            return (
-              <li key={a.id} className={cx("rounded-xl border border-line", a.status === "resolved" && "opacity-70")}>
-                <button onClick={() => setOpen(expanded ? null : a.id)} className="flex w-full items-start gap-2 px-3 py-2.5 text-left">
-                  <Badge tone={PRIORITY_TONE[a.priority]}>{PRIORITY_LABEL[a.priority]}</Badge>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm">{ALERT_TYPE_LABEL[a.type]}</p>
-                    <p className="text-[11px] text-faint">
-                      {fmtDateTime(a.createdAt, now)} · {team?.name ?? "Sin asignar"}
-                    </p>
-                  </div>
-                  <Badge tone={a.status === "resolved" ? "ok" : a.status === "following" ? "info" : "warn"}>{ALERT_STATUS_LABEL[a.status]}</Badge>
-                  <ChevronDown size={14} className={cx("mt-0.5 text-faint transition", expanded && "rotate-180")} />
-                </button>
-                {expanded && (
-                  <div className="border-t border-line px-3 py-2.5 text-xs">
-                    <p className="text-muted">{a.description}</p>
-                    <p className="mt-1 text-[11px] text-faint">Regla: {a.rule}</p>
-                    <p className="eyebrow mb-1 mt-3">Historial de resolución</p>
-                    <ol className="space-y-1">
-                      <li className="text-[11px] text-faint">{fmtDateTime(a.createdAt, now)} · Alerta abierta por regla automática</li>
-                      {a.history.map((h, i) => (
-                        <li key={i} className="text-[11px]">
-                          <span className="text-faint">{fmtDateTime(h.at, now)} · {h.by} · </span>
-                          {h.text}
-                        </li>
-                      ))}
-                    </ol>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Link href={`/alerts?alert=${a.id}`} className="inline-flex h-8 items-center rounded-xl border border-line-strong px-2.5 text-xs hover:border-accent/50">
-                        Abrir incidencia
-                      </Link>
-                      {PERMISSIONS.manageAlerts && a.status === "pending" && (
-                        <Button size="sm" variant="outline" onClick={() => setAlertStatus(a.id, "following")}>En seguimiento</Button>
-                      )}
-                      {PERMISSIONS.manageAlerts && a.status !== "resolved" && (
-                        <Button size="sm" variant="primary" onClick={() => setAlertStatus(a.id, "resolved")}>Resolver</Button>
-                      )}
-                      {PERMISSIONS.manageAlerts && a.status === "resolved" && (
-                        <Button size="sm" variant="ghost" onClick={() => setAlertStatus(a.id, "pending")}>Reabrir</Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-/* ───────────── 9. Historial de cambios ───────────── */
-
-type EventKind = "zone" | "readings" | "team" | "review" | "task" | "alert" | "note";
+type EventKind = "zone" | "readings" | "team" | "review" | "note";
 const EVENT_LABEL: Record<EventKind, string> = {
   zone: "Cambio de zona",
   readings: "Lecturas",
   team: "Equipo",
   review: "Revisión",
-  task: "Tarea",
-  alert: "Alerta",
   note: "Observación",
 };
-const EVENT_ICON: Record<EventKind, typeof MapPin> = { zone: MapPin, readings: Radio, team: ArrowRightLeft, review: ShieldCheck, task: ClipboardList, alert: BellRing, note: NotebookPen };
+const EVENT_ICON: Record<EventKind, typeof MapPin> = { zone: MapPin, readings: Radio, team: ArrowRightLeft, review: ShieldCheck, note: NotebookPen };
 
 function TimelineSection({ penguinId, className }: { penguinId: string; className?: string }) {
-  const { dataset, tasks, alerts, log, userNotes, range, now } = useDemo();
+  const { dataset, log, userNotes, range, now } = useDemo();
   const [kinds, setKinds] = useState<EventKind[]>([]);
   const [limit, setLimit] = useState(30);
 
   const events = useMemo(() => {
-    const out: { at: number; kind: EventKind; text: string; warn?: boolean }[] = [];
+    const out: { at: number; kind: EventKind; text: string }[] = [];
     const recs = (dataset.activity.get(penguinId) ?? []).filter((x) => x.start >= range.from && x.start < range.to);
     for (let i = 1; i < recs.length; i++) {
       const a = recs[i - 1], c = recs[i];
       if (a.zoneId === c.zoneId) continue;
-      out.push({ at: c.start, kind: "zone", text: `${ZONE_BY_ID[a.zoneId].name} → ${ZONE_BY_ID[c.zoneId].name}${c.start - a.end > 0 ? " (tras un hueco sin lectura)" : ""}` });
+      out.push({ at: c.start, kind: "zone", text: `${ZONE_BY_ID[a.zoneId].name} → ${ZONE_BY_ID[c.zoneId].name}` });
     }
     const list = dataset.readings.get(penguinId) ?? [];
     const perDay = new Map<number, number>();
@@ -848,17 +704,9 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
     for (const [d, n] of perDay) out.push({ at: Math.min(d + DAY - MIN, now), kind: "readings", text: `${n} lecturas recibidas el ${fmtDate(d)}` });
     for (const l of log.filter((x) => x.penguinId === penguinId)) out.push({ at: l.at, kind: l.kind === "assignment" ? "team" : "review", text: l.text });
     for (const i of dataset.incidents.filter((x) => x.penguinId === penguinId && x.kind === "care")) out.push({ at: i.at, kind: "review", text: i.text });
-    for (const t of tasks.filter((x) => x.penguinId === penguinId)) {
-      if (!t.history.length) out.push({ at: t.createdAt, kind: "task", text: `${t.title} creada (${t.id})` });
-      for (const h of t.history) out.push({ at: h.at, kind: "task", text: `${t.title}: ${h.text}` });
-    }
-    for (const a of alerts.filter((x) => x.penguinId === penguinId)) {
-      out.push({ at: a.createdAt, kind: "alert", text: `Alerta abierta: ${ALERT_TYPE_LABEL[a.type]}`, warn: true });
-      for (const h of a.history) out.push({ at: h.at, kind: "alert", text: `${ALERT_TYPE_LABEL[a.type]}: ${h.text}` });
-    }
     for (const n of userNotes.filter((x) => x.penguinId === penguinId)) out.push({ at: n.at, kind: "note", text: `${n.by}: ${n.text}` });
     return out.filter((e) => e.at <= now + HOUR).sort((a, b) => b.at - a.at);
-  }, [dataset, penguinId, range, tasks, alerts, log, userNotes, now]);
+  }, [dataset, penguinId, range, log, userNotes, now]);
 
   const shown = kinds.length ? events.filter((e) => kinds.includes(e.kind)) : events;
 
@@ -867,7 +715,7 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
       className={className}
       title={<span id="historial" className="scroll-mt-20">Historial de cambios</span>}
       icon={History}
-      subtitle={`Zonas y lecturas: ${range.label.toLowerCase()}. Equipo, revisiones, tareas y alertas: todo el registro.`}
+      subtitle={`Zonas y lecturas: ${range.label.toLowerCase()}. Equipo, revisiones y observaciones: todo el registro.`}
     >
       <div className="mb-3 flex flex-wrap gap-1.5">
         {(Object.keys(EVENT_LABEL) as EventKind[]).map((k) => {
@@ -886,24 +734,27 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
       {shown.length === 0 ? (
         <p className="py-4 text-center text-xs text-muted">Sin eventos.</p>
       ) : (
-        <ol className="scroll-thin relative max-h-[440px] space-y-1 overflow-y-auto pr-1 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-line-strong">
-          {shown.slice(0, limit).map((e, i) => {
-            const Icon = EVENT_ICON[e.kind];
-            return (
-              <li key={i} className="relative flex gap-3 px-1 py-1.5">
-                <span className="z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-line-strong bg-panel-solid">
-                  <Icon size={13} className={e.warn ? "text-warn" : "text-accent"} />
-                </span>
-                <div className="min-w-0 text-xs">
-                  <p className="text-ink">{e.text}</p>
-                  <p className="text-[11px] text-faint">
-                    {EVENT_LABEL[e.kind]} · {fmtDateTime(e.at, now)}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+        // En pantalla ancha la lista llena el alto que deja la tarjeta de equipo a su lado.
+        <div className="xl:relative xl:min-h-[240px] xl:flex-1">
+          <ol className="scroll-thin relative max-h-[440px] space-y-1 overflow-y-auto pr-1 xl:absolute xl:inset-0 xl:max-h-none before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-line-strong">
+            {shown.slice(0, limit).map((e, i) => {
+              const Icon = EVENT_ICON[e.kind];
+              return (
+                <li key={i} className="relative flex gap-3 px-1 py-1.5">
+                  <span className="z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-line-strong bg-panel-solid">
+                    <Icon size={13} className="text-accent" />
+                  </span>
+                  <div className="min-w-0 text-xs">
+                    <p className="text-ink">{e.text}</p>
+                    <p className="text-[11px] text-faint">
+                      {EVENT_LABEL[e.kind]} · {fmtDateTime(e.at, now)}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
       )}
       {shown.length > limit && (
         <button onClick={() => setLimit((l) => l + 40)} className="mt-2 inline-flex items-center gap-1 text-xs text-accent hover:underline">
@@ -916,14 +767,14 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
 
 /* ───────────── auxiliares ───────────── */
 
-function Kpi({ label, value, sub, color, warn, small }: { label: string; value: string; sub?: string; color?: string; warn?: boolean; small?: boolean }) {
+function Kpi({ label, value, sub, color, small }: { label: string; value: string; sub?: string; color?: string; small?: boolean }) {
   return (
     <div className="panel px-4 py-3">
       <p className="flex items-center gap-1.5 text-[11px] text-muted">
         {color && <span className="h-2 w-2 rounded-sm" style={{ background: color }} />}
         {label}
       </p>
-      <p className={cx("num mt-1 truncate font-semibold", small ? "text-base" : "text-xl", warn && "text-warn")}>{value}</p>
+      <p className={cx("num mt-1 truncate font-semibold", small ? "text-base" : "text-xl")}>{value}</p>
       {sub && <p className="truncate text-[11px] text-faint">{sub}</p>}
     </div>
   );
