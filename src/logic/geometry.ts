@@ -20,7 +20,7 @@ export function pointInPolygon(x: number, y: number, poly: Pt[]): boolean {
   return inside;
 }
 
-/** Polígono reducido hacia su centroide, para muestrear lejos de los bordes. */
+/** Polygon shrunk toward its centroid, to sample away from the edges. */
 export function shrink(poly: Pt[], factor: number): Pt[] {
   const [cx, cy] = centroid(poly);
   return poly.map(([x, y]) => [cx + (x - cx) * factor, cy + (y - cy) * factor]);
@@ -37,7 +37,7 @@ export function bbox(poly: Pt[]) {
   return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
 }
 
-/** Trazo suavizado (Catmull-Rom → Bézier) para que las zonas se vean orgánicas. */
+/** Smoothed path (Catmull-Rom → Bézier) so zones look organic. */
 export function smoothPath(poly: Pt[], tension = 0.18): string {
   const n = poly.length;
   const p = (i: number) => poly[(i + n) % n];

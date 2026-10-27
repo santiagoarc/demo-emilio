@@ -1,10 +1,10 @@
 /**
- * Agregados de actividad. Todo se calcula desde las lecturas individuales y
- * los huecos registrados, nunca desde cifras escritas a mano.
+ * Activity aggregates. Everything is computed from individual readings and
+ * recorded gaps, never from hand-written figures.
  *
- * Cada lectura representa un intervalo de `slotMinutes`. El tiempo "en agua"
- * o "en tierra" es tiempo REGISTRADO; lo que no tiene lectura se reporta
- * aparte como "sin posición" o "sin comunicación", nunca se reparte.
+ * Each reading represents a `slotMinutes` interval. Time "in water" or
+ * "on land" is RECORDED time; time without readings is reported separately
+ * as uncovered, never redistributed.
  */
 import type { Dataset } from "@/domain/types";
 import { firstIndexAtOrAfter } from "./status";
@@ -13,10 +13,10 @@ import { DAY, MIN, startOfDay } from "./time";
 export interface Breakdown {
   water: number;
   land: number;
-  stationary: number; // subconjunto de land: lecturas repetidas en la misma posición
-  noFix: number; // dispositivo comunica, sin posición
-  noComm: number; // dispositivo sin comunicación
-  expected: number; // tiempo cubierto por el periodo desde el alta
+  stationary: number; // subset of land: repeated readings at the same position
+  noFix: number; // no position fix
+  noComm: number; // no readings received
+  expected: number; // time covered by the period since admission
   readings: number;
 }
 
@@ -32,9 +32,9 @@ export interface ActivityAggregate {
   penguinCount: number;
   totals: Breakdown;
   perPenguin: Map<string, Breakdown>;
-  hourly: Breakdown[]; // 24 posiciones
+  hourly: Breakdown[]; // 24 slots
   daily: DayBucket[];
-  transitions: Map<string, number>; // "origen>destino"
+  transitions: Map<string, number>; // "from>to"
   zoneTime: Map<string, number>;
 }
 
@@ -100,7 +100,7 @@ export function computeActivity(ds: Dataset, penguinIds: string[], from: number,
     for (let i = 1; i < recs.length; i++) {
       const a = recs[i - 1], c = recs[i];
       if (c.start < from || c.start >= to) continue;
-      if (a.zoneId === c.zoneId || c.start - a.end > 0) continue; // con hueco no se cuenta como transición observada
+      if (a.zoneId === c.zoneId || c.start - a.end > 0) continue; // with a gap it doesn't count as an observed transition
       if (zoneFiltered && !zones!.has(a.zoneId) && !zones!.has(c.zoneId)) continue;
       const key = `${a.zoneId}>${c.zoneId}`;
       transitions.set(key, (transitions.get(key) ?? 0) + 1);
@@ -116,7 +116,7 @@ export function computeActivity(ds: Dataset, penguinIds: string[], from: number,
   return { from, to, penguinCount: penguinIds.length, totals, perPenguin, hourly, daily, transitions, zoneTime };
 }
 
-/** Promedio por ejemplar por día, en ms. */
+/** Average per penguin per day, in ms. */
 export function perPenguinPerDay(value: number, penguins: number, from: number, to: number): number {
   const days = Math.max((to - from) / DAY, 1 / 48);
   return penguins ? value / penguins / days : 0;

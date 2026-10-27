@@ -13,7 +13,7 @@ import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 import { askChat } from "@/features/chat/ask";
 import { CaseCard, InsightBadge, REASON_LABEL } from "./HealthCards";
 
-/** Lo que se muestra de un caso sin abrirlo: quién lo sigue, dónde está el pingüino y cómo va. */
+/** What a case shows before opening it: who follows it, where the penguin is and its activity check. */
 function useCaseFacts(hc: HealthCase) {
   const { dataset, penguinById, snapshots, insights, teamOf, now } = useDemo();
   const p = penguinById.get(hc.penguinId);
@@ -28,7 +28,7 @@ function useCaseFacts(hc: HealthCase) {
   return { p, team, snap, r, ins, lastW, firstW, days, now };
 }
 
-/** Tarjeta resumida de un caso; al picarla se abre el seguimiento completo. */
+/** Summary card for a case; clicking it opens the full follow-up. */
 export function CaseSummary({ hc, onOpen }: { hc: HealthCase; onOpen: () => void }) {
   const { p, team, snap, r, ins, lastW, firstW, days, now } = useCaseFacts(hc);
   if (!p) return null;
@@ -53,45 +53,45 @@ export function CaseSummary({ hc, onOpen }: { hc: HealthCase; onOpen: () => void
           </p>
           <p className="flex items-center gap-1.5 text-[11px] text-muted">
             <span className="h-2 w-2 rounded-full" style={{ background: sp.color }} />
-            {sp.nameEs}
+            {sp.nameEn}
           </p>
         </div>
-        <Badge tone={open ? "accent" : "neutral"}>{open ? "En seguimiento" : "Cerrado"}</Badge>
+        <Badge tone={open ? "accent" : "neutral"}>{open ? "Open" : "Closed"}</Badge>
       </div>
 
       <p className="mt-3 text-sm font-semibold text-ink">{hc.title}</p>
       <p className="text-[11px] text-muted">
-        {REASON_LABEL[hc.reason]} · {open ? `abierto hace ${days} ${days === 1 ? "día" : "días"}` : `cerrado tras ${days} días`}
+        {REASON_LABEL[hc.reason]} · {open ? `opened ${days} ${days === 1 ? "day" : "days"} ago` : `closed after ${days} ${days === 1 ? "day" : "days"}`}
       </p>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
         <div className="min-w-0">
           <dt className="flex items-center gap-1 text-faint">
-            <Users size={11} /> Le da seguimiento
+            <Users size={11} /> Followed by
           </dt>
           <dd className="flex items-center gap-1.5 truncate text-ink">
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: team?.color ?? "var(--muted)" }} />
-            {team?.name ?? "Sin equipo"}
+            {team?.name ?? "No team"}
           </dd>
           <dd className="truncate text-muted">{hc.owner}</dd>
         </div>
         <div className="min-w-0">
           <dt className="flex items-center gap-1 text-faint">
-            <MapPin size={11} /> Dónde está
+            <MapPin size={11} /> Last location
           </dt>
-          <dd className="truncate text-ink">{r ? ZONE_BY_ID[r.zoneId]?.name : "Sin ubicación"}</dd>
+          <dd className="truncate text-ink">{r ? ZONE_BY_ID[r.zoneId]?.name : "No location"}</dd>
           <dd className="truncate text-muted">{snap ? `${STATUS_LABEL[snap.status]}${r ? ` · ${fmtAgo(r.timestamp, now)}` : ""}` : "—"}</dd>
         </div>
         <div className="min-w-0">
-          <dt className="text-faint">¿Cómo va?</dt>
+          <dt className="text-faint" title="Inferred from simulated location data — not a clinical assessment">Activity check</dt>
           <dd className="mt-0.5">{ins ? <InsightBadge level={ins.level} /> : "—"}</dd>
         </div>
         <div className="min-w-0">
           <dt className="flex items-center gap-1 text-faint">
-            <Scale size={11} /> Peso
+            <Scale size={11} /> Weight
           </dt>
           <dd className="text-ink">
-            {lastW !== undefined ? `${lastW.toFixed(2)} kg` : "Sin pesaje"}
+            {lastW !== undefined ? `${lastW.toFixed(2)} kg` : "No weigh-in"}
             {lastW !== undefined && firstW !== undefined && firstW !== lastW && (
               <span className={cx("num ml-1", lastW > firstW ? "text-ok" : "text-warn")}>
                 ({lastW > firstW ? "+" : ""}
@@ -112,16 +112,16 @@ export function CaseSummary({ hc, onOpen }: { hc: HealthCase; onOpen: () => void
         </p>
       )}
       <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-accent opacity-80 group-hover:opacity-100">
-        Ver seguimiento <ArrowUpRight size={12} />
+        View follow-up <ArrowUpRight size={12} />
       </span>
     </button>
   );
 }
 
-/** Panel lateral con todo el seguimiento del caso. */
+/** Side panel with the case's full follow-up. */
 export function CaseDrawer({ hc, onClose }: { hc: HealthCase | null; onClose: () => void }) {
   return (
-    <Drawer open={!!hc} onClose={onClose} width={520} title="Seguimiento de salud">
+    <Drawer open={!!hc} onClose={onClose} width={520} title="Health follow-up">
       {hc && <CaseDetail hc={hc} />}
     </Drawer>
   );
@@ -146,46 +146,47 @@ function CaseDetail({ hc }: { hc: HealthCase }) {
           <p className="font-mono text-lg font-semibold">{p.id}</p>
           {p.name && <p className="text-sm text-ink">{p.name}</p>}
           <p className="text-xs text-muted">
-            {sp.nameEs} · {sp.nameEn}
+            {sp.nameEn} · <span className="italic">{sp.scientific}</span>
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Link href={`/penguins/${p.id}#salud`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line-strong px-2.5 text-xs text-ink hover:border-accent/50">
-          Ver ficha <ArrowUpRight size={12} />
+        <Link href={`/penguins/${p.id}#health`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line-strong px-2.5 text-xs text-ink hover:border-accent/50">
+          View profile <ArrowUpRight size={12} />
         </Link>
         <Link href={`/map?penguin=${p.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line-strong px-2.5 text-xs text-ink hover:border-accent/50">
-          <MapPinned size={13} /> Ver en el mapa
+          <MapPinned size={13} /> View on map
         </Link>
         <button
-          onClick={() => askChat(`Dame el reporte completo de ${p.id}: cómo va, qué cambió y qué conviene vigilar.`)}
+          onClick={() => askChat(`Give me the full report on ${p.id}: how its activity looks, what changed and what's worth watching.`)}
           className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line-strong px-2.5 text-xs text-ink hover:border-accent/50"
         >
-          <MessageSquareText size={13} /> Pedir reporte
+          <MessageSquareText size={13} /> Ask for a report
         </button>
       </div>
 
       <div className="rounded-xl border border-line px-3">
-        {row("Le da seguimiento", (
+        {row("Followed by", (
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full" style={{ background: team?.color ?? "var(--muted)" }} />
-            {team?.name ?? "Sin equipo"}
+            {team?.name ?? "No team"}
           </span>
         ))}
-        {row("Líder del equipo", team?.lead ?? "—")}
-        {row("Responsable del caso", hc.owner)}
-        {row("Integrantes", team?.members.join(", ") ?? "—")}
-        {row("Dónde está", r ? `${ZONE_BY_ID[r.zoneId]?.name} · ${snap ? STATUS_LABEL[snap.status] : ""}` : "Sin ubicación")}
-        {row("Última lectura", r ? `${fmtDateTime(r.timestamp, now)} (${fmtAgo(r.timestamp, now)})` : "—")}
-        {row("¿Cómo va?", ins ? <InsightBadge level={ins.level} /> : "—")}
-        {row("Motivo", REASON_LABEL[hc.reason])}
-        {row(hc.status === "open" ? "Abierto" : "Duración", hc.status === "open" ? `${fmtDateTime(hc.openedAt, now)} · hace ${days} ${days === 1 ? "día" : "días"}` : `${days} días`)}
+        {row("Team lead", team?.lead ?? "—")}
+        {row("Case owner", hc.owner)}
+        {row("Members", team?.members.join(", ") ?? "—")}
+        {row("Last location", r ? `${ZONE_BY_ID[r.zoneId]?.name} · ${snap ? STATUS_LABEL[snap.status] : ""}` : "No location")}
+        {row("Last reading", r ? `${fmtDateTime(r.timestamp, now)} (${fmtAgo(r.timestamp, now)})` : "—")}
+        {row("Activity check", ins ? <InsightBadge level={ins.level} /> : "—")}
+        {row("Reason", REASON_LABEL[hc.reason])}
+        {row(hc.status === "open" ? "Opened" : "Duration", hc.status === "open" ? `${fmtDateTime(hc.openedAt, now)} · ${days} ${days === 1 ? "day" : "days"} ago` : `${days} ${days === 1 ? "day" : "days"}`)}
       </div>
 
       {ins && ins.points.length > 0 && (
         <div>
-          <p className="eyebrow mb-2">Lo que muestran sus datos</p>
+          <p className="eyebrow mb-1">What its activity data shows</p>
+          <p className="mb-2 text-[11px] text-faint">Inference from simulated location data — not a clinical assessment.</p>
           <ul className="space-y-1.5">
             {ins.points.map((pt, i) => (
               <li key={i} className="flex gap-2 text-xs text-muted">
@@ -198,7 +199,7 @@ function CaseDetail({ hc }: { hc: HealthCase }) {
       )}
 
       <div>
-        <p className="eyebrow mb-2">Bitácora del seguimiento</p>
+        <p className="eyebrow mb-2">Follow-up log</p>
         <CaseCard hc={hc} expandedByDefault />
       </div>
     </div>

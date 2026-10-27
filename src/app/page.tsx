@@ -1,8 +1,8 @@
-import { OverviewView } from "@/features/overview/OverviewView";
+import { PlatformOverview } from "@/features/platform/PlatformOverview";
 
-// La demo genera sus datos en el navegador; no hay UI que validar en el servidor.
+// The demo generates its data in the browser; there is no UI to validate on the server.
 export const instant = false;
 
 export default function Home() {
-  return <OverviewView />;
+  return <PlatformOverview />;
 }

@@ -5,21 +5,21 @@ import { MIN } from "./time";
 export type LiveStatus = "water" | "land" | "resting" | "stale" | "offline" | "no_data";
 
 export const STATUS_LABEL: Record<LiveStatus, string> = {
-  water: "En agua",
-  land: "En tierra",
-  resting: "Sin movimiento registrado",
-  stale: "Ubicación desactualizada",
-  offline: "Sin comunicación",
-  no_data: "Sin datos",
+  water: "In water",
+  land: "On land",
+  resting: "No movement recorded",
+  stale: "Location not current",
+  offline: "Last known location",
+  no_data: "No data",
 };
 
 export const STATUS_HINT: Record<LiveStatus, string> = {
-  water: "Última lectura reciente indica inmersión.",
-  land: "Última lectura reciente en tierra con desplazamiento.",
-  resting: "Lecturas recientes en la misma posición. No implica inmovilidad fuera de las lecturas.",
-  stale: "El dispositivo comunica pero no hay posición reciente. Se muestra la última conocida.",
-  offline: "El dispositivo no comunica. Se muestra la última ubicación conocida.",
-  no_data: "No hay lecturas para este ejemplar en el periodo.",
+  water: "The latest reading indicates the bird is in the water.",
+  land: "The latest reading is on land, with movement.",
+  resting: "Recent readings at the same position. This says nothing about movement between readings.",
+  stale: "No recent position. Showing the last known location and its reading time.",
+  offline: "No recent readings. Showing the last known location and its reading time.",
+  no_data: "No readings for this penguin in the selected period.",
 };
 
 export interface Snapshot {
@@ -31,7 +31,7 @@ export interface Snapshot {
   recent: boolean;
 }
 
-/** Índice de la última lectura con timestamp ≤ t (o -1). */
+/** Index of the last reading with timestamp ≤ t (or -1). */
 export function lastIndexAtOrBefore(list: LocationReading[], t: number): number {
   let lo = 0, hi = list.length - 1, ans = -1;
   while (lo <= hi) {

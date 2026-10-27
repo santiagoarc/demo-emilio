@@ -11,20 +11,20 @@ import { snapshotAt, type Snapshot } from "@/logic/status";
 import { MIN } from "@/logic/time";
 import { clearPersisted, loadPersisted, savePersisted, shiftPersisted } from "./persistence";
 
-export const CURRENT_USER = "Usuario demo";
+export const CURRENT_USER = "Demo user";
 
 /**
- * Permisos del usuario de la demo. Cuando haya autenticación real vendrán de su
- * rol; mientras tanto la demo deja editar para poder mostrar los flujos.
+ * Demo user permissions. With real authentication they would come from the
+ * user's role; for now the demo allows editing so the flows can be shown.
  */
 export const PERMISSIONS = {
-  role: "Coordinación de cuidado (demo)",
+  role: "Animal care coordinator (demo)",
   reassignTeam: true,
   addObservation: true,
   manageTeams: true,
 };
 
-/** Cambio registrado en un equipo (composición, roles, estado, turnos). */
+/** Logged change to a team (members, roles, status, shifts). */
 export interface TeamLogEntry {
   id: string;
   teamId: string;
@@ -77,11 +77,11 @@ export interface DemoContextValue extends CoreState {
   teamOf: (penguinId: string) => string;
   lastReviewOf: (penguinId: string) => number;
   snapshots: Map<string, Snapshot>;
-  /** "¿Cómo va?" de cada ejemplar en las últimas 24 h, contra su especie y contra sí mismo. */
+  /** "How is it doing?" for each penguin over the last 24 h, vs. its species and vs. itself. */
   insights: Map<string, PenguinInsight>;
-  /** Ejemplares que pasan especie/equipo/ejemplar (sin el filtro de zona). */
+  /** Penguins passing the species/team/penguin filters (without the zone filter). */
   scoped: Penguin[];
-  /** Además filtrados por la zona actual registrada. */
+  /** Additionally filtered by current recorded zone. */
   visible: Penguin[];
   setFilters: (patch: Partial<Filters>) => void;
   clearFilters: () => void;
@@ -131,7 +131,7 @@ function restoreState(): CoreState {
   };
 }
 
-/** Hora de una acción del usuario: el reloj del escenario más lo transcurrido en la sesión. */
+/** Time of a user action: the scenario clock plus time elapsed in the session. */
 function useActionClock(datasetNow: number) {
   const loadedAt = useRef(0);
   useEffect(() => {
@@ -144,7 +144,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<CoreState | null>(null);
 
   useEffect(() => {
-    // Los datos dependen de la hora del navegador: se generan solo en el cliente.
+    // Data depends on the browser clock: generated on the client only.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setState(restoreState());
   }, []);
@@ -186,7 +186,7 @@ function DemoContextInner({
   const { dataset: baseDataset, assignments, filters, config, customTeams, teamEdits } = state;
   const clock = useActionClock(baseDataset.now);
 
-  // Equipos vigentes: los del escenario con sus ediciones, más los creados en la demo.
+  // Current teams: the scenario's, with edits applied, plus any created in the demo.
   const dataset = useMemo(() => {
     const teams = [...baseDataset.teams, ...customTeams].map((t) => ({ ...t, ...teamEdits[t.id] }));
     return { ...baseDataset, teams };
@@ -237,7 +237,7 @@ function DemoContextInner({
         const from = s.assignments[penguinId] ?? s.dataset.penguins.find((p) => p.id === penguinId)!.initialTeamId;
         if (from === teamId) return s;
         const at = clock();
-        const text = `Reasignado de ${teamName(from)} a ${teamName(teamId)}.`;
+        const text = `Reassigned from ${teamName(from)} to ${teamName(teamId)}.`;
         return {
           ...s,
           assignments: { ...s.assignments, [penguinId]: teamId },
@@ -287,7 +287,7 @@ function DemoContextInner({
         return {
           ...s,
           cases: s.cases.map((c) =>
-            c.id === caseId ? { ...c, status: "closed" as const, closedAt: at, entries: [{ id: `${caseId}-${at}`, at, by: CURRENT_USER, text: text || "Caso cerrado." }, ...c.entries] } : c,
+            c.id === caseId ? { ...c, status: "closed" as const, closedAt: at, entries: [{ id: `${caseId}-${at}`, at, by: CURRENT_USER, text: text || "Case closed." }, ...c.entries] } : c,
           ),
         };
       }),
@@ -313,7 +313,7 @@ function DemoContextInner({
         return {
           ...s,
           customTeams: [...s.customTeams, team],
-          teamLog: [{ id: `TL-${at}-${id}`, teamId: id, at, by: CURRENT_USER, text: `Equipo creado (${input.active ? "activo" : "inactivo"}).` }, ...s.teamLog],
+          teamLog: [{ id: `TL-${at}-${id}`, teamId: id, at, by: CURRENT_USER, text: `Team created (${input.active ? "active" : "inactive"}).` }, ...s.teamLog],
         };
       });
       return id;
@@ -328,19 +328,19 @@ function DemoContextInner({
         const before = [...s.dataset.teams, ...s.customTeams].map((t) => ({ ...t, ...s.teamEdits[t.id] })).find((t) => t.id === teamId);
         if (!before) return s;
         const texts: string[] = [];
-        if (patch.name !== undefined && patch.name !== before.name) texts.push(`Nombre: «${before.name}» → «${patch.name}».`);
-        if (patch.focus !== undefined && patch.focus !== before.focus) texts.push("Descripción actualizada.");
-        if (patch.lead !== undefined && patch.lead !== before.lead) texts.push(`Responsable: ${before.lead} → ${patch.lead}.`);
+        if (patch.name !== undefined && patch.name !== before.name) texts.push(`Name: “${before.name}” → “${patch.name}”.`);
+        if (patch.focus !== undefined && patch.focus !== before.focus) texts.push("Description updated.");
+        if (patch.lead !== undefined && patch.lead !== before.lead) texts.push(`Lead: ${before.lead} → ${patch.lead}.`);
         if (patch.members) {
           const added = patch.members.filter((m) => !before.members.includes(m));
           const removed = before.members.filter((m) => !patch.members!.includes(m));
-          if (added.length) texts.push(`Integrante${added.length > 1 ? "s" : ""} agregado${added.length > 1 ? "s" : ""}: ${added.join(", ")}.`);
-          if (removed.length) texts.push(`Integrante${removed.length > 1 ? "s" : ""} retirado${removed.length > 1 ? "s" : ""}: ${removed.join(", ")}.`);
+          if (added.length) texts.push(`Member${added.length > 1 ? "s" : ""} added: ${added.join(", ")}.`);
+          if (removed.length) texts.push(`Member${removed.length > 1 ? "s" : ""} removed: ${removed.join(", ")}.`);
         }
-        if (patch.zoneIds && patch.zoneIds.join() !== before.zoneIds.join()) texts.push("Zonas de responsabilidad actualizadas.");
-        if (patch.active !== undefined && patch.active !== (before.active ?? true)) texts.push(patch.active ? "Equipo reactivado." : "Equipo desactivado (sus pingüinos siguen asignados).");
+        if (patch.zoneIds && patch.zoneIds.join() !== before.zoneIds.join()) texts.push("Zones of responsibility updated.");
+        if (patch.active !== undefined && patch.active !== (before.active ?? true)) texts.push(patch.active ? "Team reactivated." : "Team deactivated (its penguins remain assigned).");
         if (patch.roles) {
-          for (const [m, r] of Object.entries(patch.roles)) if ((before.roles?.[m] ?? "") !== r) texts.push(`Rol de ${m}: ${r || "sin rol"}.`);
+          for (const [m, r] of Object.entries(patch.roles)) if ((before.roles?.[m] ?? "") !== r) texts.push(`Role for ${m}: ${r || "no role"}.`);
         }
         if (!texts.length) return s;
         const next: Partial<CareTeam> = { ...s.teamEdits[teamId], ...patch };
@@ -358,11 +358,11 @@ function DemoContextInner({
     (shift: Omit<Shift, "id">) =>
       setState((s) => {
         const at = clock();
-        const DAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+        const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         return {
           ...s,
           shifts: [...s.shifts, { ...shift, id: `SH-${at}-${s.shifts.length}` }],
-          teamLog: [{ id: `TL-${at}-sh`, teamId: shift.teamId, at, by: CURRENT_USER, text: `Turno configurado: ${shift.member}, ${DAYS[shift.weekday]} ${shift.start}–${shift.end}.` }, ...s.teamLog],
+          teamLog: [{ id: `TL-${at}-sh`, teamId: shift.teamId, at, by: CURRENT_USER, text: `Shift set: ${shift.member}, ${DAYS[shift.weekday]} ${shift.start}–${shift.end}.` }, ...s.teamLog],
         };
       }),
     [setState, clock],
@@ -377,7 +377,7 @@ function DemoContextInner({
         return {
           ...s,
           shifts: s.shifts.filter((x) => x.id !== shiftId),
-          teamLog: [{ id: `TL-${at}-shx`, teamId: sh.teamId, at, by: CURRENT_USER, text: `Turno retirado: ${sh.member} ${sh.start}–${sh.end}.` }, ...s.teamLog],
+          teamLog: [{ id: `TL-${at}-shx`, teamId: sh.teamId, at, by: CURRENT_USER, text: `Shift removed: ${sh.member} ${sh.start}–${sh.end}.` }, ...s.teamLog],
         };
       }),
     [setState, clock],
@@ -395,7 +395,7 @@ function DemoContextInner({
     ...state,
     dataset,
     now: dataset.now,
-    sourceLabel: "Demo · Datos simulados",
+    sourceLabel: "Demo · Simulated data",
     range,
     penguinById,
     deviceById,
@@ -424,7 +424,7 @@ function DemoContextInner({
 
 export function useDemo(): DemoContextValue {
   const v = useContext(Ctx);
-  if (!v) throw new Error("useDemo fuera de DemoProvider");
+  if (!v) throw new Error("useDemo must be used inside DemoProvider");
   return v;
 }
 
@@ -436,7 +436,7 @@ function BootScreen() {
           <span className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/20" />
           <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[var(--accent)]" />
         </div>
-        <p className="text-sm text-[var(--muted)]">Generando escenario de demostración…</p>
+        <p className="text-sm text-[var(--muted)]">Generating demo scenario…</p>
       </div>
     </div>
   );

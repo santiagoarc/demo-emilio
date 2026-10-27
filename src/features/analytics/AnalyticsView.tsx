@@ -22,8 +22,8 @@ export function AnalyticsView() {
   const n = ids.length;
   const multiDay = range.to - range.from > 1.5 * DAY;
 
-  // El mapa de calor muestra siempre la última semana, sin importar el periodo elegido:
-  // con "24 h" solo saldrían uno o dos renglones.
+  // The heatmap always shows the last week, whatever period is chosen:
+  // with "24 h" it would only have one or two rows.
   const heat = useMemo(() => {
     const from = Math.max(dataset.windowStart, startOfDay(dataset.now) - 6 * DAY);
     const to = dataset.now + 1;
@@ -55,10 +55,10 @@ export function AnalyticsView() {
         land: perPenguinPerDay(b.land, g.ids.length, range.from, range.to),
       };
     });
-  const bySpecies = groupRows(SPECIES.map((s) => ({ key: s.id, label: s.nameEs, color: s.color, ids: visible.filter((p) => p.speciesId === s.id).map((p) => p.id) }))).filter((g) => g.ids.length);
+  const bySpecies = groupRows(SPECIES.map((s) => ({ key: s.id, label: s.nameEn, color: s.color, ids: visible.filter((p) => p.speciesId === s.id).map((p) => p.id) }))).filter((g) => g.ids.length);
   const byTeam = groupRows(dataset.teams.map((tm) => ({ key: tm.id, label: tm.name, color: tm.color, ids: visible.filter((p) => teamOf(p.id) === tm.id).map((p) => p.id) }))).filter((g) => g.ids.length);
 
-  // Solo las zonas con algún movimiento, para que la tabla no lleve renglones vacíos.
+  // Only zones with some movement, so the table has no empty rows.
   const zonesInMatrix = PENGUIN_ZONES.map((z) => z.id).filter((z) => [...agg.transitions.keys()].some((k) => k.split(">").includes(z)));
   const topTransitions = [...agg.transitions.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
   const transitionsTotal = [...agg.transitions.values()].reduce((a, b) => a + b, 0);
@@ -66,9 +66,9 @@ export function AnalyticsView() {
   return (
     <div className="pb-10">
       <PageHeader
-        eyebrow="Análisis"
+        eyebrow="Analytics"
         title="Activity Analytics"
-        subtitle="Todas las gráficas se calculan desde las lecturas simuladas y responden a los filtros."
+        subtitle="Every chart is computed from the simulated readings and responds to the filters."
       />
       <div className="space-y-5 px-6 lg:px-8">
         <div className="panel-flat p-4">
@@ -77,30 +77,30 @@ export function AnalyticsView() {
 
         {n === 0 || range.to <= range.from ? (
           <Card>
-            <EmptyState icon={Activity} title={n === 0 ? "Ningún ejemplar coincide con los filtros" : "El rango de fechas está vacío"}>
-              {n === 0 ? "Ajusta especie, equipo, ejemplar o zona." : "Elige una fecha final posterior a la inicial dentro de la historia disponible."}
+            <EmptyState icon={Activity} title={n === 0 ? "No penguins match the filters" : "The date range is empty"}>
+              {n === 0 ? "Adjust species, team, penguin or zone." : "Pick an end date after the start date, within the available history."}
             </EmptyState>
           </Card>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-              <Kpi className="col-span-2 lg:col-span-1" label="Ejemplares analizados" value={String(n)} />
-              <Kpi label="Horas en agua" value={fmtHours(t.water)} color={SERIES.water} sub={`${fmtHours(perPenguinPerDay(t.water, n, range.from, range.to))} por ejemplar/día`} />
-              <Kpi label="Horas en tierra" value={fmtHours(t.land)} color={SERIES.land} sub={`${fmtHours(perPenguinPerDay(t.land, n, range.from, range.to))} por ejemplar/día`} />
-              <Kpi label="Sin movimiento registrado" value={fmtHours(t.stationary)} color={SERIES.stationary} sub="lecturas repetidas en tierra" />
-              <Kpi label="Cambios de zona" value={String(transitionsTotal)} sub="entre lecturas consecutivas" />
+              <Kpi className="col-span-2 lg:col-span-1" label="Penguins analyzed" value={String(n)} />
+              <Kpi label="Hours in water" value={fmtHours(t.water)} color={SERIES.water} sub={`${fmtHours(perPenguinPerDay(t.water, n, range.from, range.to))} per penguin/day`} />
+              <Kpi label="Hours on land" value={fmtHours(t.land)} color={SERIES.land} sub={`${fmtHours(perPenguinPerDay(t.land, n, range.from, range.to))} per penguin/day`} />
+              <Kpi label="No movement recorded" value={fmtHours(t.stationary)} color={SERIES.stationary} sub="repeated readings on land" />
+              <Kpi label="Zone changes" value={String(transitionsTotal)} sub="between consecutive readings" />
             </div>
 
             <div className="grid gap-5 xl:grid-cols-12">
-              <Card className="xl:col-span-8" title="Tiempo en agua frente a tiempo en tierra" subtitle={`${range.label} · horas-ejemplar por ${multiDay ? "día" : "hora"}`} icon={Droplets}
-                action={<Legend items={[{ color: SERIES.water, label: "Agua" }, { color: SERIES.land, label: "Tierra" }]} />}>
+              <Card className="xl:col-span-8" title="Time in water vs. time on land" subtitle={`${range.label} · penguin-hours per ${multiDay ? "day" : "hour"}`} icon={Droplets}
+                action={<Legend items={[{ color: SERIES.water, label: "Water" }, { color: SERIES.land, label: "Land" }]} />}>
                 <StackedColumns
                   height={210}
                   labelEvery={multiDay ? 1 : 3}
                   format={fmtHours}
                   series={[
-                    { key: "water", color: SERIES.water, label: "Agua" },
-                    { key: "land", color: SERIES.land, label: "Tierra" },
+                    { key: "water", color: SERIES.water, label: "Water" },
+                    { key: "land", color: SERIES.land, label: "Land" },
                   ]}
                   data={
                     multiDay
@@ -109,51 +109,51 @@ export function AnalyticsView() {
                   }
                 />
               </Card>
-              <Card className="xl:col-span-4" title="Cómo leer estas horas" icon={ShieldQuestion}>
+              <Card className="xl:col-span-4" title="How to read these hours" icon={ShieldQuestion}>
                 <ul className="space-y-4 text-xs">
-                  <Explain color={SERIES.water} title="En agua" value={fmtHours(t.water)}>
-                    Tiempo entre lecturas consecutivas que indican inmersión, sumado para todos los ejemplares del filtro.
+                  <Explain color={SERIES.water} title="In water" value={fmtHours(t.water)}>
+                    Time between consecutive readings that indicate immersion, summed across all penguins in the filter.
                   </Explain>
-                  <Explain color={SERIES.land} title="En tierra" value={fmtHours(t.land)}>
-                    Tiempo entre lecturas consecutivas en tierra, con o sin desplazamiento.
+                  <Explain color={SERIES.land} title="On land" value={fmtHours(t.land)}>
+                    Time between consecutive readings on land, with or without movement.
                   </Explain>
-                  <Explain color={SERIES.stationary} title="Sin movimiento registrado" value={fmtHours(t.stationary)}>
-                    Parte del tiempo en tierra en que las lecturas repiten la misma posición. Describe las lecturas, no afirma que el ejemplar estuviera inmóvil entre ellas.
+                  <Explain color={SERIES.stationary} title="No movement recorded" value={fmtHours(t.stationary)}>
+                    The part of time on land where readings repeat the same position. It describes the readings; it does not claim the penguin was motionless between them.
                   </Explain>
                 </ul>
               </Card>
             </div>
 
             <div className="grid gap-5 xl:grid-cols-12">
-              <Card className="xl:col-span-5" title="Actividad por hora del día" subtitle="Suma del periodo por franja horaria" icon={Clock}>
+              <Card className="xl:col-span-5" title="Activity by hour of day" subtitle="Period total for each hour slot" icon={Clock}>
                 <StackedColumns
                   height={190}
                   labelEvery={3}
                   format={fmtHours}
                   series={[
-                    { key: "water", color: SERIES.water, label: "Agua" },
-                    { key: "land", color: SERIES.land, label: "Tierra" },
+                    { key: "water", color: SERIES.water, label: "Water" },
+                    { key: "land", color: SERIES.land, label: "Land" },
                   ]}
                   data={agg.hourly.map((h, i) => ({ label: `${String(i).padStart(2, "0")}h`, tooltip: `${String(i).padStart(2, "0")}:00 – ${String(i).padStart(2, "0")}:59`, values: { water: h.water, land: h.land } }))}
                 />
               </Card>
-              <Card className="xl:col-span-7" title="Proporción en agua por día y hora" subtitle={`Últimos ${heat.days.length} días · porcentaje de lecturas en agua en cada franja`} icon={CalendarDays}>
+              <Card className="xl:col-span-7" title="Share in water by day and hour" subtitle={`Last ${heat.days.length} days · share of readings in water in each slot`} icon={CalendarDays}>
                 <Heatmap
                   rows={heat.days.map((_, i) => i)}
                   cols={Array.from({ length: 24 }, (_, i) => i)}
                   value={(r, c) => (heat.total[r][c] ? heat.water[r][c] / heat.total[r][c] : null)}
                   color="79,179,255"
-                  format={(v) => `${Math.round(v * 100)}% en agua`}
-                  rowLabel={(r) => `${fmtWeekday(heat.days[r])} ${new Date(heat.days[r]).getDate()}`}
+                  format={(v) => `${Math.round(v * 100)}% in water`}
+                  rowLabel={(r) => fmtWeekday(heat.days[r])}
                   colLabel={(c) => `${c}h`}
                 />
               </Card>
             </div>
 
             <div className="grid gap-5 xl:grid-cols-12">
-              <Card className="xl:col-span-8" title="Movimientos entre zonas" subtitle="Cambios de zona entre lecturas consecutivas" icon={ArrowRightLeft}>
+              <Card className="xl:col-span-8" title="Movement between zones" subtitle="Zone changes between consecutive readings" icon={ArrowRightLeft}>
                 {transitionsTotal === 0 ? (
-                  <EmptyState icon={ArrowRightLeft} title="Sin cambios de zona observados en el periodo" />
+                  <EmptyState icon={ArrowRightLeft} title="No zone changes observed in this period" />
                 ) : (
                   <Matrix
                     rows={zonesInMatrix}
@@ -165,7 +165,7 @@ export function AnalyticsView() {
                   />
                 )}
               </Card>
-              <Card className="xl:col-span-4" title="Recorridos más frecuentes" icon={Route}>
+              <Card className="xl:col-span-4" title="Most frequent routes" icon={Route}>
                 <ul className="space-y-3">
                   {topTransitions.map(([k, v]) => {
                     const [a, b] = k.split(">");
@@ -175,8 +175,8 @@ export function AnalyticsView() {
                         onMouseMove={(e) =>
                           showTip(e, {
                             title: `${ZONE_BY_ID[a].name} → ${ZONE_BY_ID[b].name}`,
-                            rows: [{ color: "var(--accent)", label: "Movimientos", value: v }],
-                            note: `${Math.round((v / Math.max(1, transitionsTotal)) * 100)}% de todos los cambios de zona del periodo`,
+                            rows: [{ color: "var(--accent)", label: "Moves", value: v }],
+                            note: `${Math.round((v / Math.max(1, transitionsTotal)) * 100)}% of all zone changes in the period`,
                           })
                         }
                         onMouseLeave={hideTip}
@@ -193,16 +193,16 @@ export function AnalyticsView() {
                       </li>
                     );
                   })}
-                  {topTransitions.length === 0 && <li className="text-xs text-muted">Sin datos.</li>}
+                  {topTransitions.length === 0 && <li className="text-xs text-muted">No data.</li>}
                 </ul>
               </Card>
             </div>
 
             <div className="grid gap-5 xl:grid-cols-2">
-              <Card title="Comparación por especie" subtitle="Promedio por ejemplar y día" icon={Bird} action={<CompareLegend />}>
+              <Card title="Comparison by species" subtitle="Average per penguin per day" icon={Bird} action={<CompareLegend />}>
                 <CompareRows rows={bySpecies} />
               </Card>
-              <Card title="Comparación por equipo" subtitle="Promedio por ejemplar y día" icon={Users} action={<CompareLegend />}>
+              <Card title="Comparison by team" subtitle="Average per penguin per day" icon={Users} action={<CompareLegend />}>
                 <CompareRows rows={byTeam} />
               </Card>
             </div>
@@ -250,11 +250,11 @@ function Explain({ color, title, value, children }: { color: string; title: stri
 }
 
 function CompareLegend() {
-  return <Legend items={[{ color: SERIES.water, label: "Agua" }, { color: SERIES.land, label: "Tierra" }]} />;
+  return <Legend items={[{ color: SERIES.water, label: "Water" }, { color: SERIES.land, label: "Land" }]} />;
 }
 
 function CompareRows({ rows }: { rows: { key: string; label: string; color: string; ids: string[]; water: number; land: number }[] }) {
-  if (!rows.length) return <p className="text-xs text-muted">Sin datos.</p>;
+  if (!rows.length) return <p className="text-xs text-muted">No data.</p>;
   return (
     <ul className="space-y-3.5">
       {rows.map((r) => (
@@ -265,14 +265,14 @@ function CompareRows({ rows }: { rows: { key: string; label: string; color: stri
               {r.label} <span className="text-faint">· {r.ids.length}</span>
             </span>
             <span className="num text-muted">
-              <b className="text-ink">{fmtHours(r.water)}</b> agua · <b className="text-ink">{fmtHours(r.land)}</b> tierra
+              <b className="text-ink">{fmtHours(r.water)}</b> water · <b className="text-ink">{fmtHours(r.land)}</b> land
             </span>
           </div>
           <SplitBar
-            title={`${r.label} · ${fmtHours(r.water)} agua, ${fmtHours(r.land)} tierra por ejemplar y día`}
+            title={`${r.label} · ${fmtHours(r.water)} water, ${fmtHours(r.land)} land per penguin per day`}
             parts={[
-              { value: r.water, color: SERIES.water, label: "Agua" },
-              { value: r.land, color: SERIES.land, label: "Tierra" },
+              { value: r.water, color: SERIES.water, label: "Water" },
+              { value: r.land, color: SERIES.land, label: "Land" },
             ]}
           />
         </li>

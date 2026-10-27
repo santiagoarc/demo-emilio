@@ -20,7 +20,7 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
   const { filters, setFilters, clearFilters, dataset, range, teamOf } = useDemo();
   const n = activeFilterCount(filters);
 
-  // En el panel angosto del mapa: etiqueta a la izquierda y botones en columnas parejas.
+  // In the narrow map panel: label on the left, buttons in even columns.
   if (compact) {
     const row = "grid grid-cols-[64px_1fr] items-start gap-2";
     const label = "eyebrow pt-2";
@@ -28,17 +28,17 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
     return (
       <div className={cx("flex flex-col gap-3", className)}>
         <div className={row}>
-          <span className={label}>Especie</span>
+          <span className={label}>Species</span>
           <div className="grid grid-cols-2 gap-1.5">
             {SPECIES.map((s) => (
               <Chip key={s.id} color={s.color} className={chip} active={filters.species.includes(s.id)} onClick={() => setFilters({ species: toggle(filters.species, s.id as SpeciesId) })}>
-                <span className="truncate">{s.nameEs.replace("Pingüino ", "")}</span>
+                <span className="truncate">{s.nameEn.replace(" Penguin", "")}</span>
               </Chip>
             ))}
           </div>
         </div>
         <div className={row}>
-          <span className={label}>Equipo</span>
+          <span className={label}>Team</span>
           <div className="grid grid-cols-2 gap-1.5">
             {dataset.teams.map((t) => (
               <Chip key={t.id} color={t.color} className={chip} active={filters.teams.includes(t.id)} onClick={() => setFilters({ teams: toggle(filters.teams, t.id) })}>
@@ -48,15 +48,15 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
           </div>
         </div>
         <div className={row}>
-          <span className={label}>Zona</span>
+          <span className={label}>Zone</span>
           <div className="flex flex-col gap-1.5">
             <Select
               value=""
               onChange={(e) => e.target.value && setFilters({ zones: toggle(filters.zones, e.target.value) })}
               className="h-8 w-full rounded-lg px-2.5 text-xs"
-              aria-label="Filtrar por zona"
+              aria-label="Filter by zone"
             >
-              <option value="">+ Zona</option>
+              <option value="">+ Zone</option>
               {PENGUIN_ZONES.map((z) => (
                 <option key={z.id} value={z.id}>
                   {filters.zones.includes(z.id) ? "✓ " : ""}
@@ -75,7 +75,7 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
             )}
             {n > 0 && (
               <Button size="sm" variant="ghost" className="self-start" onClick={clearFilters}>
-                <FilterX size={13} /> Limpiar ({n})
+                <FilterX size={13} /> Clear ({n})
               </Button>
             )}
           </div>
@@ -87,15 +87,15 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
   return (
     <div className={cx("flex flex-col gap-3", className)}>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="eyebrow mr-1">Especie</span>
+        <span className="eyebrow mr-1">Species</span>
         {SPECIES.map((s) => (
           <Chip key={s.id} color={s.color} active={filters.species.includes(s.id)} onClick={() => setFilters({ species: toggle(filters.species, s.id as SpeciesId) })}>
-            {compact ? s.nameEs.replace("Pingüino ", "") : s.nameEs}
+            {compact ? s.nameEn.replace(" Penguin", "") : s.nameEn}
           </Chip>
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="eyebrow mr-1">Equipo</span>
+        <span className="eyebrow mr-1">Team</span>
         {dataset.teams.map((t) => (
           <Chip key={t.id} color={t.color} active={filters.teams.includes(t.id)} onClick={() => setFilters({ teams: toggle(filters.teams, t.id) })}>
             {t.name}
@@ -106,9 +106,9 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
           value=""
           onChange={(e) => e.target.value && setFilters({ zones: toggle(filters.zones, e.target.value) })}
           className="h-7 rounded-full px-2.5 text-xs"
-          aria-label="Filtrar por zona"
+          aria-label="Filter by zone"
         >
-          <option value="">+ Zona</option>
+          <option value="">+ Zone</option>
           {PENGUIN_ZONES.map((z) => (
             <option key={z.id} value={z.id}>
               {filters.zones.includes(z.id) ? "✓ " : ""}
@@ -126,9 +126,9 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
             value={filters.penguinId ?? ""}
             onChange={(e) => setFilters({ penguinId: e.target.value || null })}
             className="h-7 rounded-full px-2.5 text-xs"
-            aria-label="Filtrar por ejemplar"
+            aria-label="Filter by penguin"
           >
-            <option value="">Todos los ejemplares</option>
+            <option value="">All penguins</option>
             {dataset.penguins
               .filter((p) => (!filters.species.length || filters.species.includes(p.speciesId)) && (!filters.teams.length || filters.teams.includes(teamOf(p.id))))
               .map((p) => (
@@ -140,13 +140,13 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
         )}
         {n > 0 && (
           <Button size="sm" variant="ghost" onClick={clearFilters}>
-            <FilterX size={13} /> Limpiar ({n})
+            <FilterX size={13} /> Clear ({n})
           </Button>
         )}
       </div>
       {showRange && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="eyebrow mr-1">Periodo</span>
+          <span className="eyebrow mr-1">Period</span>
           <Segmented<RangePreset>
             size="sm"
             value={filters.range}
@@ -170,7 +170,7 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
                 onChange={(e) => setFilters({ customFrom: e.target.value })}
                 className="h-7 rounded-lg border border-line-strong bg-panel-solid px-2 text-xs text-ink outline-none"
               />
-              <span>a</span>
+              <span>to</span>
               <input
                 type="date"
                 value={filters.customTo ?? ""}
@@ -181,7 +181,7 @@ export function GlobalFilters({ showRange = true, showPenguin = false, className
               />
             </div>
           )}
-          <span className="text-[11px] text-faint">{range.label} · historia disponible: {dataset.slotMinutes === 30 ? "lecturas cada 30 min" : `lecturas cada ${dataset.slotMinutes} min`}, {Math.round((dataset.now - dataset.windowStart) / 86400000)} días</span>
+          <span className="text-[11px] text-faint">{range.label} · history available: readings every {dataset.slotMinutes} min, {Math.round((dataset.now - dataset.windowStart) / 86400000)} days</span>
         </div>
       )}
     </div>

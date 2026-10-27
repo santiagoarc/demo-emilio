@@ -1,18 +1,18 @@
 import type { ReadingQuality, ReadingSource, RecordStatus } from "@/domain/types";
 
 export const SOURCE_LABEL: Record<ReadingSource, string> = {
-  uwb: "Red de localización en tierra (simulada)",
-  acoustic: "Receptor acústico en agua (simulado)",
-  rfid_gate: "Compuerta RFID (simulada)",
+  uwb: "Land positioning network (simulated)",
+  acoustic: "Underwater acoustic receiver (simulated)",
+  rfid_gate: "RFID gate (simulated)",
 };
 
-export const SOURCE_SHORT: Record<ReadingSource, string> = { uwb: "Tierra · UWB", acoustic: "Agua · acústico", rfid_gate: "Compuerta RFID" };
+export const SOURCE_SHORT: Record<ReadingSource, string> = { uwb: "Land · UWB", acoustic: "Water · acoustic", rfid_gate: "RFID gate" };
 
-export const QUALITY_LABEL: Record<ReadingQuality, string> = { high: "Alta", medium: "Media", low: "Baja" };
+export const QUALITY_LABEL: Record<ReadingQuality, string> = { high: "High", medium: "Medium", low: "Low" };
 export const QUALITY_TONE: Record<ReadingQuality, "ok" | "info" | "warn"> = { high: "ok", medium: "info", low: "warn" };
 
 export const RECORD_STATUS_LABEL: Record<RecordStatus, string> = {
-  active: "Registro activo",
-  recent: "Alta reciente",
-  incomplete: "Datos incompletos",
+  active: "Active record",
+  recent: "Recently admitted",
+  incomplete: "Incomplete record",
 };

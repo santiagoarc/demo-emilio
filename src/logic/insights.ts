@@ -1,7 +1,7 @@
 /**
- * "¿Cómo va?" de cada pingüino: compara sus últimos días contra él mismo y contra
- * su especie, con las mismas cifras de actividad que el resto de la demo.
- * No es diagnóstico: señala lo que conviene mirar.
+ * "How is it doing?" for each penguin: compares its last few days against itself and
+ * against its species, using the same activity figures as the rest of the demo.
+ * Not a diagnosis: it only points at what may be worth a look.
  */
 import type { Dataset, Penguin } from "@/domain/types";
 import { computeActivity, type Breakdown } from "./metrics";
@@ -18,17 +18,17 @@ export interface PenguinInsight {
   level: InsightLevel;
   headline: string;
   points: InsightPoint[];
-  /** Horas por día en las últimas 24 h y el promedio de la especie. */
+  /** Hours per day over the last 24 h, and the species average. */
   water: { mine: number; species: number };
   land: { mine: number; species: number };
-  coverage: number; // 0–1, tiempo con lectura sobre tiempo esperado (24 h)
+  coverage: number; // 0–1, time with readings over expected time (24 h)
 }
 
-export const INSIGHT_LABEL: Record<InsightLevel, string> = { ok: "Va bien", watch: "Vigilar", check: "Revisar" };
+export const INSIGHT_LABEL: Record<InsightLevel, string> = { ok: "Typical", watch: "Watch", check: "Review" };
 
 const perDay = (b: Breakdown, days: number) => ({ water: b.water / days / HOUR, land: b.land / days / HOUR, stationary: b.stationary / days / HOUR });
 
-/** Promedio diario por especie en la ventana disponible; se calcula una vez por dataset. */
+/** Daily average per species over the available window; computed once per dataset. */
 export function speciesBaselines(ds: Dataset): Map<string, { water: number; land: number; stationary: number }> {
   const out = new Map<string, { water: number; land: number; stationary: number }>();
   const days = Math.max(1, (ds.now - ds.windowStart) / DAY);
@@ -57,32 +57,32 @@ export function penguinInsight(
   const coverage = day.expected > 0 ? (day.water + day.land) / day.expected : 0;
   const points: InsightPoint[] = [];
 
-  // Un día en el agua varía mucho: solo cuenta lo que se sale con claridad.
-  // "Revisar" pide que esté bajo contra su especie y también contra sus propios días.
-  // Un ejemplar recién dado de alta aún no tiene un día completo que comparar.
+  // Time in the water varies a lot day to day: only clear outliers count.
+  // "Review" requires being low against the species AND against its own previous days.
+  // A newly admitted penguin doesn't have a full day to compare yet.
   if (coverage >= 0.6) {
     const vsSpecies = base.water > 0 ? today.water / base.water : 1;
     const vsSelf = before.water > 0.5 ? today.water / before.water : 1;
     if (vsSpecies < 0.3 && vsSelf < 0.5) {
-      points.push({ level: "check", text: `Nadó ${today.water.toFixed(1)} h en 24 h: menos de la mitad que en sus días anteriores (${before.water.toFixed(1)} h) y muy por debajo de su especie (${base.water.toFixed(1)} h).` });
+      points.push({ level: "check", text: `Recorded ${today.water.toFixed(1)} h in the water in the last 24 h: less than half its previous days (${before.water.toFixed(1)} h) and well below its species (${base.water.toFixed(1)} h).` });
     } else if (vsSpecies < 0.45 && vsSelf < 0.6) {
-      points.push({ level: "watch", text: `Nadó ${today.water.toFixed(1)} h en 24 h, por debajo de su especie (${base.water.toFixed(1)} h) y de sus días anteriores (${before.water.toFixed(1)} h).` });
+      points.push({ level: "watch", text: `Recorded ${today.water.toFixed(1)} h in the water in the last 24 h, below its species (${base.water.toFixed(1)} h) and its previous days (${before.water.toFixed(1)} h).` });
     } else if (vsSpecies < 0.4) {
-      points.push({ level: "watch", text: `Nadó ${today.water.toFixed(1)} h en 24 h, muy por debajo de su especie (${base.water.toFixed(1)} h), aunque es parecido a sus días anteriores.` });
+      points.push({ level: "watch", text: `Recorded ${today.water.toFixed(1)} h in the water in the last 24 h, well below its species (${base.water.toFixed(1)} h), though similar to its own previous days.` });
     } else if (vsSelf < 0.4 && before.water - today.water > 1.5) {
-      points.push({ level: "watch", text: `Bajó su tiempo en agua: ${today.water.toFixed(1)} h hoy vs ${before.water.toFixed(1)} h en sus días anteriores.` });
+      points.push({ level: "watch", text: `Less time in the water: ${today.water.toFixed(1)} h in the last 24 h vs ${before.water.toFixed(1)} h on its previous days.` });
     } else if (vsSpecies > 2.2) {
-      points.push({ level: "watch", text: `Nadó ${today.water.toFixed(1)} h en 24 h, más del doble que su especie (${base.water.toFixed(1)} h).` });
+      points.push({ level: "watch", text: `Recorded ${today.water.toFixed(1)} h in the water in the last 24 h, more than twice its species (${base.water.toFixed(1)} h).` });
     }
 
     const still = base.stationary > 0 ? today.stationary / base.stationary : 1;
-    if (today.stationary >= 4 && still > 1.8) points.push({ level: "watch", text: `${today.stationary.toFixed(1)} h sin movimiento registrado, más de lo usual en su especie (${base.stationary.toFixed(1)} h).` });
+    if (today.stationary >= 4 && still > 1.8) points.push({ level: "watch", text: `${today.stationary.toFixed(1)} h with no movement recorded, more than usual for its species (${base.stationary.toFixed(1)} h).` });
   }
 
   const level: InsightLevel = points.some((x) => x.level === "check") ? "check" : points.some((x) => x.level === "watch") ? "watch" : "ok";
-  if (level === "ok") points.unshift({ level: "ok", text: `Actividad dentro de lo usual: ${today.water.toFixed(1)} h en agua y ${today.land.toFixed(1)} h en tierra en las últimas 24 h.` });
+  if (level === "ok") points.unshift({ level: "ok", text: `Activity within the usual range: ${today.water.toFixed(1)} h in water and ${today.land.toFixed(1)} h on land in the last 24 h.` });
   const headline =
-    level === "ok" ? "Actividad normal para su especie" : level === "watch" ? "Algo cambió; conviene vigilar" : "Conviene revisarlo";
+    level === "ok" ? "Activity typical for its species" : level === "watch" ? "Activity changed — worth watching" : "Activity pattern worth a keeper check";
 
   return {
     level,

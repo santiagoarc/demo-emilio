@@ -4,7 +4,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { DemoProvider } from "@/state/DemoProvider";
 import "./globals.css";
 
-// La demo genera sus datos en el navegador; no hay UI que validar en el servidor.
+// The demo generates its data in the browser; there is no UI to validate on the server.
 export const instant = false;
 
 const geistSans = Geist({
@@ -18,13 +18,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Penguin Tracking & Care · Demo",
-  description: "Demo de monitoreo, localización y gestión de pingüinos con datos simulados.",
+  title: "Animal Care Platform · SeaWorld concept demo",
+  description: "Concept demo for penguin and aviary care teams, built on simulated data.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full">
         <DemoProvider>
           <AppShell>{children}</AppShell>

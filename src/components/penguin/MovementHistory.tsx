@@ -5,7 +5,7 @@ import { ZONE_BY_ID } from "@/domain/habitat";
 import { fmtDateTime, fmtTime } from "@/logic/time";
 import { useDemo } from "@/state/DemoProvider";
 
-/** Tramos por zona, del más reciente al más antiguo. */
+/** Stretches by zone, newest first. */
 export function MovementHistory({ penguinId, from, to, limit = 12 }: { penguinId: string; from: number; to: number; limit?: number }) {
   const { dataset, now } = useDemo();
   const recs = (dataset.activity.get(penguinId) ?? [])
@@ -13,7 +13,7 @@ export function MovementHistory({ penguinId, from, to, limit = 12 }: { penguinId
     .sort((a, b) => b.start - a.start)
     .slice(0, limit);
 
-  if (!recs.length) return <p className="py-4 text-center text-xs text-muted">Sin movimientos registrados en este periodo.</p>;
+  if (!recs.length) return <p className="py-4 text-center text-xs text-muted">No movements recorded in this period.</p>;
 
   return (
     <ol className="relative space-y-1 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-line-strong">
@@ -28,10 +28,10 @@ export function MovementHistory({ penguinId, from, to, limit = 12 }: { penguinId
             <div className="min-w-0 text-xs">
               <p className="text-ink">
                 {z.name}
-                {r.stationary && r.readings > 1 && <span className="ml-1.5 text-faint">· sin movimiento registrado</span>}
+                {r.stationary && r.readings > 1 && <span className="ml-1.5 text-faint">· no movement recorded</span>}
               </p>
               <p className="text-faint">
-                {fmtDateTime(r.start, now)} – {Math.min(r.end, to) >= now ? "ahora" : fmtTime(Math.min(r.end, to))} · {r.readings} lectura{r.readings === 1 ? "" : "s"}
+                {fmtDateTime(r.start, now)} – {Math.min(r.end, to) >= now ? "now" : fmtTime(Math.min(r.end, to))} · {r.readings} reading{r.readings === 1 ? "" : "s"}
               </p>
             </div>
           </li>

@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { ChevronRight, MapPinned, Plus, Search, Users, Waves } from "lucide-react";
 import { ZONE_BY_ID } from "@/domain/habitat";
 import { computeActivity } from "@/logic/metrics";
-import { fmtDate, fmtHours, fmtWeekday } from "@/logic/time";
+import { fmtHours, fmtWeekday } from "@/logic/time";
 import { PERMISSIONS, useDemo } from "@/state/DemoProvider";
 import { Card, Segmented, SimulatedTag, cx } from "@/components/ui/primitives";
 import { Donut, SERIES, StackedColumns } from "@/components/charts/Charts";
@@ -45,7 +45,7 @@ export function TeamsView() {
     return [...list].sort((a, b) => by[sort](a, b) || a.team.name.localeCompare(b.team.name));
   }, [stats, q, sort, statusFilter]);
 
-  // Distribución por zona: última ubicación registrada de todos los ejemplares.
+  // Distribution by zone: last recorded location of every penguin.
   const zoneRows = useMemo(() => {
     const m = new Map<string, number>();
     for (const p of dataset.penguins) {
@@ -61,66 +61,66 @@ export function TeamsView() {
 
   return (
     <div className="pb-10">
-      {/* Encabezado */}
+      {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4 px-6 pb-4 pt-6 lg:px-8">
         <div className="min-w-0">
           <p className="eyebrow mb-1">Care Teams · SeaWorld Penguin Tracking & Care</p>
-          <h1 className="text-[28px] font-semibold tracking-tight">Equipos de cuidado</h1>
-          <p className="mt-1 text-sm text-muted">Gestión de equipos, pingüinos asignados y actividad registrada.</p>
+          <h1 className="text-[28px] font-semibold tracking-tight">Care teams</h1>
+          <p className="mt-1 text-sm text-muted">Manage teams, assigned penguins and recorded activity.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPicker />
           <DayPicker />
           {PERMISSIONS.manageTeams && (
             <button onClick={() => setCreating(true)} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3.5 text-sm font-semibold text-white hover:bg-[#0b8178]">
-              <Plus size={16} /> Nuevo equipo
+              <Plus size={16} /> New team
             </button>
           )}
         </div>
       </div>
 
       <div className="space-y-5 px-6 lg:px-8">
-        {/* Indicadores */}
+        {/* Indicators */}
         <div className="grid gap-3 sm:grid-cols-3">
-          <Kpi icon={Users} color="#a78bfa" value={String(dataset.teams.length)} label="Equipos de cuidado" sub={`${activeCount} activos · ${dataset.teams.length - activeCount} inactivos`} />
-          <Kpi icon={Users} color="#5cb8ff" value={String(assignedIds.length)} label="Pingüinos asignados" sub={`${Math.round((assignedIds.length / Math.max(1, total)) * 100)}% del total · un equipo por ejemplar`} />
-          <Kpi icon={Waves} color="#2fd8c8" value={`${Math.round((inWater / Math.max(1, assignedIds.length)) * 100)}%`} label="En agua ahora" sub={`${inWater} de ${assignedIds.length} · asignación actual`} />
+          <Kpi icon={Users} color="#a78bfa" value={String(dataset.teams.length)} label="Care teams" sub={`${activeCount} active · ${dataset.teams.length - activeCount} inactive`} />
+          <Kpi icon={Users} color="#5cb8ff" value={String(assignedIds.length)} label="Assigned penguins" sub={`${Math.round((assignedIds.length / Math.max(1, total)) * 100)}% of total · one team per penguin`} />
+          <Kpi icon={Waves} color="#2fd8c8" value={`${Math.round((inWater / Math.max(1, assignedIds.length)) * 100)}%`} label="In water now" sub={`${inWater} of ${assignedIds.length} · current assignment`} />
         </div>
 
-        {/* Equipos */}
+        {/* Teams */}
         <section>
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="text-[17px] font-semibold tracking-tight">Equipos de cuidado</h2>
-              <p className="text-xs text-muted">Selecciona un equipo para ver su información detallada. Nombres configurables, no representan la estructura real.</p>
+              <h2 className="text-[17px] font-semibold tracking-tight">Care teams</h2>
+              <p className="text-xs text-muted">Select a team to see its details. Names are configurable and do not reflect the real structure.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex h-9 w-[220px] items-center gap-2 rounded-xl border border-line bg-ink/[0.05] px-3">
                 <Search size={14} className="text-muted" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar equipo o responsable…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search team or lead…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint" />
               </div>
               <Segmented<StatusFilter>
                 size="sm"
                 value={statusFilter}
                 onChange={setStatusFilter}
                 options={[
-                  { value: "all", label: "Todos" },
-                  { value: "active", label: "Activos" },
-                  { value: "inactive", label: "Inactivos" },
+                  { value: "all", label: "All" },
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
                 ]}
               />
               <label className="flex h-9 items-center gap-2 rounded-xl border border-line bg-ink/[0.05] px-3 text-xs text-muted">
-                Ordenar por
+                Sort by
                 <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="bg-transparent text-xs text-ink outline-none">
-                  <option value="penguins">Pingüinos asignados</option>
-                  <option value="name">Nombre</option>
-                  <option value="status">Estado</option>
+                  <option value="penguins">Assigned penguins</option>
+                  <option value="name">Name</option>
+                  <option value="status">Status</option>
                 </select>
               </label>
             </div>
           </div>
           {cards.length === 0 ? (
-            <p className="panel px-4 py-8 text-center text-sm text-muted">Ningún equipo coincide con la búsqueda.</p>
+            <p className="panel px-4 py-8 text-center text-sm text-muted">No teams match the search.</p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
               {cards.map((x) => (
@@ -130,9 +130,9 @@ export function TeamsView() {
           )}
         </section>
 
-        {/* Analítica */}
+        {/* Analytics */}
         <div className="grid gap-5 xl:grid-cols-3">
-          <Card title="Distribución de pingüinos por equipo" subtitle="Asignación actual · clic para abrir el equipo">
+          <Card title="Penguins by team" subtitle="Current assignment · click to open the team">
             <div className="flex flex-wrap items-center gap-5">
               <Donut
                 size={136}
@@ -141,7 +141,7 @@ export function TeamsView() {
                 center={
                   <div>
                     <p className="num text-2xl font-semibold leading-none">{assignedIds.length}</p>
-                    <p className="text-[10px] text-faint">asignados</p>
+                    <p className="text-[10px] text-faint">assigned</p>
                   </div>
                 }
               />
@@ -160,7 +160,7 @@ export function TeamsView() {
             </div>
           </Card>
 
-          <Card title="Distribución por zona" subtitle="Última ubicación registrada · todos los equipos · clic para abrir el mapa">
+          <Card title="Distribution by zone" subtitle="Last recorded location · all teams · click to open the map">
             <ul className="space-y-0.5">
               {zoneRows.slice(0, 7).map(([z, n]) => {
                 const pct = Math.round((n / Math.max(1, total)) * 100);
@@ -178,27 +178,27 @@ export function TeamsView() {
                 );
               })}
             </ul>
-            {zoneRows.length > 7 && <p className="mt-1 px-1.5 text-[11px] text-faint">+{zoneRows.length - 7} zonas más en Habitat Map</p>}
+            {zoneRows.length > 7 && <p className="mt-1 px-1.5 text-[11px] text-faint">+{zoneRows.length - 7} more {zoneRows.length - 7 === 1 ? "zone" : "zones"} in Habitat Map</p>}
           </Card>
 
-          <Card title="Actividad general de los equipos" subtitle={`${range.label} · horas registradas, suma de ejemplares asignados`} action={<SimulatedTag />}>
+          <Card title="Overall team activity" subtitle={`${range.label} · recorded hours, summed across assigned penguins`} action={<SimulatedTag />}>
             <StackedColumns
               height={142}
               labelEvery={byHour ? 6 : agg.daily.length > 8 ? 2 : 1}
               format={fmtHours}
               series={[
-                { key: "water", color: SERIES.water, label: "Agua" },
-                { key: "land", color: SERIES.land, label: "Tierra" },
+                { key: "water", color: SERIES.water, label: "Water" },
+                { key: "land", color: SERIES.land, label: "Land" },
               ]}
               data={
                 byHour
                   ? agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))
-                  : agg.daily.map((d) => ({ label: fmtDate(d.day).split(" ")[0], tooltip: fmtWeekday(d.day), values: { water: d.water, land: d.land } }))
+                  : agg.daily.map((d) => ({ label: String(new Date(d.day).getDate()), tooltip: fmtWeekday(d.day), values: { water: d.water, land: d.land } }))
               }
             />
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
-              <Dot color={SERIES.water}>Agua</Dot>
-              <Dot color={SERIES.land}>Tierra</Dot>
+              <Dot color={SERIES.water}>Water</Dot>
+              <Dot color={SERIES.land}>Land</Dot>
             </div>
           </Card>
         </div>
@@ -236,14 +236,14 @@ function TeamCard({ x, total, onOpen }: { x: TeamStats; total: number; onOpen: (
         <Avatars team={team} max={4} size={28} />
         <div className="min-w-0 leading-tight">
           <p className="truncate text-sm">{team.lead}</p>
-          <p className="text-[11px] text-faint">Responsable · {team.members.length} integrantes</p>
+          <p className="text-[11px] text-faint">Team lead · {team.members.length} {team.members.length === 1 ? "member" : "members"}</p>
         </div>
       </div>
       <div className="mt-3">
         <div className="flex items-baseline justify-between text-xs">
-          <span className="text-muted">Pingüinos asignados</span>
+          <span className="text-muted">Assigned penguins</span>
           <span>
-            <b className="num text-sm">{x.penguinIds.length}</b> <span className="text-faint">· {pct}% del total</span>
+            <b className="num text-sm">{x.penguinIds.length}</b> <span className="text-faint">· {pct}% of total</span>
           </span>
         </div>
         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
@@ -251,20 +251,20 @@ function TeamCard({ x, total, onOpen }: { x: TeamStats; total: number; onOpen: (
         </div>
       </div>
       <p className="mt-3 truncate text-[11px] text-muted" title={team.zoneIds.map((z) => ZONE_BY_ID[z]?.name).join(", ")}>
-        <span className="text-faint">Zonas: </span>
-        {team.zoneIds.length ? team.zoneIds.slice(0, 3).map((z) => ZONE_BY_ID[z]?.name).join(", ") : "Sin zonas asignadas"}
+        <span className="text-faint">Zones: </span>
+        {team.zoneIds.length ? team.zoneIds.slice(0, 3).map((z) => ZONE_BY_ID[z]?.name).join(", ") : "No zones assigned"}
         {team.zoneIds.length > 3 && ` +${team.zoneIds.length - 3}`}
       </p>
       <div className="mt-3 flex items-center gap-3 border-t border-line pt-3 text-xs">
         <span className="inline-flex items-center gap-1 text-muted">
-          <Waves size={13} className="text-faint" /> {x.inWater} en agua ahora
+          <Waves size={13} className="text-faint" /> {x.inWater} in water now
         </span>
         <Link
           href={`/map?team=${team.id}`}
           onClick={(e) => e.stopPropagation()}
           className="ml-auto inline-flex items-center gap-1 rounded-lg border border-line-strong px-2 py-1 text-[11px] text-muted hover:border-accent/50 hover:text-ink"
         >
-          <MapPinned size={12} /> Ver en el mapa
+          <MapPinned size={12} /> View on map
         </Link>
       </div>
     </article>

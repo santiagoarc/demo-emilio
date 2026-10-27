@@ -23,7 +23,7 @@ export function StatusPill({ status, compact, className }: { status: LiveStatus;
       style={{ color, borderColor: `${color}40`, background: `${color}14` }}
     >
       <Icon size={12} />
-      {compact && status === "resting" ? "Sin movimiento" : STATUS_LABEL[status]}
+      {compact && status === "resting" ? "No movement" : STATUS_LABEL[status]}
     </span>
   );
 }

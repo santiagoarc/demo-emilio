@@ -11,22 +11,22 @@ import { colonyRoster, mentionedPenguins, penguinDossier } from "./penguinContex
 import { ASK_EVENT } from "./ask";
 import { localAnswer } from "./localReports";
 
-/** Lo que se ve en pantalla y lo que se manda a Claude (la pregunta más las fichas adjuntas). */
+/** What's shown on screen and what's sent to Claude (the question plus attached dossiers). */
 interface Turn {
   role: "user" | "assistant";
   text: string;
   sent: string;
   attached?: string[];
-  /** Pingüinos de los que trata la pregunta, para seguir la conversación sin repetir el código. */
+  /** Penguins the question is about, so the conversation can continue without repeating the code. */
   about?: string[];
 }
 
-const SUGGESTIONS = ["Dame el reporte completo de KNG-005", "¿Qué pingüinos pasaron menos tiempo en el agua hoy?", "Compara GEN-001 con el promedio de su especie"];
+const SUGGESTIONS = ["Give me the full report on KNG-005", "Which penguins spent the least time in water today?", "Compare GEN-001 with its species average"];
 
 /**
- * Chat de reportes por pingüino. Responde con la información del sistema; si el
- * servidor tiene llave de Claude, la pregunta va a Claude con las fichas adjuntas
- * (la primera vez que se menciona cada pingüino, o el que está abierto en pantalla).
+ * Per-penguin reports chat. Answers from the system's data; if the server has a
+ * Claude key, the question goes to Claude with the dossiers attached (the first time
+ * each penguin is mentioned, or the one open on screen).
  */
 export function PenguinChat() {
   const demo = useDemo();
@@ -36,7 +36,7 @@ export function PenguinChat() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  // null: aún no se sabe; false: el servidor no tiene llave y se responde con los datos del sistema.
+  // null: not known yet; false: the server has no key, so answers come from the system's data.
   const [claude, setClaude] = useState<boolean | null>(null);
   const abort = useRef<AbortController | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -45,7 +45,7 @@ export function PenguinChat() {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
   }, [turns]);
 
-  // La última versión de send, para el aviso de "pedir análisis" de otras pantallas.
+  // Latest version of send, for "ask for analysis" requests from other screens.
   const sendRef = useRef<(q: string) => void>(() => {});
   useEffect(() => {
     const onAsk = (e: Event) => {
@@ -56,7 +56,7 @@ export function PenguinChat() {
     return () => window.removeEventListener(ASK_EVENT, onAsk);
   }, []);
 
-  // El pingüino que el usuario tiene abierto: su ficha o el seleccionado en el mapa.
+  // The penguin the user has open: its profile or the one selected on the map.
   const onScreen = pathname.startsWith("/penguins/") ? decodeURIComponent(pathname.split("/")[2] ?? "") : params.get("penguin");
 
   const send = async (question: string) => {
@@ -69,17 +69,17 @@ export function PenguinChat() {
       const p = demo.penguinById.get(onScreen);
       if (p) {
         found = [p];
-        note = `(El usuario tiene abierta la ficha de ${p.id}.)\n`;
+        note = `(The user has ${p.id}'s profile open.)\n`;
       }
     }
     const fresh = found.filter((p) => !already.has(p.id)).slice(0, 4);
-    const sent = fresh.length ? `${q}\n\n${note}<datos>\n${fresh.map((p) => penguinDossier(demo, p)).join("\n\n")}\n</datos>` : q;
+    const sent = fresh.length ? `${q}\n\n${note}<data>\n${fresh.map((p) => penguinDossier(demo, p)).join("\n\n")}\n</data>` : q;
 
     const history: Turn[] = [...turns, { role: "user", text: q, sent, attached: fresh.map((p) => p.id), about: found.map((p) => p.id) }];
     setTurns([...history, { role: "assistant", text: "", sent: "" }]);
     setInput("");
 
-    // Respuesta con los datos del sistema: al instante y sin servicios externos.
+    // Answer from the system's data: instant and with no external services.
     const context = turns.flatMap((t) => t.about ?? []).map((id) => demo.penguinById.get(id)!).filter(Boolean);
     const local = () => localAnswer(demo, q, mentionedPenguins(demo.dataset.penguins, q), context.length ? context : found);
     if (claude === false) {
@@ -109,7 +109,7 @@ export function PenguinChat() {
       }
       if (!res.ok || !res.body) {
         const err = (await res.json().catch(() => null)) as { error?: string } | null;
-        show(`_${err?.error ?? `No se pudo obtener respuesta (${res.status}).`}_`);
+        show(`_${err?.error ?? `Couldn't get a response (${res.status}).`}_`);
         return;
       }
       setClaude(true);
@@ -122,7 +122,7 @@ export function PenguinChat() {
         show(answer);
       }
     } catch (e) {
-      show(answer + ((e as Error).name === "AbortError" ? "\n\n_Respuesta detenida._" : "\n\n_Se perdió la conexión._"));
+      show(answer + ((e as Error).name === "AbortError" ? "\n\n_Response stopped._" : "\n\n_Connection lost._"));
     } finally {
       setBusy(false);
       abort.current = null;
@@ -144,11 +144,11 @@ export function PenguinChat() {
         <button
           onClick={() => setOpen(true)}
           className={cx("fixed right-5 z-50 inline-flex h-12 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(11,36,64,0.25)] transition hover:bg-[#0b8178]",
-            // En el mapa, abajo a la derecha está el botón de la ficha del panel.
+            // On the map, the bottom-right corner holds the panel's profile button.
             pathname === "/map" ? "bottom-[84px]" : "bottom-5",
           )}
         >
-          <MessageSquareText size={18} /> Reportes
+          <MessageSquareText size={18} /> Reports
         </button>
       )}
       {open && (
@@ -156,15 +156,15 @@ export function PenguinChat() {
           <header className="flex items-center gap-2 border-b border-line px-4 py-3">
             <MessageSquareText size={17} className="text-accent" />
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold">Reportes por pingüino</h2>
-              <p className="text-[11px] text-muted">Pregunta por código o nombre · {claude ? "responde Claude con los datos del sistema" : "con la información del sistema"}</p>
+              <h2 className="text-sm font-semibold">Penguin reports</h2>
+              <p className="text-[11px] text-muted">Ask by code or name · {claude ? "Claude answers using the system's data" : "using the system's data"}</p>
             </div>
             {turns.length > 0 && (
-              <button onClick={() => !busy && setTurns([])} title="Nueva conversación" className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink">
+              <button onClick={() => !busy && setTurns([])} title="New conversation" className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink">
                 <RotateCcw size={15} />
               </button>
             )}
-            <button onClick={() => setOpen(false)} aria-label="Cerrar" className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink">
+            <button onClick={() => setOpen(false)} aria-label="Close" className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink">
               <X size={16} />
             </button>
           </header>
@@ -172,7 +172,7 @@ export function PenguinChat() {
           <div ref={scroller} className="scroll-thin flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {turns.length === 0 && (
               <div className="space-y-2">
-                <p className="text-xs text-muted">Pide el reporte de un ejemplar, compara contra su especie o pregunta por la colonia.</p>
+                <p className="text-xs text-muted">Ask for a bird&rsquo;s report, compare it with its species, or ask about the colony.</p>
                 {SUGGESTIONS.map((s) => (
                   <button key={s} onClick={() => void send(s)} className="block w-full rounded-xl border border-line-strong px-3 py-2 text-left text-xs text-ink hover:bg-ink/[0.04]">
                     {s}
@@ -184,11 +184,11 @@ export function PenguinChat() {
               t.role === "user" ? (
                 <div key={i} className="ml-8 rounded-2xl rounded-br-md bg-accent/12 px-3 py-2 text-sm text-ink">
                   {t.text}
-                  {!!t.attached?.length && <p className="mt-1 text-[10px] text-muted">Ficha adjunta: {t.attached.join(", ")}</p>}
+                  {!!t.attached?.length && <p className="mt-1 text-[10px] text-muted">Dossier attached: {t.attached.join(", ")}</p>}
                 </div>
               ) : (
                 <div key={i} className="chat-md text-sm text-ink">
-                  {t.text ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.text}</ReactMarkdown> : <span className="text-xs text-muted">Preparando el reporte…</span>}
+                  {t.text ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.text}</ReactMarkdown> : <span className="text-xs text-muted">Preparing the report…</span>}
                 </div>
               ),
             )}
@@ -205,15 +205,15 @@ export function PenguinChat() {
                 }
               }}
               rows={1}
-              placeholder="Ej. ¿Cómo va Koda esta semana?"
+              placeholder="e.g. How is Koda doing this week?"
               className="max-h-32 min-h-10 flex-1 resize-none rounded-xl border border-line-strong bg-panel-solid px-3 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
             {busy ? (
-              <button type="button" onClick={() => abort.current?.abort()} aria-label="Detener" className="grid h-10 w-10 place-items-center rounded-xl bg-ink/10 text-ink hover:bg-ink/15">
+              <button type="button" onClick={() => abort.current?.abort()} aria-label="Stop" className="grid h-10 w-10 place-items-center rounded-xl bg-ink/10 text-ink hover:bg-ink/15">
                 <Square size={14} />
               </button>
             ) : (
-              <button type="submit" disabled={!input.trim()} aria-label="Enviar" className={cx("grid h-10 w-10 place-items-center rounded-xl bg-accent text-white transition hover:bg-[#0b8178]", !input.trim() && "opacity-40")}>
+              <button type="submit" disabled={!input.trim()} aria-label="Send" className={cx("grid h-10 w-10 place-items-center rounded-xl bg-accent text-white transition hover:bg-[#0b8178]", !input.trim() && "opacity-40")}>
                 <ArrowUp size={16} />
               </button>
             )}

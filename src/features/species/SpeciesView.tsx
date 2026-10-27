@@ -17,7 +17,7 @@ import type { RangePreset } from "@/logic/filters";
 export function SpeciesView() {
   const { dataset, snapshots, teamOf, filters, setFilters, range } = useDemo();
 
-  // Las tarjetas muestran las seis especies; respetan equipo y zona, no el filtro de especie.
+  // The cards show all six species; they honor the team and zone filters, not the species filter.
   const base = useMemo(
     () =>
       dataset.penguins.filter(
@@ -56,34 +56,34 @@ export function SpeciesView() {
   return (
     <div className="pb-10">
       <PageHeader
-        eyebrow="Catálogo · SeaWorld Penguin Tracking & Care"
+        eyebrow="Catalog · SeaWorld Penguin Tracking & Care"
         title="Species"
-        subtitle="Explora las seis especies y revisa su población, actividad y equipos responsables. Datos simulados."
+        subtitle="Explore the six species and review their population, activity and responsible teams. Simulated data."
         actions={
           <Segmented<RangePreset>
             size="sm"
             value={filters.range === "custom" ? "24h" : filters.range}
             onChange={(v) => setFilters({ range: v })}
             options={[
-              { value: "today", label: "Hoy" },
+              { value: "today", label: "Today" },
               { value: "24h", label: "24 h" },
-              { value: "7d", label: "7 días" },
-              { value: "14d", label: "14 días" },
+              { value: "7d", label: "7 days" },
+              { value: "14d", label: "14 days" },
             ]}
           />
         }
       />
       <div className="space-y-5 px-6 lg:px-8">
         <div className="panel grid divide-line sm:grid-cols-3 sm:divide-x">
-          <Kpi icon={Users} color="#5cb8ff" value={total} label="Pingüinos registrados" />
-          <Kpi icon={Activity} color="#2fd8c8" value={inWater} label="En agua ahora" side={total ? `${Math.round((inWater / total) * 100)}%` : "—"} sideHint="del total" />
-          <Kpi icon={Users} color="#a78bfa" value={teamsInvolved} label="Equipos involucrados" side="en el cuidado" />
+          <Kpi icon={Users} color="#5cb8ff" value={total} label="Registered penguins" />
+          <Kpi icon={Activity} color="#2fd8c8" value={inWater} label="In water now" side={total ? `${Math.round((inWater / total) * 100)}%` : "—"} sideHint="of total" />
+          <Kpi icon={Users} color="#a78bfa" value={teamsInvolved} label="Teams involved" side="in care" />
         </div>
 
         {(filters.teams.length > 0 || filters.zones.length > 0) && (
           <p className="text-xs text-muted">
-            Mostrando solo ejemplares de {[filters.teams.map((t) => dataset.teams.find((x) => x.id === t)?.name).join(", "), filters.zones.map((z) => ZONE_BY_ID[z].name).join(", ")].filter(Boolean).join(" · ")}.{" "}
-            <button className="text-accent hover:underline" onClick={() => setFilters({ teams: [], zones: [] })}>Quitar</button>
+            Showing only penguins from {[filters.teams.map((t) => dataset.teams.find((x) => x.id === t)?.name).join(", "), filters.zones.map((z) => ZONE_BY_ID[z].name).join(", ")].filter(Boolean).join(" · ")}.{" "}
+            <button className="text-accent hover:underline" onClick={() => setFilters({ teams: [], zones: [] })}>Remove</button>
           </p>
         )}
 
@@ -96,36 +96,35 @@ export function SpeciesView() {
                 <div className="min-w-0 flex-1">
                   <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: x.s.color }} />
-                    {x.s.nameEs}
+                    {x.s.nameEn}
                   </h2>
-                  <p className="text-sm text-muted">{x.s.nameEn}</p>
                   <p className="text-[11px] italic text-faint">{x.s.scientific}</p>
                 </div>
                 <ChevronRight size={18} className="text-faint transition group-hover:translate-x-0.5 group-hover:text-ink" />
               </Link>
               <div className="grid grid-cols-3 divide-x divide-line border-b border-line">
-                <Mini label="Registrados" value={String(x.total)} />
-                <Mini label="En agua" value={String(x.inWater)} />
-                <Mini label="En tierra" value={String(x.onLand)} />
+                <Mini label="Registered" value={String(x.total)} />
+                <Mini label="In water" value={String(x.inWater)} />
+                <Mini label="On land" value={String(x.onLand)} />
               </div>
               <div className="space-y-3.5 p-4">
                 <div>
-                  <p className="mb-1.5 text-[11px] text-muted">Tiempo promedio por día · {range.label.toLowerCase()}</p>
+                  <p className="mb-1.5 text-[11px] text-muted">Average time per day · {range.label.toLowerCase()}</p>
                   <SplitBar
                     parts={[
-                      { value: x.water, color: SERIES.water, label: "Agua" },
-                      { value: x.land, color: SERIES.land, label: "Tierra" },
+                      { value: x.water, color: SERIES.water, label: "Water" },
+                      { value: x.land, color: SERIES.land, label: "Land" },
                     ]}
                   />
                   <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-                    <Dot color={SERIES.water}>Agua <b className="num text-ink">{fmtHours(x.water)}</b></Dot>
-                    <Dot color={SERIES.land}>Tierra <b className="num text-ink">{fmtHours(x.land)}</b></Dot>
+                    <Dot color={SERIES.water}>Water <b className="num text-ink">{fmtHours(x.water)}</b></Dot>
+                    <Dot color={SERIES.land}>Land <b className="num text-ink">{fmtHours(x.land)}</b></Dot>
                   </div>
                 </div>
                 <div>
-                  <p className="mb-1.5 text-[11px] text-muted">Distribución por zona (última ubicación)</p>
+                  <p className="mb-1.5 text-[11px] text-muted">Distribution by zone (last location)</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {x.zones.length === 0 && <span className="text-xs text-faint">Sin datos.</span>}
+                    {x.zones.length === 0 && <span className="text-xs text-faint">No data.</span>}
                     {x.zones.slice(0, 3).map(([z, n]) => (
                       <span key={z} className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted">
                         {ZONE_BY_ID[z].name} <b className="num ml-0.5 text-ink">{n}</b>
@@ -135,14 +134,14 @@ export function SpeciesView() {
                   </div>
                 </div>
                 <div>
-                  <p className="mb-1.5 text-[11px] text-muted">Equipos responsables</p>
+                  <p className="mb-1.5 text-[11px] text-muted">Responsible teams</p>
                   <div className="flex flex-wrap gap-1.5">
                     {x.teams.map(([t, n]) => {
                       const team = dataset.teams.find((y) => y.id === t);
                       return (
                         <span key={t} className="inline-flex items-center gap-1.5 rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted">
                           <span className="h-1.5 w-1.5 rounded-full" style={{ background: team?.color ?? "#56718a" }} />
-                          {team?.name ?? "Sin asignar"} <b className="num text-ink">{n}</b>
+                          {team?.name ?? "Unassigned"} <b className="num text-ink">{n}</b>
                         </span>
                       );
                     })}
@@ -154,13 +153,13 @@ export function SpeciesView() {
                   href={`/species/${x.s.id}`}
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent/10 text-xs font-medium text-ink transition hover:bg-accent/20"
                 >
-                  <List size={13} /> Ver ejemplares
+                  <List size={13} /> View penguins
                 </Link>
                 <Link
                   href={`/map?species=${x.s.id}`}
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-line-strong text-xs font-medium text-muted transition hover:text-ink"
                 >
-                  <MapPinned size={13} /> Ver en mapa
+                  <MapPinned size={13} /> View on map
                 </Link>
               </div>
             </article>

@@ -12,8 +12,8 @@ import { InsightBadge, NewCaseForm } from "./HealthCards";
 import { CaseDrawer, CaseSummary } from "./CaseSummary";
 
 /**
- * Salud: casos que el equipo sigue de cerca y el "¿cómo va?" de cada ejemplar,
- * para ver de un vistazo a quién conviene revisar.
+ * Health: cases the team is following closely, plus an activity check for each
+ * penguin, to see at a glance who may be worth a look.
  */
 export function HealthView() {
   const { dataset, cases, insights, teamOf } = useDemo();
@@ -43,13 +43,13 @@ export function HealthView() {
   return (
     <div className="pb-10">
       <PageHeader
-        eyebrow="Salud"
-        title="Seguimiento y cómo van"
-        subtitle={<>Casos especiales que el equipo sigue de cerca y el estado de cada ejemplar en las últimas 24 h, contra su especie. <SimulatedTag /></>}
+        eyebrow="Health"
+        title="Follow-ups & activity checks"
+        subtitle={<>Care follow-ups the team is tracking, and each penguin&rsquo;s last 24 h of activity compared with its species. Activity checks are inferences from simulated location data — not a clinical assessment. <SimulatedTag /></>}
         actions={
           !adding && (
             <Button variant="primary" onClick={() => setAdding(true)}>
-              <Plus size={15} /> Nuevo seguimiento
+              <Plus size={15} /> New follow-up
             </Button>
           )
         }
@@ -57,10 +57,10 @@ export function HealthView() {
 
       <div className="space-y-5 px-6 lg:px-8">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat label="En seguimiento" value={open.length} sub={`${closed.length} cerrados`} color="var(--accent)" />
-          <Stat label="Revisar" value={count("check")} sub="algo fuera de lo usual" color="var(--danger)" />
-          <Stat label="Vigilar" value={count("watch")} sub="algo cambió" color="var(--warn)" />
-          <Stat label="Van bien" value={count("ok")} sub={`de ${dataset.penguins.length} ejemplares`} color="var(--ok)" />
+          <Stat label="Open follow-ups" value={open.length} sub={`${closed.length} closed`} color="var(--accent)" />
+          <Stat label="Review" value={count("check")} sub="activity well outside the usual" color="var(--danger)" />
+          <Stat label="Watch" value={count("watch")} sub="activity changed" color="var(--warn)" />
+          <Stat label="Typical" value={count("ok")} sub={`of ${dataset.penguins.length} penguins`} color="var(--ok)" />
         </div>
 
         {adding && (
@@ -72,8 +72,8 @@ export function HealthView() {
           />
         )}
 
-        <Card title="En seguimiento" icon={HeartPulse} subtitle="Casos abiertos, del más reciente al más antiguo · pica uno para ver su seguimiento">
-          {!open.length && <p className="py-6 text-center text-sm text-muted">No hay casos abiertos.</p>}
+        <Card title="Open follow-ups" icon={HeartPulse} subtitle="Simulated care logs, most recently updated first · click one to see its log">
+          {!open.length && <p className="py-6 text-center text-sm text-muted">No open follow-ups.</p>}
           <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
             {open.map((c) => (
               <CaseSummary key={c.id} hc={c} onOpen={() => setOpenId(c.id)} />
@@ -82,16 +82,16 @@ export function HealthView() {
         </Card>
 
         <Card
-          title="¿Cómo van?"
-          subtitle="Últimas 24 h contra el promedio de su especie y contra sus días anteriores"
+          title="Activity checks"
+          subtitle="Last 24 h vs. the species average and the penguin's own previous days · inferred from simulated location data, not a clinical assessment"
           action={
             <Segmented
               size="sm"
               value={show}
               onChange={setShow}
               options={[
-                { value: "attention", label: "Revisar y vigilar" },
-                { value: "all", label: "Todos" },
+                { value: "attention", label: "Review & watch" },
+                { value: "all", label: "All" },
               ]}
             />
           }
@@ -100,10 +100,10 @@ export function HealthView() {
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-[11px] text-muted">
-                  <th className="px-3 py-2 font-medium">Ejemplar</th>
-                  <th className="px-3 py-2 font-medium">Estado</th>
-                  <th className="px-3 py-2 font-medium">Agua 24 h (especie)</th>
-                  <th className="px-3 py-2 font-medium">Por qué</th>
+                  <th className="px-3 py-2 font-medium">Penguin</th>
+                  <th className="px-3 py-2 font-medium">Activity</th>
+                  <th className="px-3 py-2 font-medium">Water, 24 h (species avg.)</th>
+                  <th className="px-3 py-2 font-medium">Why</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
               </thead>
@@ -128,11 +128,11 @@ export function HealthView() {
                     <td className="whitespace-nowrap px-3 py-2.5 text-right">
                       {inCase.has(p.id) ? (
                         <button onClick={() => setOpenId(open.find((c) => c.penguinId === p.id)!.id)} className="text-[11px] font-medium text-accent hover:underline">
-                          Ver seguimiento
+                          View follow-up
                         </button>
                       ) : (
-                        <Link href={`/penguins/${p.id}#salud`} className="text-[11px] text-accent hover:underline">
-                          Ver ficha
+                        <Link href={`/penguins/${p.id}#health`} className="text-[11px] text-accent hover:underline">
+                          View profile
                         </Link>
                       )}
                     </td>
@@ -140,12 +140,12 @@ export function HealthView() {
                 ))}
               </tbody>
             </table>
-            {!rows.length && <p className="py-6 text-center text-sm text-muted">Todos los ejemplares van dentro de lo usual.</p>}
+            {!rows.length && <p className="py-6 text-center text-sm text-muted">Every penguin&rsquo;s activity is within the usual range.</p>}
           </div>
         </Card>
 
         {closed.length > 0 && (
-          <Card title="Cerrados" subtitle="Casos que ya se resolvieron">
+          <Card title="Closed" subtitle="Follow-ups that have been resolved">
             <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
               {closed.map((c) => (
                 <CaseSummary key={c.id} hc={c} onOpen={() => setOpenId(c.id)} />

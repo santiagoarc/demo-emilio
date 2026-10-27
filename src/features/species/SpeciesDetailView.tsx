@@ -20,6 +20,7 @@ import {
 import { ZONE_BY_ID } from "@/domain/habitat";
 import { SPECIES_BY_ID } from "@/domain/species";
 import type { SpeciesId } from "@/domain/types";
+import { QUALITY_LABEL, SOURCE_SHORT } from "@/logic/labels";
 import { computeActivity, perPenguinPerDay, type Breakdown } from "@/logic/metrics";
 import { STATUS_LABEL, type LiveStatus, type Snapshot } from "@/logic/status";
 import { fmtDateTime, fmtHours, fmtTime } from "@/logic/time";
@@ -45,7 +46,7 @@ export function SpeciesDetailView() {
     return (
       <div className="p-8">
         <Card>
-          <EmptyState icon={SearchX} title={`No existe la especie "${id}"`} action={<Link href="/species" className="text-sm text-accent hover:underline">Volver a Species</Link>} />
+          <EmptyState icon={SearchX} title={`Species "${id}" not found`} action={<Link href="/species" className="text-sm text-accent hover:underline">Back to Species</Link>} />
         </Card>
       </div>
     );
@@ -53,14 +54,14 @@ export function SpeciesDetailView() {
   return <Detail speciesId={sp.id} />;
 }
 
-/** Estado de la tabla en la URL: se conserva al abrir una ficha y volver. */
+/** Table state lives in the URL: it survives opening a profile and coming back. */
 function useTableState(speciesId: string) {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const storeKey = `penguin-demo/species-table/${speciesId}`;
 
-  // Al volver sin parámetros (p. ej. desde la ficha), recupera la última vista.
+  // When returning without parameters (e.g. from a profile), restore the last view.
   useEffect(() => {
     if (params.toString()) return;
     try {
@@ -176,12 +177,12 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
     [dataset, filteredIds, prevFrom, range.from],
   );
 
-  // --- Indicadores (sobre los ejemplares filtrados) ---
+  // --- Indicators (over the filtered penguins) ---
   const inWater = filtered.filter((r) => r.snap.status === "water").length;
   const onLand = filtered.filter((r) => r.snap.status === "land" || r.snap.status === "resting").length;
   const teamsInUse = new Set(filtered.map((r) => r.team).filter((x) => x !== UNASSIGNED)).size;
 
-  // --- Zonas y equipos (sobre toda la especie; sirven de filtro) ---
+  // --- Zones and teams (over the whole species; they act as filters) ---
   const zoneRows = useMemo(() => {
     const m = new Map<string, { n: number; last: number }>();
     for (const r of rowsAll) {
@@ -208,28 +209,31 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
   const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const sortBy = (k: SortKey) => t.set({ sort: k, dir: t.sort === k && t.dir === "asc" ? "desc" : "asc" });
   const hasFilters = !!(t.q || t.teams.length || t.zones.length || t.status.length || t.activity.length);
-  const teamName = (k: string) => (k === UNASSIGNED ? "Sin asignar" : dataset.teams.find((x) => x.id === k)?.name ?? k);
+  const teamName = (k: string) => (k === UNASSIGNED ? "Unassigned" : dataset.teams.find((x) => x.id === k)?.name ?? k);
   const teamColor = (k: string) => dataset.teams.find((x) => x.id === k)?.color ?? "#56718a";
 
   const exportCsv = () => {
     const rows = checked.size ? filtered.filter((r) => checked.has(r.id)) : filtered;
-    const head = ["Código", "Nombre", "Especie", "Estado", "Zona", "Equipo", "Agua (h)", "Tierra (h)", "Última lectura"];
+    const head = ["ID", "Name", "Species", "Status", "Zone", "Team", "Water (h)", "Land (h)", "Last reading", "Reading source", "Reading quality", "Accuracy (m)"];
     const lines = rows.map((r) => [
       r.id,
       r.name ?? "",
-      sp.nameEs,
+      sp.nameEn,
       STATUS_LABEL[r.snap.status],
       r.zone === NO_ZONE ? "" : ZONE_BY_ID[r.zone].name,
       teamName(r.team),
       r.b?.readings ? (r.b.water / 3_600_000).toFixed(1) : "",
       r.b?.readings ? (r.b.land / 3_600_000).toFixed(1) : "",
       r.snap.reading ? new Date(r.snap.reading.timestamp).toISOString() : "",
+      r.snap.reading ? SOURCE_SHORT[r.snap.reading.source] : "",
+      r.snap.reading ? QUALITY_LABEL[r.snap.reading.quality] : "",
+      r.snap.reading ? String(r.snap.reading.accuracyM) : "",
     ]);
     const csv = [head, ...lines].map((l) => l.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `ejemplares-${sp.code}-simulado.csv`;
+    a.download = `penguins-${sp.code}-simulated.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -245,14 +249,14 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
 
   return (
     <div className="pb-10">
-      {/* Encabezado */}
+      {/* Header */}
       <div className="flex flex-wrap items-center gap-4 px-6 pb-4 pt-6 lg:px-8">
         <Link
           href="/species"
           className="inline-flex h-11 items-center gap-2 rounded-xl border border-accent/40 bg-accent/10 pl-2.5 pr-4 text-sm font-medium text-ink transition hover:border-accent hover:bg-accent/20"
         >
           <ChevronLeft size={18} className="text-accent" />
-          Todas las especies
+          All species
         </Link>
         <span className="hidden h-10 w-px bg-line sm:block" />
         <PenguinIllustration speciesId={speciesId} size={60} />
@@ -260,13 +264,13 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
           <nav className="flex items-center gap-1 text-xs text-muted">
             <Link href="/species" className="hover:text-ink">Species</Link>
             <ChevronRight size={12} className="text-faint" />
-            <span className="text-ink">{sp.nameEs}</span>
+            <span className="text-ink">{sp.nameEn}</span>
           </nav>
           <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h1 className="text-[28px] font-semibold leading-tight tracking-tight">{sp.nameEs}</h1>
+            <h1 className="text-[28px] font-semibold leading-tight tracking-tight">{sp.nameEn}</h1>
             <span className="inline-flex items-center gap-2 text-sm text-muted">
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: sp.color }} />
-              {sp.nameEn} · <i>{sp.scientific}</i>
+              <i>{sp.scientific}</i>
             </span>
             <SimulatedTag />
           </div>
@@ -276,30 +280,30 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
             href={`/map?species=${speciesId}`}
             className="inline-flex h-9 items-center gap-2 rounded-xl border border-line-strong px-3.5 text-sm font-medium text-ink transition hover:border-accent/50"
           >
-            <MapPinned size={15} /> Ver en el mapa
+            <MapPinned size={15} /> View on map
           </Link>
           <PeriodPicker />
         </div>
       </div>
 
       <div className="space-y-5 px-6 lg:px-8">
-        {/* Indicadores */}
+        {/* Indicators */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard icon={<PenguinIllustration speciesId={speciesId} size={38} framed={false} />} value={filtered.length} label="Ejemplares registrados" note={isFiltered ? `de ${rowsAll.length} · filtrados` : undefined} />
-          <KpiCard icon={<Waves size={22} />} color="#5cb8ff" value={inWater} label="En agua ahora" side={filtered.length ? `${Math.round((inWater / filtered.length) * 100)}%` : "—"} />
-          <KpiCard icon={<Mountain size={22} />} color="#9fb4c7" value={onLand} label="En tierra ahora" side={filtered.length ? `${Math.round((onLand / filtered.length) * 100)}%` : "—"} />
-          <KpiCard icon={<Users size={22} />} color="#a78bfa" value={teamsInUse} label="Equipos responsables" />
+          <KpiCard icon={<PenguinIllustration speciesId={speciesId} size={38} framed={false} />} value={filtered.length} label="Registered penguins" note={isFiltered ? `of ${rowsAll.length} · filtered` : undefined} />
+          <KpiCard icon={<Waves size={22} />} color="#5cb8ff" value={inWater} label="In water now" side={filtered.length ? `${Math.round((inWater / filtered.length) * 100)}%` : "—"} />
+          <KpiCard icon={<Mountain size={22} />} color="#9fb4c7" value={onLand} label="On land now" side={filtered.length ? `${Math.round((onLand / filtered.length) * 100)}%` : "—"} />
+          <KpiCard icon={<Users size={22} />} color="#a78bfa" value={teamsInUse} label="Responsible teams" />
         </div>
 
-        {/* Paneles */}
+        {/* Panels */}
         <div className="grid gap-5 xl:grid-cols-12">
           <Card
             className="xl:col-span-7"
-            title="Actividad de la especie"
-            subtitle={`Promedio por ejemplar por día · ${range.label.toLowerCase()}${isFiltered ? " · ejemplares filtrados" : ""}`}
+            title="Species activity"
+            subtitle={`Average per penguin per day · ${range.label.toLowerCase()}${isFiltered ? " · filtered penguins" : ""}`}
           >
             {panelAgg.penguinCount === 0 ? (
-              <p className="py-6 text-center text-xs text-muted">Sin datos con los filtros actuales.</p>
+              <p className="py-6 text-center text-xs text-muted">No data with the current filters.</p>
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-5">
@@ -307,21 +311,21 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                     size={124}
                     thickness={14}
                     parts={[
-                      { value: avg.water, color: SERIES.water, label: "Agua" },
-                      { value: avg.land, color: SERIES.land, label: "Tierra" },
+                      { value: avg.water, color: SERIES.water, label: "Water" },
+                      { value: avg.land, color: SERIES.land, label: "Land" },
                     ]}
                     center={
                       <div>
                         <p className="num text-lg font-semibold leading-none">{fmtHours(avgTotal)}</p>
-                        <p className="text-[10px] text-faint">por día</p>
+                        <p className="text-[10px] text-faint">per day</p>
                       </div>
                     }
                   />
                   <div className="min-w-[180px] flex-1 space-y-2 text-sm">
                     {(
                       [
-                        ["Agua", avg.water, SERIES.water, prev?.water],
-                        ["Tierra", avg.land, SERIES.land, prev?.land],
+                        ["Water", avg.water, SERIES.water, prev?.water],
+                        ["Land", avg.land, SERIES.land, prev?.land],
                       ] as const
                     ).map(([label, v, color, pv]) => (
                       <div key={label} className="flex items-center gap-2">
@@ -329,34 +333,34 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                         <span className="flex-1 text-muted">{label}</span>
                         <span className="num font-semibold">{fmtHours(v)}</span>
                         <span className="num w-10 text-right text-xs text-faint">{avgTotal ? `${Math.round((v / avgTotal) * 100)}%` : "—"}</span>
-                        <span className="num w-16 text-right text-[11px] text-faint" title="Contra el periodo anterior de la misma duración">
+                        <span className="num w-16 text-right text-[11px] text-faint" title="Versus the previous period of the same length">
                           {pv === undefined ? "" : `${v - pv >= 0 ? "+" : "−"}${fmtHours(Math.abs(v - pv))}`}
                         </span>
                       </div>
                     ))}
-                    <p className="text-[10px] text-faint">{prev ? "Última columna: diferencia contra el periodo anterior de igual duración." : "Sin periodo anterior completo para comparar."}</p>
+                    <p className="text-[10px] text-faint">{prev ? "Last column: difference versus the previous period of equal length." : "No complete previous period to compare against."}</p>
                   </div>
                 </div>
                 <div className="mt-4">
-                  <p className="mb-2 text-[11px] text-muted">Distribución por hora del día (horas registradas, suma de ejemplares)</p>
+                  <p className="mb-2 text-[11px] text-muted">Distribution by hour of day (recorded hours, summed across penguins)</p>
                   <StackedColumns
                     height={78}
                     labelEvery={6}
                     format={fmtHours}
                     series={[
-                      { key: "water", color: SERIES.water, label: "Agua" },
-                      { key: "land", color: SERIES.land, label: "Tierra" },
+                      { key: "water", color: SERIES.water, label: "Water" },
+                      { key: "land", color: SERIES.land, label: "Land" },
                     ]}
                     data={panelAgg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))}
                   />
                 </div>
-                <p className="mt-3 text-[10px] text-faint">Promedios calculados desde lecturas simuladas.</p>
+                <p className="mt-3 text-[10px] text-faint">Averages computed from simulated readings.</p>
               </>
             )}
           </Card>
 
           <div className="flex flex-col gap-5 xl:col-span-5">
-          <Card className="flex-1" title="Distribución por zona" subtitle="Última ubicación válida de cada ejemplar · clic para filtrar la tabla">
+          <Card className="flex-1" title="Distribution by zone" subtitle="Last valid location of each penguin · click to filter the table">
             <ul className="space-y-1">
               {zoneRows.map(([z, e]) => {
                 const on = t.zones.includes(z);
@@ -364,18 +368,18 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                 return (
                   <li key={z} className={cx("group flex items-center gap-2 rounded-lg px-2 py-1.5", on ? "bg-accent/10" : "hover:bg-ink/[0.03]")}>
                     <button onClick={() => t.set({ zone: toggle(t.zones, z) })} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                      <span className="w-[108px] shrink-0 truncate text-[13px]">{z === NO_ZONE ? "Sin ubicación" : ZONE_BY_ID[z].name}</span>
+                      <span className="w-[108px] shrink-0 truncate text-[13px]">{z === NO_ZONE ? "No location" : ZONE_BY_ID[z].name}</span>
                       <span className="h-2 flex-1 overflow-hidden rounded-full bg-ink/[0.05]">
                         <span className="block h-full rounded-full bg-accent-2" style={{ width: `${pctv}%`, opacity: t.zones.length && !on ? 0.35 : 1 }} />
                       </span>
                       <span className="num w-6 text-right text-[13px] font-semibold">{e.n}</span>
                       <span className="num w-9 text-right text-[11px] text-faint">{pctv}%</span>
                     </button>
-                    <span className="w-[68px] shrink-0 text-right text-[10px] leading-tight text-faint" title="Lectura más reciente de los ejemplares en esta zona">
-                      {e.last ? fmtTime(e.last) : "Sin datos"}
+                    <span className="w-[68px] shrink-0 text-right text-[10px] leading-tight text-faint" title="Most recent reading among the penguins in this zone">
+                      {e.last ? fmtTime(e.last) : "No data"}
                     </span>
                     {z !== NO_ZONE ? (
-                      <Link href={`/map?zone=${z}&species=${speciesId}`} title="Abrir zona en Habitat Map" className="rounded-md p-1 text-faint hover:bg-ink/5 hover:text-accent">
+                      <Link href={`/map?zone=${z}&species=${speciesId}`} title="Open zone in Habitat Map" className="rounded-md p-1 text-faint hover:bg-ink/5 hover:text-accent">
                         <MapPinned size={13} />
                       </Link>
                     ) : (
@@ -387,7 +391,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
             </ul>
           </Card>
 
-          <Card className="flex-1" title="Equipos responsables" subtitle="Asignación actual · clic para filtrar">
+          <Card className="flex-1" title="Responsible teams" subtitle="Current assignment · click to filter">
             <ul className="space-y-1.5">
               {teamRows.map(([k, e]) => {
                 const on = t.teams.includes(k);
@@ -416,24 +420,24 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
           </div>
         </div>
 
-        {/* Tabla + panel lateral */}
+        {/* Table + side panel */}
         <div className={cx("grid items-start gap-5", t.sel && "xl:grid-cols-[minmax(0,1fr)_340px]")}>
           <section className="panel min-w-0 overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4">
               <h2 className="text-[17px] font-semibold tracking-tight">
-                Ejemplares de {sp.nameEs} <span className="num text-muted">({filtered.length})</span>
+                {sp.nameEn} penguins <span className="num text-muted">({filtered.length})</span>
               </h2>
               <div className="flex items-center gap-2">
                 {checked.size > 0 && (
                   <button onClick={() => setChecked(new Set())} className="text-xs text-muted hover:text-ink">
-                    {checked.size} seleccionado{checked.size === 1 ? "" : "s"} · quitar
+                    {checked.size} selected · clear
                   </button>
                 )}
                 <button
                   onClick={exportCsv}
                   className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong px-3 text-xs font-medium text-ink transition hover:border-accent/50"
                 >
-                  <Download size={14} /> Exportar {checked.size ? "selección" : "CSV"}
+                  <Download size={14} /> Export {checked.size ? "selection" : "CSV"}
                 </button>
               </div>
             </div>
@@ -447,40 +451,40 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                     setQ(e.target.value);
                     t.set({ q: e.target.value });
                   }}
-                  placeholder="Buscar por código, nombre o dispositivo…"
+                  placeholder="Search by ID, name or device…"
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
                 />
               </div>
-              <FilterMenu className="flex-1" label="Equipo" value={t.teams} onChange={(v) => t.set({ team: v })} options={teamRows.map(([k]) => ({ value: k, label: teamName(k), color: teamColor(k) }))} />
+              <FilterMenu className="flex-1" label="Team" value={t.teams} onChange={(v) => t.set({ team: v })} options={teamRows.map(([k]) => ({ value: k, label: teamName(k), color: teamColor(k) }))} />
               <FilterMenu
                 className="flex-1"
-                label="Zona"
-                allLabel="Todas"
+                label="Zone"
+                allLabel="All"
                 value={t.zones}
                 onChange={(v) => t.set({ zone: v })}
-                options={zoneRows.map(([z]) => ({ value: z, label: z === NO_ZONE ? "Sin ubicación" : ZONE_BY_ID[z].name }))}
+                options={zoneRows.map(([z]) => ({ value: z, label: z === NO_ZONE ? "No location" : ZONE_BY_ID[z].name }))}
               />
               <FilterMenu<LiveStatus>
                 className="flex-1"
-                label="Estado"
+                label="Status"
                 value={t.status}
                 onChange={(v) => t.set({ st: v })}
                 options={(["water", "land", "resting"] as LiveStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s], color: STATUS_COLOR[s] }))}
               />
               <FilterMenu<ActivityFilter>
                 className="flex-1"
-                label="Actividad"
-                allLabel="Todas"
+                label="Activity"
+                allLabel="All"
                 value={t.activity}
                 onChange={(v) => t.set({ act: v })}
                 options={[
-                  { value: "water", label: "Más tiempo en agua", color: SERIES.water },
-                  { value: "land", label: "Más tiempo en tierra", color: SERIES.land },
+                  { value: "water", label: "More time in water", color: SERIES.water },
+                  { value: "land", label: "More time on land", color: SERIES.land },
                 ]}
               />
               {hasFilters && (
                 <button onClick={clearAll} className="inline-flex h-10 items-center gap-1 px-2 text-xs text-muted hover:text-ink">
-                  <X size={13} /> Limpiar
+                  <X size={13} /> Clear
                 </button>
               )}
             </div>
@@ -492,7 +496,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                     <th className="w-10 px-4 py-2.5">
                       <input
                         type="checkbox"
-                        aria-label="Seleccionar todos"
+                        aria-label="Select all"
                         className="accent-[var(--accent)]"
                         checked={filtered.length > 0 && filtered.every((r) => checked.has(r.id))}
                         onChange={(e) => {
@@ -505,15 +509,15 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                         }}
                       />
                     </th>
-                    <th className="px-2 py-2.5 font-medium">Foto</th>
-                    <SortTh k="id" t={t} onSort={sortBy}>Código</SortTh>
-                    <SortTh k="name" t={t} onSort={sortBy}>Nombre</SortTh>
-                    <th className="px-2 py-2.5 font-medium">Estado</th>
-                    <th className="px-2 py-2.5 font-medium">Zona actual</th>
-                    <th className="px-2 py-2.5 font-medium">Equipo responsable</th>
-                    <SortTh k="water" t={t} onSort={sortBy} sub={range.label}>Tiempo en agua</SortTh>
-                    <SortTh k="land" t={t} onSort={sortBy} sub={range.label}>Tiempo en tierra</SortTh>
-                    <SortTh k="last" t={t} onSort={sortBy}>Última lectura</SortTh>
+                    <th className="px-2 py-2.5 font-medium">Photo</th>
+                    <SortTh k="id" t={t} onSort={sortBy}>ID</SortTh>
+                    <SortTh k="name" t={t} onSort={sortBy}>Name</SortTh>
+                    <th className="px-2 py-2.5 font-medium">Status</th>
+                    <th className="px-2 py-2.5 font-medium">Last recorded zone</th>
+                    <th className="px-2 py-2.5 font-medium">Responsible team</th>
+                    <SortTh k="water" t={t} onSort={sortBy} sub={range.label}>Time in water</SortTh>
+                    <SortTh k="land" t={t} onSort={sortBy} sub={range.label}>Time on land</SortTh>
+                    <SortTh k="last" t={t} onSort={sortBy}>Last reading</SortTh>
                     <th className="w-10" />
                   </tr>
                 </thead>
@@ -530,7 +534,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                         <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
-                            aria-label={`Seleccionar ${r.id}`}
+                            aria-label={`Select ${r.id}`}
                             className="accent-[var(--accent)]"
                             checked={checked.has(r.id)}
                             onChange={() => {
@@ -545,13 +549,13 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                           <PenguinIllustration speciesId={speciesId} size={36} />
                         </td>
                         <td className="px-2 py-2 font-mono text-[13px]">{r.id}</td>
-                        <td className="px-2 py-2">{r.name ?? <span className="text-faint">Sin nombre</span>}</td>
+                        <td className="px-2 py-2">{r.name ?? <span className="text-faint">Unnamed</span>}</td>
                         <td className="px-2 py-2">
                           <StatusPill status={r.snap.status} compact />
                         </td>
                         <td className="px-2 py-2">
                           {r.zone === NO_ZONE ? (
-                            <span className="text-faint">Sin datos</span>
+                            <span className="text-faint">No data</span>
                           ) : (
                             <span className="inline-flex rounded-md border border-line-strong px-1.5 py-0.5 text-xs text-ink">
                               {ZONE_BY_ID[r.zone].name}
@@ -564,13 +568,23 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                             {teamName(r.team)}
                           </span>
                         </td>
-                        <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">Sin datos</span> : <HBar value={r.b!.water} max={maxH} color={SERIES.water} />}</td>
-                        <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">Sin datos</span> : <HBar value={r.b!.land} max={maxH} color="#f5b84b" />}</td>
-                        <td className="whitespace-nowrap px-2 py-2 text-xs text-muted">
-                          {r.snap.reading ? fmtDateTime(r.snap.reading.timestamp, now) : "Sin datos"}
+                        <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">No data</span> : <HBar value={r.b!.water} max={maxH} color={SERIES.water} />}</td>
+                        <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">No data</span> : <HBar value={r.b!.land} max={maxH} color="#f5b84b" />}</td>
+                        <td
+                          className="whitespace-nowrap px-2 py-2 text-xs text-muted"
+                          title={r.snap.reading ? `${SOURCE_SHORT[r.snap.reading.source]} · ${QUALITY_LABEL[r.snap.reading.quality]} quality (±${r.snap.reading.accuracyM} m) · simulated` : undefined}
+                        >
+                          {r.snap.reading ? (
+                            <>
+                              {fmtDateTime(r.snap.reading.timestamp, now)}
+                              <span className="block text-[10px] text-faint">{QUALITY_LABEL[r.snap.reading.quality]} quality · ±{r.snap.reading.accuracyM} m</span>
+                            </>
+                          ) : (
+                            "No data"
+                          )}
                         </td>
                         <td className="pr-3">
-                          <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Abrir ficha" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-ink/5 hover:text-ink">
+                          <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Open profile" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-ink/5 hover:text-ink">
                             <ChevronRight size={15} />
                           </Link>
                         </td>
@@ -580,14 +594,14 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                 </tbody>
               </table>
               {filtered.length === 0 && (
-                <EmptyState icon={SearchX} title="Ningún ejemplar coincide" action={<button onClick={clearAll} className="text-sm text-accent hover:underline">Limpiar filtros</button>}>
-                  Ajusta la búsqueda o los filtros.
+                <EmptyState icon={SearchX} title="No penguins match" action={<button onClick={clearAll} className="text-sm text-accent hover:underline">Clear filters</button>}>
+                  Adjust the search or the filters.
                 </EmptyState>
               )}
             </div>
 
             <div className="border-t border-line px-4 py-3 text-xs text-muted">
-              {filtered.length} {filtered.length === 1 ? "ejemplar" : "ejemplares"}
+              {filtered.length} {filtered.length === 1 ? "penguin" : "penguins"}
             </div>
           </section>
 

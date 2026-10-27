@@ -1,63 +1,68 @@
-# Penguin Tracking & Care — demo
+# Animal Care Platform — demo para SeaWorld Abu Dhabi
 
-Demo web para presentar a SeaWorld un concepto de monitoreo, localización y
-gestión de pingüinos. **Todo es simulado**: no hay dispositivos, APIs ni
-proveedores conectados, y ninguna cifra refleja el inventario real.
+Demo web para presentar a SeaWorld un concepto de consulta y seguimiento de
+animales: **pingüinos** y **aviario**. La interfaz está en **inglés** porque se
+presenta a responsables de SeaWorld.
+
+**Todo es simulado**: no hay dispositivos, APIs ni proveedores conectados, y
+ninguna cifra es inventario real. Lo único con fuente son los nombres de
+especies que SeaWorld Abu Dhabi publica (ver abajo).
 
 ## Ejecutar
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev:webpack -- -p 3020   # http://localhost:3020
 ```
 
-Producción local: `npm run build && npm start`.
+En esta máquina Windows bloquea Turbopack, por eso `dev:webpack`. En otra
+máquina `npm run dev` también sirve. Producción local: `npm run build && npm start`.
 
-No requiere variables de entorno ni credenciales.
+No requiere variables de entorno. Opcional: `ANTHROPIC_API_KEY` en
+`.env.local` hace que el chat de reportes use Claude; sin ella responde con los
+datos del sistema.
 
-## Qué incluye
+## Estructura de la app
 
-| Pantalla | Ruta | Para qué |
+La barra lateral cambia entre tres áreas:
+
+| Área | Ruta | Qué muestra |
 | --- | --- | --- |
-| Penguin Operations Overview | `/` | Indicadores, especies, zonas, actividad por hora, alertas y últimos movimientos. Todo reacciona a los filtros. |
-| Habitat Map | `/map` | Mapa interactivo: zoom, arrastre, capas, filtros, selección de zona y ejemplar, panel lateral y línea de tiempo de 24 h. |
-| Species | `/species` | Las seis especies con totales calculados, ubicación reciente, zonas, tiempo agua/tierra y equipos. |
-| Penguins | `/penguins` | Registro completo con búsqueda, estado y orden. |
-| Ficha individual | `/penguins/[id]` | Identificación, localización, actividad, comparación de periodos, operación, observaciones e incidencias. |
-| Care Teams | `/teams` | Fichas de equipo, mapa de sus ejemplares, reasignación, tareas, alertas y actividad. |
-| Activity Analytics | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor, movimientos entre zonas, comparación por especie y equipo, evolución diaria e historial de un ejemplar. |
-| Alerts & Tasks | `/alerts` | Alertas por reglas, cambio de estado con historial, asignación a equipos y creación de tareas. |
+| **Overview** | `/` | Resumen de ambas áreas, qué datos son simulados, cuáles tienen fuente y cuáles faltan. |
+| | `/roadmap` | Estado de los datos, *Potential capabilities* (salud, comportamiento, alimentación, reproducción, asignación) y *Technology to validate*. |
+| **Penguins** | `/penguins/overview` | Indicadores, especies, zonas y actividad. |
+| | `/map` | Mapa del hábitat, recorrido y paradas numeradas de un ejemplar. |
+| | `/species`, `/penguins`, `/penguins/[id]`, `/teams` | Especies, registro, ficha individual y equipos. |
+| | `/health` | Seguimiento de casos (simulados) y chequeo de actividad (inferencia, no diagnóstico). |
+| | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |
+| | `/penguins/rules` | Reglas propuestas (ejemplos configurables, no alertas operativas). |
+| **Aviary** | `/aviary` | Aves registradas en la demo vs. estimación ≈500, especies, distribución por zona y equipo. |
+| | `/aviary/birds`, `/aviary/birds/[id]` | Búsqueda y perfil con avistamientos y movimientos entre zonas. |
+| | `/aviary/habitat` | Plano ilustrativo por zonas, coloreado por último avistamiento. |
+| | `/aviary/inventory` | Esqueleto del inventario con fuente, conteo confirmado ("To be confirmed") y lo que SeaWorld debe enviar. |
+| | `/aviary/rules` | Reglas propuestas del aviario. |
 
-Atajo: `Ctrl K` busca cualquier ejemplar.
+## Datos: simulado, con fuente y pendiente
+
+| Dato | Estado |
+| --- | --- |
+| 6 especies de pingüino | Fuente: [SeaWorld Abu Dhabi, 10-abr-2023](https://seaworldabudhabi.com/en/news/tropical-ocean-reveal), consultada el 27-oct-2026. |
+| 206 pingüinos y su reparto | Cifra de la demo, por confirmar. |
+| Grupos del aviario (tucanes, loros, flamenco del Caribe) | Misma fuente. No publica lista de especies ni cantidades. |
+| ≈500 aves | Estimación de la reunión, por confirmar. La demo genera 500 registros que solo la representan. |
+| Lecturas, avistamientos, casos de salud, equipos y personas | Simulados. |
+
+El aviario **no asume chips ni ubicación en vivo**: los datos son avistamientos
+manuales de cuidadores a nivel zona. La ubicación en tiempo real aparece solo
+como "Future integration preview", rotulada como por validar.
 
 ## Escenario de demostración
 
-- Configuración en `src/config/demo.config.ts`: ejemplares por especie (206 por
-  omisión), días de historia, frecuencia de lecturas, mezcla de conectividad y
-  umbrales de las reglas de alerta.
-- Desde la app: **Escenario y reinicio de la demo** (abajo a la izquierda)
-  permite cambiar las cantidades por especie y la semilla, o volver al
-  escenario inicial.
-- La misma semilla genera siempre el mismo escenario. Los datos se generan en
-  el navegador con la hora actual como "ahora".
-- Las reasignaciones, tareas y estados de alertas se guardan en el
-  `localStorage` del navegador y sobreviven a recargas. Las lecturas no se
-  guardan: se regeneran desde la semilla.
-
-## Reglas de honestidad de los datos
-
-- Las posiciones del mapa son lecturas simuladas tal como se "registraron".
-  Al reproducir la línea de tiempo, el punto se desliza entre dos lecturas
-  consecutivas como animación visual (rotulada en pantalla y desactivable con
-  "Movimiento suave"); si entre ellas hay un hueco, se queda en su última
-  ubicación conocida. Las líneas del recorrido solo unen lecturas consecutivas.
-- Bajo el agua no se asume GPS: la fuente es un receptor acústico con
-  precisión de zona (el radio se dibuja en el mapa).
-- El tiempo sin lectura se reporta aparte y se distingue entre **sin posición**
-  (el dispositivo comunica) y **sin comunicación** (el dispositivo no responde).
-  "Sin movimiento registrado" describe lecturas repetidas, no inmovilidad.
-- Las alertas son operativas y salen de reglas explícitas. No hay
-  diagnósticos, estados clínicos ni recomendaciones veterinarias. Las
-  observaciones de cuidado se marcan como registros ficticios.
+- Pingüinos: `src/config/demo.config.ts` (cantidades por especie, días de
+  historia, frecuencia de lecturas). Desde la app: **Demo scenario & reset**.
+- Aviario: `src/domain/aviary.ts` (especies, zonas configurables, equipos,
+  fuente) y `src/data/aviarySimulate.ts` (roster y avistamientos).
+- La misma semilla genera siempre el mismo escenario. Lo que edita el usuario
+  se guarda en el `localStorage` del navegador (`penguin-demo/v2`).
 
 Estructura de datos y puntos de integración: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).

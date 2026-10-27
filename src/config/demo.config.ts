@@ -1,31 +1,31 @@
 import type { SpeciesId } from "@/domain/types";
 
 /**
- * Escenario de demostración.
+ * Demo scenario.
  *
- * Todo lo que aparece en la demo sale de aquí. Ninguna cifra refleja el
- * inventario real de SeaWorld: los ~206 ejemplares y su reparto por especie son
- * un supuesto de presentación, sujeto a confirmación.
+ * Everything shown in the demo comes from here. No figure reflects SeaWorld's
+ * actual collection: the ~206 penguins and their species split are a
+ * presentation assumption, subject to confirmation.
  */
 export interface DemoConfig {
   seed: number;
-  /** Días de historia simulada. */
+  /** Days of simulated history. */
   historyDays: number;
-  /** Cada cuánto llega una lectura simulada. */
+  /** How often a simulated reading arrives. */
   slotMinutes: number;
   speciesCounts: Record<SpeciesId, number>;
-  /** Proporción de ejemplares asignados al equipo veterinario. */
+  /** Share of penguins assigned to the veterinary team. */
   vetShare: number;
   rules: RulesConfig;
 }
 
-/** Umbrales del estado de cada ejemplar y del intervalo de revisión de rutina. */
+/** Thresholds for each penguin's status and the routine-check interval. */
 export interface RulesConfig {
-  /** Una ubicación es "reciente" si la última lectura tiene menos de esto. */
+  /** A location is "recent" if the last reading is younger than this. */
   recentLocationMinutes: number;
-  /** Sin latido del dispositivo por más de esto → sin comunicación. */
+  /** No device heartbeat for longer than this → treated as no recent signal. */
   deviceOfflineMinutes: number;
-  /** Días máximos entre revisiones de rutina. */
+  /** Maximum days between routine checks. */
   careReviewIntervalDays: number;
 }
 

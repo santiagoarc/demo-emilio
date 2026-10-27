@@ -26,7 +26,7 @@ export interface TrailPoint {
   t: number;
   quality: ReadingQuality;
   medium: Medium;
-  /** Zona de la lectura: las lecturas seguidas en la misma zona forman una parada. */
+  /** Zone of the reading: consecutive readings in the same zone form one stop. */
   zoneId?: string;
 }
 
@@ -41,7 +41,7 @@ interface TrailStop {
   readings: number;
 }
 
-/** Agrupa lecturas consecutivas en la misma zona (o muy juntas, si no hay zona) en paradas numeradas. */
+/** Groups consecutive readings in the same zone (or very close together, if there is no zone) into numbered stops. */
 function trailStops(trail: TrailPoint[]): TrailStop[] {
   const stops: TrailStop[] = [];
   for (const p of trail) {
@@ -50,7 +50,7 @@ function trailStops(trail: TrailPoint[]): TrailStop[] {
     if (same) {
       last.to = p.t;
       last.readings++;
-      // La parada se dibuja donde terminó de estar.
+      // The stop is drawn where the bird ended up.
       last.x = p.x;
       last.y = p.y;
     } else {
@@ -60,7 +60,7 @@ function trailStops(trail: TrailPoint[]): TrailStop[] {
   return stops;
 }
 
-const stopTime = new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+const stopTime = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 export interface MapLayers {
   zones: boolean;
@@ -82,7 +82,7 @@ interface View {
 
 const FULL: View = { x: 0, y: 0, w: HABITAT.width, h: HABITAT.height };
 
-/** Superficie de cada zona de tierra: nieve, roca o grava. Sin entrada, usa la de su tipo. */
+/** Surface of each land zone: snow, rock or pebbles. Without an entry, the zone kind's default is used. */
 const ZONE_SURFACE: Record<string, { fill: string; texture?: string }> = {
   "snow-beach": { fill: "url(#snow-fill)", texture: "url(#snow-tex)" },
   "ice-ridge": { fill: "url(#snow-fill)", texture: "url(#snow-tex)" },
@@ -91,20 +91,20 @@ const ZONE_SURFACE: Record<string, { fill: string; texture?: string }> = {
   "observation-ledge": { fill: "url(#rock-fill)", texture: "url(#rock-tex)" },
 };
 
-/** Cuánto se aleja un ejemplar de su última lectura en modo en vivo (unidades del plano; 40 u = 1 m). */
+/** How far a penguin drifts from its last reading in live mode (layout units; 40 u = 1 m). */
 const LIVE_RADIUS: Partial<Record<LiveStatus, number>> = { water: 120, land: 34 };
 const LIVE_TICK_MS = 400;
-/** Fracción de ejemplares en tierra que eligen un nuevo destino en cada tick: caminan a ratos. */
+/** Share of penguins on land that pick a new destination each tick: they walk now and then. */
 const LIVE_SHARE = 0.3;
 const LIVE_STEP_MS = 2600;
-/** Tramo de nado: al llegar a un punto eligen el siguiente, así en el agua nunca se detienen. */
+/** Swim leg: on reaching a point they pick the next one, so they never stop in the water. */
 const SWIM_STEP_MS = 1500;
-/** Color del terreno alrededor de las zonas. */
+/** Ground color around the zones. */
 export const MAP_BG = "#ece2cd";
 
 /**
- * Desplazamiento simulado alrededor de la última lectura: cada ejemplar en agua o
- * en tierra deriva sin salir de su zona. Los que reposan se quedan quietos.
+ * Simulated drift around the last reading: each penguin in water or on land
+ * wanders without leaving its zone. Resting birds stay put.
  */
 function useLiveDrift(markers: MapMarker[], live: boolean) {
   const [offsets, setOffsets] = useState<Map<string, [number, number]>>(() => new Map());
@@ -201,17 +201,17 @@ export function HabitatMap({
   layers?: MapLayers;
   interactive?: boolean;
   wheelZoom?: boolean;
-  /** Transición suave al cambiar de posición (desactivar mientras se reproduce cuadro a cuadro). */
+  /** Smooth transition when the position changes (disable during frame-by-frame playback). */
   animate?: boolean;
-  /** Los ejemplares se mueven alrededor de su última lectura, como en una vista en vivo. */
+  /** Penguins move around their last reading, like a live view. */
   live?: boolean;
   focus?: { key: number; x: number; y: number; w?: number } | null;
   overlay?: ReactNode;
-  /** Tamaño relativo de las etiquetas de zona (los mapas pequeños las agrandan). */
+  /** Relative size of zone labels (small maps enlarge them). */
   labelScale?: number;
-  /** Botones de acercar/alejar y barra de escala. */
+  /** Zoom in/out buttons and scale bar. */
   showControls?: boolean;
-  /** Puntos más grandes con un pingüino dentro (p. ej. al filtrar por equipo). */
+  /** Larger dots with a penguin inside (e.g. when filtering by team). */
   penguinMarkers?: boolean;
   className?: string;
 }) {
@@ -237,7 +237,7 @@ export function HabitatMap({
     if (!focus) return;
     const w = focus.w ?? FULL.w / 2.6;
     const h = (w / FULL.w) * FULL.h;
-    // Centrar en el foco pedido por la página (ejemplar o zona).
+    // Center on the focus requested by the page (penguin or zone).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setView(clampView({ x: focus.x - w / 2, y: focus.y - h / 2, w, h }));
   }, [focus]);
@@ -246,7 +246,7 @@ export function HabitatMap({
     const el = svgRef.current;
     if (!el || !interactive) return;
     const onWheel = (e: WheelEvent) => {
-      // En mapas incrustados la rueda sigue desplazando la página; con Ctrl acerca.
+      // On embedded maps the wheel keeps scrolling the page; Ctrl+wheel zooms.
       if (!wheelZoom && !e.ctrlKey) return;
       e.preventDefault();
       const p = toSvg(el, e.clientX, e.clientY);
@@ -266,12 +266,12 @@ export function HabitatMap({
   }, []);
   const maxCount = Math.max(1, ...(zoneCounts ? [...zoneCounts.values()] : [1]));
   const selected = markers.find((m) => m.id === selectedId);
-  // Atenuados abajo y el seleccionado hasta arriba.
+  // Dimmed markers at the bottom, the selected one on top.
   const ordered = useMemo(
     () => [...markers].sort((a, b) => Number(!a.dim) - Number(!b.dim) || Number(a.id === selectedId) - Number(b.id === selectedId)),
     [markers, selectedId],
   );
-  // Con un ejemplar seleccionado, los demás se ven borrosos y sus paradas se numeran.
+  // With a penguin selected, the others blur and its stops are numbered.
   const focusOn = !!selectedId && markers.some((m) => m.id === selectedId);
   const stops = useMemo(() => (trail?.length ? trailStops(trail) : []), [trail]);
   const drift = useLiveDrift(markers, live);
@@ -367,9 +367,9 @@ export function HabitatMap({
           </filter>
         </defs>
 
-        {/* Fondo de un solo color; sigue fuera del plano para que no queden bandas en pantallas anchas. */}
+        {/* Solid background; extends past the layout so wide screens show no bands. */}
         <rect x={-4000} y={-4000} width={HABITAT.width + 8000} height={HABITAT.height + 8000} fill={MAP_BG} pointerEvents="none" />
-        {/* Las zonas se reparten todo el recinto y se tocan entre sí: sin huecos. */}
+        {/* Zones split the whole enclosure and touch each other: no gaps. */}
         {layers.zones && (
           <g clipPath="url(#habitat-clip)">
             {zones.map(({ zone, path }) => {
@@ -379,7 +379,7 @@ export function HabitatMap({
               const count = zoneCounts?.get(zone.id) ?? 0;
               return (
                 <g key={zone.id} data-zone={zone.id} onPointerEnter={() => setHover(`z:${zone.id}`)} onPointerLeave={() => setHover(null)} className={onZoneClick ? "cursor-pointer" : ""}>
-                  {/* El trazo del mismo color tapa las rendijas donde se juntan tres zonas. */}
+                  {/* A same-color stroke hides the slivers where three zones meet. */}
                   <path d={path} fill={surface?.fill ?? st.fill} stroke={surface?.fill ?? st.fill} strokeWidth={10} strokeLinejoin="round" />
                   {surface?.texture && <path d={path} fill={surface.texture} pointerEvents="none" />}
                   {zone.kind === "water" && <path d={path} fill="url(#ripples)" pointerEvents="none" />}
@@ -387,7 +387,7 @@ export function HabitatMap({
                 </g>
               );
             })}
-            {/* Bordes compartidos: orilla de arena en el agua, línea fina entre zonas de tierra. */}
+            {/* Shared borders: a sandy shoreline at the water, a thin line between land zones. */}
             {zones.map(({ zone, path }) =>
               zone.restricted && !layers.restricted ? null : (
                 <path
@@ -436,8 +436,8 @@ export function HabitatMap({
             const count = zoneCounts?.get(zone.id);
             const showCount = count !== undefined && zone.kind !== "restricted";
             const fs = Math.max(15 * k * labelScale, 9);
-            const sub = showCount ? `${count} ${count === 1 ? "ejemplar" : "ejemplares"}` : "";
-            // Etiqueta en cápsula oscura: se lee igual sobre agua, nieve o roca.
+            const sub = showCount ? `${count} ${count === 1 ? "penguin" : "penguins"}` : "";
+            // Label in a dark capsule: reads the same over water, snow or rock.
             const w = Math.max(zone.name.length * fs * 0.56, sub.length * fs * 0.5) + fs * 1.4;
             const h = showCount ? fs * 2.75 : fs * 1.75;
             return (
@@ -457,15 +457,15 @@ export function HabitatMap({
 
         {layers.trail && trail && trail.length > 0 && (
           <g pointerEvents="none" strokeLinecap="round" strokeLinejoin="round">
-            {/* Contorno claro debajo de la línea para que resalte sobre agua y arena. */}
+            {/* Light outline under the line so it stands out over water and sand. */}
             <polyline points={trail.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={8 * k} />
-            {/* Tramo por tramo: de lo más antiguo (claro) a lo más reciente (intenso). */}
+            {/* Segment by segment: oldest (light) to most recent (strong). */}
             {trail.slice(1).map((p, i) => {
               const a = trail[i];
               const f = (i + 1) / trail.length;
               return <line key={p.t} x1={a.x} y1={a.y} x2={p.x} y2={p.y} stroke="#0b6f68" strokeOpacity={0.35 + f * 0.65} strokeWidth={(3 + f * 2.2) * k} />;
             })}
-            {/* Flechas de dirección a mitad de algunos tramos. */}
+            {/* Direction arrows midway along some segments. */}
             {trail.slice(1).map((p, i) => {
               const a = trail[i];
               const len = Math.hypot(p.x - a.x, p.y - a.y);
@@ -495,7 +495,7 @@ export function HabitatMap({
                 strokeWidth={1.4 * k}
               />
             ))}
-            {/* Punto de inicio del recorrido. */}
+            {/* Start of the path. */}
             <circle cx={trail[0].x} cy={trail[0].y} r={7 * k} fill="none" stroke="#0b6f68" strokeWidth={2 * k} strokeDasharray={`${3 * k} ${2 * k}`} />
           </g>
         )}
@@ -503,7 +503,7 @@ export function HabitatMap({
         {layers.markers &&
           ordered.map((m) => {
             const isSel = m.id === selectedId;
-            // El seleccionado siempre es pingüino; con un filtro o estado elegido, también los que coinciden.
+            // The selected marker is always a penguin glyph; with a filter or status chosen, so are the matches.
             const asPenguin = isSel || (penguinMarkers && !m.dim);
             const r = (asPenguin ? 13 : 8) * Math.max(k, 0.4);
             const hv = hover === m.id;
@@ -560,7 +560,7 @@ export function HabitatMap({
             );
           })}
 
-        {/* Paradas numeradas del recorrido del seleccionado (1 = la más antigua). */}
+        {/* Numbered stops along the selected penguin's path (1 = oldest). */}
         {layers.trail && focusOn && stops.length > 1 && (
           <g>
             {stops.map((st) => {
@@ -574,13 +574,13 @@ export function HabitatMap({
                   className="cursor-default"
                   onMouseMove={(e) =>
                     showTip(e, {
-                      title: `Parada ${st.n}${last ? " · ahora" : ""}`,
+                      title: `Stop ${st.n}${last ? " · latest" : ""}`,
                       rows: [
-                        { label: "Zona", value: st.zoneId ? (HABITAT.zones.find((zz) => zz.id === st.zoneId)?.name ?? st.zoneId) : "—" },
-                        { color: st.medium === "water" ? "#2b7fd0" : "#d4920f", label: st.medium === "water" ? "En agua" : "En tierra", value: `${stopTime.format(st.from)}–${stopTime.format(st.to)}` },
-                        { label: "Tiempo", value: mins >= 60 ? `${(mins / 60).toFixed(1)} h` : `${mins} min` },
+                        { label: "Zone", value: st.zoneId ? (HABITAT.zones.find((zz) => zz.id === st.zoneId)?.name ?? st.zoneId) : "—" },
+                        { color: st.medium === "water" ? "#2b7fd0" : "#d4920f", label: st.medium === "water" ? "In water" : "On land", value: `${stopTime.format(st.from)}–${stopTime.format(st.to)}` },
+                        { label: "Duration", value: mins >= 60 ? `${(mins / 60).toFixed(1)} h` : `${mins} min` },
                       ],
-                      note: `${st.readings} ${st.readings === 1 ? "lectura" : "lecturas"}`,
+                      note: `${st.readings} ${st.readings === 1 ? "reading" : "readings"}`,
                     })
                   }
                   onMouseLeave={hideTip}
@@ -598,18 +598,18 @@ export function HabitatMap({
 
       {interactive && showControls && (
         <div className="absolute bottom-4 right-4 flex flex-col overflow-hidden rounded-xl border border-line-strong bg-panel-solid/90 backdrop-blur">
-          <MapBtn label="Acercar" onClick={() => zoomAt(1 / 1.4)}>
+          <MapBtn label="Zoom in" onClick={() => zoomAt(1 / 1.4)}>
             <Plus size={15} />
           </MapBtn>
-          <MapBtn label="Alejar" onClick={() => zoomAt(1.4)}>
+          <MapBtn label="Zoom out" onClick={() => zoomAt(1.4)}>
             <Minus size={15} />
           </MapBtn>
-          <MapBtn label="Ver todo el hábitat" onClick={() => setView(FULL)}>
+          <MapBtn label="Show the whole habitat" onClick={() => setView(FULL)}>
             <Maximize2 size={14} />
           </MapBtn>
           {selected && (
             <MapBtn
-              label="Centrar en el seleccionado"
+              label="Center on selected penguin"
               onClick={() => {
                 const w = FULL.w / 3;
                 const h = (w / FULL.w) * FULL.h;
@@ -628,7 +628,7 @@ export function HabitatMap({
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#e5484d] opacity-70" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-[#e5484d]" />
           </span>
-          En vivo
+          Live · simulated
         </div>
       )}
       {overlay}
@@ -645,13 +645,13 @@ function MapBtn({ children, onClick, label }: { children: ReactNode; onClick: ()
 }
 
 function ScaleBar({ k }: { k: number }) {
-  // 5 m en unidades del plano, expresado como fracción del ancho visible.
+  // 5 m in layout units, as a fraction of the visible width.
   const meters = k > 0.6 ? 5 : k > 0.3 ? 2 : 1;
   const pct = ((meters * HABITAT.unitsPerMeter) / (HABITAT.width * k)) * 100;
   return (
     <div className="pointer-events-none absolute bottom-4 left-4 hidden text-[10px] text-muted sm:block">
       <div className="h-1.5 border-x border-b border-muted/60" style={{ width: `${pct}vw`, maxWidth: 160 }} />
-      <span>{meters} m · plano de referencia</span>
+      <span>{meters} m · reference layout</span>
     </div>
   );
 }
@@ -694,7 +694,7 @@ function toSvg(svg: SVGSVGElement, clientX: number, clientY: number) {
   return { x: p.x, y: p.y };
 }
 
-/** Pingüino dibujado dentro del punto; `s` es su medio alto. */
+/** Penguin drawn inside the dot; `s` is its half-height. */
 function PenguinGlyph({ s }: { s: number }) {
   return (
     <g transform={`scale(${s})`} pointerEvents="none">

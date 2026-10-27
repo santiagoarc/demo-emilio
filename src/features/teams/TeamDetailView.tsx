@@ -27,9 +27,10 @@ import {
 import { ZONE_BY_ID } from "@/domain/habitat";
 import { SPECIES, SPECIES_BY_ID } from "@/domain/species";
 import type { Shift, SpeciesId } from "@/domain/types";
+import { QUALITY_LABEL, SOURCE_SHORT } from "@/logic/labels";
 import { computeActivity, type Breakdown } from "@/logic/metrics";
 import { STATUS_LABEL, type LiveStatus, type Snapshot } from "@/logic/status";
-import { HOUR, fmtDate, fmtDateTime, fmtHours, fmtWeekday } from "@/logic/time";
+import { HOUR, fmtDateTime, fmtHours, fmtWeekday } from "@/logic/time";
 import { PERMISSIONS, useDemo } from "@/state/DemoProvider";
 import { Badge, Button, Card, EmptyState, Select, SimulatedTag, cx } from "@/components/ui/primitives";
 import { SERIES, StackedColumns } from "@/components/charts/Charts";
@@ -40,15 +41,15 @@ import { StatusPill, STATUS_COLOR } from "@/components/penguin/StatusPill";
 import { SpeciesPenguinPanel } from "@/features/species/SpeciesPenguinPanel";
 import { ActiveBadge, Avatars, TeamFormDrawer, initials, isActive } from "./shared";
 
-type Tab = "resumen" | "pinguinos" | "horario" | "personal";
+type Tab = "overview" | "penguins" | "schedule" | "staff";
 const TABS: { id: Tab; label: string }[] = [
-  { id: "resumen", label: "Resumen" },
-  { id: "pinguinos", label: "Pingüinos" },
-  { id: "horario", label: "Horario" },
-  { id: "personal", label: "Personal" },
+  { id: "overview", label: "Overview" },
+  { id: "penguins", label: "Penguins" },
+  { id: "schedule", label: "Schedule" },
+  { id: "staff", label: "Staff" },
 ];
-const WEEKDAYS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-const AVAIL_LABEL: Record<Shift["availability"], string> = { available: "Disponible", partial: "Parcial", unavailable: "No disponible" };
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const AVAIL_LABEL: Record<Shift["availability"], string> = { available: "Available", partial: "Partial", unavailable: "Unavailable" };
 
 type SortKey = "id" | "name" | "last" | "water" | "land";
 type ActivityFilter = "water" | "land" | "nodata";
@@ -73,7 +74,7 @@ export function TeamDetailView() {
     return (
       <div className="p-8">
         <Card>
-          <EmptyState icon={SearchX} title={`No existe el equipo "${id}"`} action={<Link href="/teams" className="text-sm text-accent hover:underline">Volver a Care Teams</Link>} />
+          <EmptyState icon={SearchX} title={`Team "${id}" not found`} action={<Link href="/teams" className="text-sm text-accent hover:underline">Back to Care Teams</Link>} />
         </Card>
       </div>
     );
@@ -87,7 +88,7 @@ function Detail({ teamId }: { teamId: string }) {
   const params = useSearchParams();
   const { dataset, teamOf, snapshots, range } = useDemo();
   const team = dataset.teams.find((t) => t.id === teamId)!;
-  const tab = (TABS.some((t) => t.id === params.get("tab")) ? params.get("tab") : "resumen") as Tab;
+  const tab = (TABS.some((t) => t.id === params.get("tab")) ? params.get("tab") : "overview") as Tab;
   const sel = params.get("sel");
   const setParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params.toString());
@@ -110,19 +111,19 @@ function Detail({ teamId }: { teamId: string }) {
     const st = snapshots.get(id)!.status;
     return st === "land" || st === "resting";
   }).length;
-  const share = (n: number) => (penguins.length ? `${Math.round((n / penguins.length) * 100)}% del equipo` : "Sin datos");
+  const share = (n: number) => (penguins.length ? `${Math.round((n / penguins.length) * 100)}% of the team` : "No data");
   const total = dataset.penguins.length;
 
   return (
     <div className="pb-10">
-      {/* Encabezado */}
+      {/* Header */}
       <div className="px-6 pt-5 lg:px-8">
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/teams"
             className="inline-flex h-10 items-center gap-2 rounded-xl border border-accent/40 bg-accent/10 pl-2.5 pr-4 text-sm font-medium text-ink transition hover:border-accent hover:bg-accent/20"
           >
-            <ChevronLeft size={18} className="text-accent" /> Todos los equipos
+            <ChevronLeft size={18} className="text-accent" /> All teams
           </Link>
           <nav className="flex items-center gap-1 text-xs text-muted">
             <Link href="/teams" className="hover:text-ink">Care Teams</Link>
@@ -146,61 +147,61 @@ function Detail({ teamId }: { teamId: string }) {
               <SimulatedTag />
             </div>
             <p className="text-sm text-muted">
-              {team.focus || "Sin descripción"} · {penguins.length} pingüinos asignados ({Math.round((penguins.length / Math.max(1, total)) * 100)}% del total)
+              {team.focus || "No description"} · {penguins.length} assigned {penguins.length === 1 ? "penguin" : "penguins"} ({Math.round((penguins.length / Math.max(1, total)) * 100)}% of total)
             </p>
           </div>
           <div className="flex items-center gap-3">
             <Avatars team={team} max={4} size={34} />
             <div className="leading-tight">
               <p className="text-sm font-medium">{team.lead}</p>
-              <p className="text-[11px] text-faint">Responsable · {team.members.length} integrantes</p>
+              <p className="text-[11px] text-faint">Team lead · {team.members.length} {team.members.length === 1 ? "member" : "members"}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex h-9 items-center gap-2 rounded-xl border border-line bg-ink/[0.05] px-3 text-xs text-muted">
-              Equipo
-              <select value={teamId} onChange={(e) => router.push(`/teams/${e.target.value}${tab !== "resumen" ? `?tab=${tab}` : ""}`)} className="bg-transparent text-xs text-ink outline-none">
+              Team
+              <select value={teamId} onChange={(e) => router.push(`/teams/${e.target.value}${tab !== "overview" ? `?tab=${tab}` : ""}`)} className="bg-transparent text-xs text-ink outline-none">
                 {dataset.teams.map((t) => (
                   <option key={t.id} value={t.id} className="bg-panel-solid">
                     {t.name}
-                    {isActive(t) ? "" : " (inactivo)"}
+                    {isActive(t) ? "" : " (inactive)"}
                   </option>
                 ))}
               </select>
             </label>
             {PERMISSIONS.manageTeams && (
               <Button variant="outline" onClick={() => setEditing(true)}>
-                <Pencil size={14} /> Editar equipo
+                <Pencil size={14} /> Edit team
               </Button>
             )}
             <Link href={`/map?team=${teamId}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3.5 text-sm font-semibold text-white hover:bg-[#0b8178]">
-              <MapPinned size={15} /> Ver en el mapa
+              <MapPinned size={15} /> View on map
             </Link>
           </div>
         </div>
         {!isActive(team) && (
           <p className="mt-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
-            Equipo inactivo. Sus registros se conservan y sus pingüinos siguen asignados hasta que se reasignen de forma explícita.
+            Inactive team. Its records are kept and its penguins stay assigned until they are explicitly reassigned.
           </p>
         )}
       </div>
 
       <div className="mt-4 space-y-4 px-6 lg:px-8">
-        {/* Indicadores */}
+        {/* Indicators */}
         <div className="grid gap-3 sm:grid-cols-3">
-          <Kpi icon={Users} color={team.color} value={String(penguins.length)} label="Pingüinos asignados" sub={`${Math.round((penguins.length / Math.max(1, total)) * 100)}% del total`} />
-          <Kpi icon={Waves} color="#2fd8c8" value={String(inWater)} label="En agua ahora" sub={share(inWater)} />
-          <Kpi icon={Mountain} color="#9fb4c7" value={String(onLand)} label="En tierra ahora" sub={share(onLand)} />
+          <Kpi icon={Users} color={team.color} value={String(penguins.length)} label="Assigned penguins" sub={`${Math.round((penguins.length / Math.max(1, total)) * 100)}% of total`} />
+          <Kpi icon={Waves} color="#2fd8c8" value={String(inWater)} label="In water now" sub={share(inWater)} />
+          <Kpi icon={Mountain} color="#9fb4c7" value={String(onLand)} label="On land now" sub={share(onLand)} />
         </div>
 
-        {/* Pestañas */}
+        {/* Tabs */}
         <div className="panel flex gap-1 overflow-x-auto p-1">
           {TABS.map((t) => {
-            const count = t.id === "pinguinos" ? penguins.length : t.id === "personal" ? team.members.length : null;
+            const count = t.id === "penguins" ? penguins.length : t.id === "staff" ? team.members.length : null;
             return (
               <button
                 key={t.id}
-                onClick={() => setParams({ tab: t.id === "resumen" ? null : t.id })}
+                onClick={() => setParams({ tab: t.id === "overview" ? null : t.id })}
                 className={cx("flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl px-4 text-sm font-medium transition", tab === t.id ? "bg-accent/15 text-ink shadow-[inset_0_-2px_0_var(--accent)]" : "text-muted hover:bg-ink/[0.04] hover:text-ink")}
               >
                 {t.label}
@@ -210,13 +211,13 @@ function Detail({ teamId }: { teamId: string }) {
           })}
         </div>
 
-        {tab === "resumen" && (
+        {tab === "overview" && (
           <div className="space-y-4">
-            {/* Tres tarjetas a la misma altura; en dos columnas el horario ocupa la fila completa. */}
+            {/* Three cards at the same height; with two columns the schedule spans the full row. */}
             <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
               <ZonePanel teamId={teamId} ids={ids} />
               <ActivityPanel agg={agg} label={range.label} span={range.to - range.from} />
-              <ScheduleSide teamId={teamId} onAll={() => setParams({ tab: "horario" })} className="lg:col-span-2 xl:col-span-1" />
+              <ScheduleSide teamId={teamId} onAll={() => setParams({ tab: "schedule" })} className="lg:col-span-2 xl:col-span-1" />
             </div>
             <PenguinTable
               teamId={teamId}
@@ -225,14 +226,14 @@ function Detail({ teamId }: { teamId: string }) {
               state={table}
               setState={setTable}
               selected={null}
-              onSelect={(id) => setParams({ tab: "pinguinos", sel: id })}
+              onSelect={(id) => setParams({ tab: "penguins", sel: id })}
               compact
               rangeLabel={range.label}
             />
           </div>
         )}
 
-        {tab === "pinguinos" && (
+        {tab === "penguins" && (
           <div className={cx("grid items-start gap-4", sel && ids.includes(sel) && "xl:grid-cols-[minmax(0,1fr)_350px]")}>
             <PenguinTable
               teamId={teamId}
@@ -253,8 +254,8 @@ function Detail({ teamId }: { teamId: string }) {
           </div>
         )}
 
-        {tab === "horario" && <ScheduleTab teamId={teamId} />}
-        {tab === "personal" && <StaffTab teamId={teamId} />}
+        {tab === "schedule" && <ScheduleTab teamId={teamId} />}
+        {tab === "staff" && <StaffTab teamId={teamId} />}
       </div>
 
       <TeamFormDrawer open={editing} onClose={() => setEditing(false)} team={team} />
@@ -262,7 +263,7 @@ function Detail({ teamId }: { teamId: string }) {
   );
 }
 
-/* ───────────── Resumen ───────────── */
+/* ───────────── Overview ───────────── */
 
 function ZonePanel({ teamId, ids }: { teamId: string; ids: string[] }) {
   const { snapshots } = useDemo();
@@ -285,9 +286,9 @@ function ZonePanel({ teamId, ids }: { teamId: string; ids: string[] }) {
   const max = Math.max(1, ...rows.list.map(([, e]) => e.n));
 
   return (
-    <Card title="Distribución por zona" subtitle="Última ubicación registrada · clic para abrir en el mapa">
+    <Card title="Distribution by zone" subtitle="Last recorded location · click to open on the map">
       {rows.list.length === 0 ? (
-        <p className="py-4 text-center text-xs text-muted">Sin datos de ubicación.</p>
+        <p className="py-4 text-center text-xs text-muted">No location data.</p>
       ) : (
         <ul className="space-y-0.5">
           {rows.list.map(([z, e]) => (
@@ -305,7 +306,7 @@ function ZonePanel({ teamId, ids }: { teamId: string; ids: string[] }) {
           ))}
         </ul>
       )}
-      {rows.none > 0 && <p className="mt-2 text-[11px] text-faint">{rows.none} sin ubicación registrada.</p>}
+      {rows.none > 0 && <p className="mt-2 text-[11px] text-faint">{rows.none} with no recorded location.</p>}
     </Card>
   );
 }
@@ -313,9 +314,9 @@ function ZonePanel({ teamId, ids }: { teamId: string; ids: string[] }) {
 function ActivityPanel({ agg, label, span }: { agg: ReturnType<typeof computeActivity>; label: string; span: number }) {
   const byHour = span <= 26 * HOUR;
   return (
-    <Card title="Actividad del equipo" subtitle={`${label} · horas registradas de sus pingüinos`} action={<SimulatedTag />}>
+    <Card title="Team activity" subtitle={`${label} · recorded hours of its penguins`} action={<SimulatedTag />}>
       {agg.penguinCount === 0 ? (
-        <p className="py-4 text-center text-xs text-muted">Sin pingüinos asignados.</p>
+        <p className="py-4 text-center text-xs text-muted">No penguins assigned.</p>
       ) : (
         <>
           <StackedColumns
@@ -323,18 +324,18 @@ function ActivityPanel({ agg, label, span }: { agg: ReturnType<typeof computeAct
             labelEvery={byHour ? 6 : agg.daily.length > 8 ? 2 : 1}
             format={fmtHours}
             series={[
-              { key: "water", color: SERIES.water, label: "Agua" },
-              { key: "land", color: SERIES.land, label: "Tierra" },
+              { key: "water", color: SERIES.water, label: "Water" },
+              { key: "land", color: SERIES.land, label: "Land" },
             ]}
             data={
               byHour
                 ? agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))
-                : agg.daily.map((d) => ({ label: fmtDate(d.day).split(" ")[0], tooltip: fmtWeekday(d.day), values: { water: d.water, land: d.land } }))
+                : agg.daily.map((d) => ({ label: String(new Date(d.day).getDate()), tooltip: fmtWeekday(d.day), values: { water: d.water, land: d.land } }))
             }
           />
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
-            <Dot color={SERIES.water}>Agua</Dot>
-            <Dot color={SERIES.land}>Tierra</Dot>
+            <Dot color={SERIES.water}>Water</Dot>
+            <Dot color={SERIES.land}>Land</Dot>
           </div>
         </>
       )}
@@ -347,13 +348,13 @@ function ScheduleSide({ teamId, onAll, className }: { teamId: string; onAll: () 
   const weekday = new Date(now).getDay();
   const today = shifts.filter((s) => s.teamId === teamId && s.weekday === weekday).sort((a, b) => a.start.localeCompare(b.start));
   return (
-    <Card className={className} title="Horario del equipo (hoy)" icon={CalendarClock} action={<button onClick={onAll} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">Ver horario <ArrowRight size={12} /></button>}>
+    <Card className={className} title="Team schedule (today)" icon={CalendarClock} action={<button onClick={onAll} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">View schedule <ArrowRight size={12} /></button>}>
       {today.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center py-2 text-center">
-          <p className="text-xs text-muted">{shifts.some((s) => s.teamId === teamId) ? "Sin turnos configurados para hoy." : "No hay turnos configurados para este equipo."}</p>
+          <p className="text-xs text-muted">{shifts.some((s) => s.teamId === teamId) ? "No shifts set up for today." : "No shifts set up for this team."}</p>
           {PERMISSIONS.manageTeams && (
             <button onClick={onAll} className="mt-2 text-xs text-accent hover:underline">
-              Configurar turnos
+              Set up shifts
             </button>
           )}
         </div>
@@ -364,7 +365,7 @@ function ScheduleSide({ teamId, onAll, className }: { teamId: string; onAll: () 
   );
 }
 
-/* ───────────── Tabla de pingüinos ───────────── */
+/* ───────────── Penguin table ───────────── */
 
 function PenguinTable({
   teamId,
@@ -401,7 +402,7 @@ function PenguinTable({
     [ids, dataset, snapshots, perPenguin],
   );
   const zoneOptions = [...new Set(all.map((r) => r.zone).filter(Boolean))].map((z) => ({ value: z, label: ZONE_BY_ID[z].name }));
-  const speciesOptions = SPECIES.filter((s) => all.some((r) => r.species === s.id)).map((s) => ({ value: s.id, label: s.nameEs, color: s.color }));
+  const speciesOptions = SPECIES.filter((s) => all.some((r) => r.species === s.id)).map((s) => ({ value: s.id, label: s.nameEn, color: s.color }));
 
   const rows = useMemo(() => {
     const q = t.q.trim().toLowerCase();
@@ -438,16 +439,16 @@ function PenguinTable({
   return (
     <section className="panel min-w-0 overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
-        {compact && <h3 className="mr-2 text-[15px] font-semibold">Pingüinos del equipo <span className="num text-muted">({rows.length})</span></h3>}
+        {compact && <h3 className="mr-2 text-[15px] font-semibold">Team penguins <span className="num text-muted">({rows.length})</span></h3>}
         <div className="flex h-10 min-w-[200px] flex-[2] items-center gap-2 rounded-xl border border-line bg-ink/[0.05] px-3">
           <Search size={14} className="text-muted" />
-          <input value={t.q} onChange={(e) => set({ q: e.target.value })} placeholder="Buscar por código, nombre o dispositivo…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint" />
+          <input value={t.q} onChange={(e) => set({ q: e.target.value })} placeholder="Search by ID, name or device…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint" />
         </div>
-        <FilterMenu<SpeciesId> className="flex-1" label="Especie" allLabel="Todas" value={t.species} onChange={(v) => set({ species: v })} options={speciesOptions} />
-        <FilterMenu className="flex-1" label="Zona" allLabel="Todas" value={t.zones} onChange={(v) => set({ zones: v })} options={zoneOptions} />
+        <FilterMenu<SpeciesId> className="flex-1" label="Species" allLabel="All" value={t.species} onChange={(v) => set({ species: v })} options={speciesOptions} />
+        <FilterMenu className="flex-1" label="Zone" allLabel="All" value={t.zones} onChange={(v) => set({ zones: v })} options={zoneOptions} />
         <FilterMenu<LiveStatus>
           className="flex-1"
-          label="Estado"
+          label="Status"
           value={t.status}
           onChange={(v) => set({ status: v })}
           options={(["water", "land", "resting"] as LiveStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s], color: STATUS_COLOR[s] }))}
@@ -455,19 +456,19 @@ function PenguinTable({
         {!compact && (
           <FilterMenu<ActivityFilter>
             className="flex-1"
-            label="Actividad"
-            allLabel="Todas"
+            label="Activity"
+            allLabel="All"
             value={t.activity}
             onChange={(v) => set({ activity: v })}
             options={[
-              { value: "water", label: "Más tiempo en agua", color: SERIES.water },
-              { value: "land", label: "Más tiempo en tierra", color: SERIES.land },
+              { value: "water", label: "More time in water", color: SERIES.water },
+              { value: "land", label: "More time on land", color: SERIES.land },
             ]}
           />
         )}
         {hasFilters && (
           <button onClick={() => setState({ ...EMPTY_TABLE, sort: t.sort, dir: t.dir, per: t.per })} className="inline-flex h-10 items-center gap-1 px-2 text-xs text-muted hover:text-ink">
-            <X size={13} /> Limpiar
+            <X size={13} /> Clear
           </button>
         )}
       </div>
@@ -475,15 +476,15 @@ function PenguinTable({
         <table className="w-full min-w-[1000px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] text-muted">
-              <th className="px-3 py-2.5 font-medium">Foto</th>
-              <SortTh k="id" t={t} onSort={sortBy}>Código</SortTh>
-              <SortTh k="name" t={t} onSort={sortBy}>Nombre</SortTh>
-              <th className="px-2 py-2.5 font-medium">Especie</th>
-              <th className="px-2 py-2.5 font-medium">Zona registrada</th>
-              <th className="px-2 py-2.5 font-medium">Estado</th>
-              <SortTh k="water" t={t} onSort={sortBy} sub={rangeLabel}>En agua</SortTh>
-              <SortTh k="land" t={t} onSort={sortBy} sub={rangeLabel}>En tierra</SortTh>
-              <SortTh k="last" t={t} onSort={sortBy}>Última lectura</SortTh>
+              <th className="px-3 py-2.5 font-medium">Photo</th>
+              <SortTh k="id" t={t} onSort={sortBy}>ID</SortTh>
+              <SortTh k="name" t={t} onSort={sortBy}>Name</SortTh>
+              <th className="px-2 py-2.5 font-medium">Species</th>
+              <th className="px-2 py-2.5 font-medium">Last recorded zone</th>
+              <th className="px-2 py-2.5 font-medium">Status</th>
+              <SortTh k="water" t={t} onSort={sortBy} sub={rangeLabel}>In water</SortTh>
+              <SortTh k="land" t={t} onSort={sortBy} sub={rangeLabel}>On land</SortTh>
+              <SortTh k="last" t={t} onSort={sortBy}>Last reading</SortTh>
               <th className="w-10" />
             </tr>
           </thead>
@@ -498,23 +499,35 @@ function PenguinTable({
                 >
                   <td className="px-3 py-1.5"><PenguinIllustration speciesId={r.species} size={32} /></td>
                   <td className="px-2 py-2 font-mono text-[13px]">{r.id}</td>
-                  <td className="px-2 py-2">{r.name ?? <span className="text-faint">Sin nombre</span>}</td>
-                  <td className="px-2 py-2 text-xs text-muted">{SPECIES_BY_ID[r.species].nameEs}</td>
+                  <td className="px-2 py-2">{r.name ?? <span className="text-faint">Unnamed</span>}</td>
+                  <td className="px-2 py-2 text-xs text-muted">{SPECIES_BY_ID[r.species].nameEn}</td>
                   <td className="px-2 py-2">
                     {r.zone ? (
                       <span className="inline-flex rounded-md border border-line-strong px-1.5 py-0.5 text-xs">
                         {ZONE_BY_ID[r.zone].name}
                       </span>
                     ) : (
-                      <span className="text-xs text-faint">Sin datos</span>
+                      <span className="text-xs text-faint">No data</span>
                     )}
                   </td>
                   <td className="px-2 py-2"><StatusPill status={r.snap.status} compact /></td>
-                  <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">Sin datos</span> : <HBar value={r.b!.water} max={maxH} color={SERIES.water} />}</td>
-                  <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">Sin datos</span> : <HBar value={r.b!.land} max={maxH} color="#f5b84b" />}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-xs text-muted">{r.snap.reading ? fmtDateTime(r.snap.reading.timestamp, now) : "Sin datos"}</td>
+                  <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">No data</span> : <HBar value={r.b!.water} max={maxH} color={SERIES.water} />}</td>
+                  <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">No data</span> : <HBar value={r.b!.land} max={maxH} color="#f5b84b" />}</td>
+                  <td
+                    className="whitespace-nowrap px-2 py-2 text-xs text-muted"
+                    title={r.snap.reading ? `${SOURCE_SHORT[r.snap.reading.source]} · ${QUALITY_LABEL[r.snap.reading.quality]} quality (±${r.snap.reading.accuracyM} m) · simulated` : undefined}
+                  >
+                    {r.snap.reading ? (
+                      <>
+                        {fmtDateTime(r.snap.reading.timestamp, now)}
+                        <span className="block text-[10px] text-faint">{QUALITY_LABEL[r.snap.reading.quality]} quality · ±{r.snap.reading.accuracyM} m</span>
+                      </>
+                    ) : (
+                      "No data"
+                    )}
+                  </td>
                   <td className="pr-3">
-                    <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Abrir ficha" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-ink/5 hover:text-ink">
+                    <Link href={`/penguins/${r.id}`} onClick={(e) => e.stopPropagation()} title="Open profile" className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-ink/5 hover:text-ink">
                       <ChevronRight size={15} />
                     </Link>
                   </td>
@@ -523,12 +536,12 @@ function PenguinTable({
             })}
           </tbody>
         </table>
-        {rows.length === 0 && <EmptyState icon={SearchX} title={ids.length ? "Ningún pingüino coincide" : "Este equipo no tiene pingüinos asignados"} />}
+        {rows.length === 0 && <EmptyState icon={SearchX} title={ids.length ? "No penguins match" : "This team has no assigned penguins"} />}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-xs text-muted">
         <span>
-          Mostrando {rows.length ? (page - 1) * per + 1 : 0}–{Math.min(page * per, rows.length)} de {rows.length}
-          {teamId && compact ? " · clic en un renglón para ver su resumen" : ""}
+          Showing {rows.length ? (page - 1) * per + 1 : 0}–{Math.min(page * per, rows.length)} of {rows.length}
+          {teamId && compact ? " · click a row to see its summary" : ""}
         </span>
         <div className="flex items-center gap-1">
           <PageBtn disabled={page <= 1} onClick={() => set({ page: page - 1 })}><ChevronLeft size={14} /></PageBtn>
@@ -539,7 +552,7 @@ function PenguinTable({
         </div>
         {!compact && (
           <label className="flex items-center gap-2">
-            Filas por página
+            Rows per page
             <select value={t.per} onChange={(e) => set({ per: Number(e.target.value) })} className="h-8 rounded-lg border border-line-strong bg-panel-solid px-2 text-xs text-ink">
               {[10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
@@ -562,7 +575,7 @@ function ReassignBox({ penguinId, onDone }: { penguinId: string; onDone: () => v
   if (!PERMISSIONS.reassignTeam) return null;
   return (
     <div className="panel p-3">
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium"><ArrowRightLeft size={13} className="text-accent" /> Reasignar a otro equipo</p>
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium"><ArrowRightLeft size={13} className="text-accent" /> Reassign to another team</p>
       <Select
         value={target}
         onChange={(e) => {
@@ -571,11 +584,11 @@ function ReassignBox({ penguinId, onDone }: { penguinId: string; onDone: () => v
         }}
         className="h-8 w-full text-xs"
       >
-        <option value="">Elegir equipo de destino…</option>
+        <option value="">Choose destination team…</option>
         {options.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
       </Select>
       {to && !confirming && (
-        <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => setConfirming(true)}>Revisar cambio</Button>
+        <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => setConfirming(true)}>Review change</Button>
       )}
       {to && confirming && (
         <div className="mt-2 rounded-lg border border-accent/30 bg-accent/5 p-2.5 text-xs">
@@ -583,13 +596,13 @@ function ReassignBox({ penguinId, onDone }: { penguinId: string; onDone: () => v
             <span className="font-mono">{p.id}</span>{p.name ? ` · ${p.name}` : ""}
           </p>
           <p className="mt-1.5 flex items-center gap-2">
-            <span className="rounded-md bg-ink/[0.06] px-1.5 py-0.5">{from?.name ?? "Sin asignar"}</span>
+            <span className="rounded-md bg-ink/[0.06] px-1.5 py-0.5">{from?.name ?? "Unassigned"}</span>
             <ArrowRight size={13} className="text-accent" />
             <span className="rounded-md bg-accent/15 px-1.5 py-0.5 text-ink">{to.name}</span>
           </p>
-          <p className="mt-1.5 text-[11px] text-faint">Queda en el historial y se refleja en Species, Penguins y Habitat Map.</p>
+          <p className="mt-1.5 text-[11px] text-faint">It is kept in the history and reflected in Species, Penguins and Habitat Map.</p>
           <div className="mt-2 flex gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>Cancelar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>Cancel</Button>
             <Button
               size="sm"
               variant="primary"
@@ -598,7 +611,7 @@ function ReassignBox({ penguinId, onDone }: { penguinId: string; onDone: () => v
                 onDone();
               }}
             >
-              Confirmar reasignación
+              Confirm reassignment
             </Button>
           </div>
         </div>
@@ -607,7 +620,7 @@ function ReassignBox({ penguinId, onDone }: { penguinId: string; onDone: () => v
   );
 }
 
-/* ───────────── Horario ───────────── */
+/* ───────────── Schedule ───────────── */
 
 function ShiftTimeline({ shifts, compact }: { shifts: Shift[]; compact?: boolean }) {
   const { dataset } = useDemo();
@@ -654,9 +667,9 @@ function ScheduleTab({ teamId }: { teamId: string }) {
   const [showForm, setShowForm] = useState(false);
   const mine = shifts.filter((s) => s.teamId === teamId);
   const day = mine.filter((s) => s.weekday === weekday).sort((a, b) => a.start.localeCompare(b.start));
-  const turno = (start: string) => {
+  const shiftName = (start: string) => {
     const h = Number(start.split(":")[0]);
-    return h < 12 ? "Mañana" : h < 18 ? "Tarde" : "Noche";
+    return h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Night";
   };
 
   return (
@@ -666,29 +679,29 @@ function ScheduleTab({ teamId }: { teamId: string }) {
           <button onClick={() => setWeekday((weekday + 6) % 7)} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-muted hover:text-ink"><ChevronLeft size={15} /></button>
           <p className="min-w-[110px] text-center text-sm font-semibold">{WEEKDAYS[weekday]}</p>
           <button onClick={() => setWeekday((weekday + 1) % 7)} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-muted hover:text-ink"><ChevronRight size={15} /></button>
-          {weekday !== new Date(now).getDay() && <button onClick={() => setWeekday(new Date(now).getDay())} className="text-xs text-accent hover:underline">Hoy</button>}
+          {weekday !== new Date(now).getDay() && <button onClick={() => setWeekday(new Date(now).getDay())} className="text-xs text-accent hover:underline">Today</button>}
           {PERMISSIONS.manageTeams && (
-            <Button size="sm" variant="primary" className="ml-auto" onClick={() => setShowForm(true)}><Plus size={14} /> Configurar turno</Button>
+            <Button size="sm" variant="primary" className="ml-auto" onClick={() => setShowForm(true)}><Plus size={14} /> Set up shift</Button>
           )}
         </div>
         {mine.length === 0 ? (
-          <EmptyState icon={CalendarClock} title="No hay turnos configurados" action={PERMISSIONS.manageTeams ? <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>Configurar turnos</Button> : undefined}>
-            La demo no incluye horarios del personal y no se inventan. Cuando se registren, aparecerán aquí por día.
+          <EmptyState icon={CalendarClock} title="No shifts set up" action={PERMISSIONS.manageTeams ? <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>Set up shifts</Button> : undefined}>
+            The demo includes no staff schedules and none are made up. Once they are recorded, they will appear here by day.
           </EmptyState>
         ) : day.length === 0 ? (
-          <p className="py-8 text-center text-xs text-muted">Sin turnos configurados para el {WEEKDAYS[weekday].toLowerCase()}.</p>
+          <p className="py-8 text-center text-xs text-muted">No shifts set up for {WEEKDAYS[weekday]}.</p>
         ) : (
           <>
             <ShiftTimeline shifts={day} />
             <table className="mt-5 w-full text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-[11px] text-muted">
-                  <th className="py-2 font-medium">Nombre</th>
-                  <th className="py-2 font-medium">Rol</th>
-                  <th className="py-2 font-medium">Turno</th>
-                  <th className="py-2 font-medium">Inicio</th>
-                  <th className="py-2 font-medium">Fin</th>
-                  <th className="py-2 font-medium">Disponibilidad</th>
+                  <th className="py-2 font-medium">Name</th>
+                  <th className="py-2 font-medium">Role</th>
+                  <th className="py-2 font-medium">Shift</th>
+                  <th className="py-2 font-medium">Start</th>
+                  <th className="py-2 font-medium">End</th>
+                  <th className="py-2 font-medium">Availability</th>
                   <th />
                 </tr>
               </thead>
@@ -696,14 +709,14 @@ function ScheduleTab({ teamId }: { teamId: string }) {
                 {day.map((s) => (
                   <tr key={s.id} className="border-b border-line/60 last:border-0">
                     <td className="py-2">{s.member}</td>
-                    <td className="py-2 text-xs text-muted">{s.member === team.lead ? "Responsable" : team.roles?.[s.member] || "Sin rol registrado"}</td>
-                    <td className="py-2 text-xs">{turno(s.start)}</td>
+                    <td className="py-2 text-xs text-muted">{s.member === team.lead ? "Team lead" : team.roles?.[s.member] || "No role on record"}</td>
+                    <td className="py-2 text-xs">{shiftName(s.start)}</td>
                     <td className="py-2 font-mono text-xs">{s.start}</td>
                     <td className="py-2 font-mono text-xs">{s.end}</td>
                     <td className="py-2"><Badge tone={s.availability === "available" ? "ok" : s.availability === "partial" ? "warn" : "neutral"}>{AVAIL_LABEL[s.availability]}</Badge></td>
                     <td className="py-2 text-right">
                       {PERMISSIONS.manageTeams && (
-                        <button onClick={() => removeShift(s.id)} className="rounded-lg p-1.5 text-faint hover:bg-ink/5 hover:text-danger" title="Retirar turno"><Trash2 size={14} /></button>
+                        <button onClick={() => removeShift(s.id)} className="rounded-lg p-1.5 text-faint hover:bg-ink/5 hover:text-danger" title="Remove shift"><Trash2 size={14} /></button>
                       )}
                     </td>
                   </tr>
@@ -716,7 +729,7 @@ function ScheduleTab({ teamId }: { teamId: string }) {
       {showForm && PERMISSIONS.manageTeams ? (
         <ShiftForm team={team} weekday={weekday} onAdd={(s) => addShift(s)} onClose={() => setShowForm(false)} />
       ) : (
-        <Card title="Semana" icon={CalendarClock} subtitle="Turnos configurados por día">
+        <Card title="Week" icon={CalendarClock} subtitle="Shifts set up per day">
           <ul className="space-y-1">
             {WEEKDAYS.map((d, i) => {
               const n = mine.filter((s) => s.weekday === i).length;
@@ -724,7 +737,7 @@ function ScheduleTab({ teamId }: { teamId: string }) {
                 <li key={d}>
                   <button onClick={() => setWeekday(i)} className={cx("flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm", i === weekday ? "bg-accent/10 text-ink" : "text-muted hover:bg-ink/[0.04]")}>
                     {d}
-                    <span className="num text-xs text-faint">{n ? `${n} turno${n === 1 ? "" : "s"}` : "—"}</span>
+                    <span className="num text-xs text-faint">{n ? `${n} shift${n === 1 ? "" : "s"}` : "—"}</span>
                   </button>
                 </li>
               );
@@ -745,7 +758,7 @@ function ShiftForm({ team, weekday, onAdd, onClose }: { team: ReturnType<typeof 
   const [saved, setSaved] = useState(false);
   const field = "mt-1 w-full rounded-xl border border-line-strong bg-ink/[0.05] px-3 py-2 text-sm outline-none focus:border-accent/60 [color-scheme:dark]";
   return (
-    <Card title="Configurar turno" icon={CalendarClock} action={<button onClick={onClose} className="rounded-lg p-1 text-muted hover:text-ink"><X size={15} /></button>}>
+    <Card title="Set up shift" icon={CalendarClock} action={<button onClick={onClose} className="rounded-lg p-1 text-muted hover:text-ink"><X size={15} /></button>}>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -755,44 +768,44 @@ function ShiftForm({ team, weekday, onAdd, onClose }: { team: ReturnType<typeof 
         }}
       >
         <label className="block text-xs text-muted">
-          Integrante
+          Member
           <select value={member} onChange={(e) => (setMember(e.target.value), setSaved(false))} className={field}>
             {team.members.map((m) => <option key={m} value={m} className="bg-panel-solid">{m}</option>)}
           </select>
         </label>
         <label className="block text-xs text-muted">
-          Día
+          Day
           <select value={day} onChange={(e) => (setDay(Number(e.target.value)), setSaved(false))} className={field}>
             {WEEKDAYS.map((d, i) => <option key={d} value={i} className="bg-panel-solid">{d}</option>)}
           </select>
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-xs text-muted">
-            Inicio
+            Start
             <input type="time" value={start} onChange={(e) => (setStart(e.target.value), setSaved(false))} className={field} />
           </label>
           <label className="block text-xs text-muted">
-            Fin
+            End
             <input type="time" value={end} onChange={(e) => (setEnd(e.target.value), setSaved(false))} className={field} />
           </label>
         </div>
         <label className="block text-xs text-muted">
-          Disponibilidad
+          Availability
           <select value={availability} onChange={(e) => setAvailability(e.target.value as Shift["availability"])} className={field}>
             {(Object.keys(AVAIL_LABEL) as Shift["availability"][]).map((k) => <option key={k} value={k} className="bg-panel-solid">{AVAIL_LABEL[k]}</option>)}
           </select>
         </label>
         <div className="flex items-center justify-between">
-          {saved ? <span className="text-xs text-ok">Turno guardado.</span> : <span />}
-          <Button type="submit" variant="primary" size="sm" disabled={!member || start >= end}>Guardar turno</Button>
+          {saved ? <span className="text-xs text-ok">Shift saved.</span> : <span />}
+          <Button type="submit" variant="primary" size="sm" disabled={!member || start >= end}>Save shift</Button>
         </div>
-        {start >= end && <p className="text-[11px] text-danger">La hora de fin debe ser posterior al inicio.</p>}
+        {start >= end && <p className="text-[11px] text-danger">End time must be after start time.</p>}
       </form>
     </Card>
   );
 }
 
-/* ───────────── Personal ───────────── */
+/* ───────────── Staff ───────────── */
 
 function StaffTab({ teamId }: { teamId: string }) {
   const { dataset, shifts, teamLog, updateTeam, now } = useDemo();
@@ -810,10 +823,10 @@ function StaffTab({ teamId }: { teamId: string }) {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] text-muted">
-                <th className="px-4 py-2.5 font-medium">Nombre</th>
-                <th className="px-2 py-2.5 font-medium">Rol</th>
-                <th className="px-2 py-2.5 font-medium">Asignación</th>
-                <th className="px-2 py-2.5 font-medium">Turno configurado</th>
+                <th className="px-4 py-2.5 font-medium">Name</th>
+                <th className="px-2 py-2.5 font-medium">Role</th>
+                <th className="px-2 py-2.5 font-medium">Assignment</th>
+                <th className="px-2 py-2.5 font-medium">Scheduled shift</th>
                 <th className="px-2 py-2.5" />
               </tr>
             </thead>
@@ -831,32 +844,32 @@ function StaffTab({ teamId }: { teamId: string }) {
                     </td>
                     <td className="px-2 py-2">
                       {isLead ? (
-                        <Badge tone="accent">Responsable</Badge>
+                        <Badge tone="accent">Team lead</Badge>
                       ) : can ? (
                         <input
                           defaultValue={team.roles?.[m] ?? ""}
-                          placeholder="Sin rol registrado"
+                          placeholder="No role on record"
                           onBlur={(e) => e.target.value.trim() !== (team.roles?.[m] ?? "") && updateTeam(teamId, { roles: { ...team.roles, [m]: e.target.value.trim() } })}
                           className="h-8 w-44 rounded-lg border border-line bg-ink/[0.05] px-2 text-xs outline-none placeholder:text-faint focus:border-accent/60"
                         />
                       ) : (
-                        <span className="text-xs text-muted">{team.roles?.[m] || "Sin rol registrado"}</span>
+                        <span className="text-xs text-muted">{team.roles?.[m] || "No role on record"}</span>
                       )}
                     </td>
-                    <td className="px-2 py-2"><Badge tone="ok">Activo en el equipo</Badge></td>
+                    <td className="px-2 py-2"><Badge tone="ok">Active on team</Badge></td>
                     <td className="px-2 py-2 text-xs text-muted">
-                      {myShifts.length ? myShifts.map((s) => `${WEEKDAYS[s.weekday].slice(0, 3)} ${s.start}–${s.end}`).join(" · ") : <span className="text-faint">Sin turno configurado</span>}
+                      {myShifts.length ? myShifts.map((s) => `${WEEKDAYS[s.weekday].slice(0, 3)} ${s.start}–${s.end}`).join(" · ") : <span className="text-faint">No shift set up</span>}
                     </td>
                     <td className="px-2 py-2 text-right">
                       {can && !isLead &&
                         (removing === m ? (
                           <span className="inline-flex items-center gap-1.5 text-xs">
-                            ¿Retirar?
-                            <Button size="sm" variant="danger" onClick={() => (updateTeam(teamId, { members: team.members.filter((x) => x !== m) }), setRemoving(null))}>Sí</Button>
+                            Remove?
+                            <Button size="sm" variant="danger" onClick={() => (updateTeam(teamId, { members: team.members.filter((x) => x !== m) }), setRemoving(null))}>Yes</Button>
                             <Button size="sm" variant="ghost" onClick={() => setRemoving(null)}>No</Button>
                           </span>
                         ) : (
-                          <button onClick={() => setRemoving(m)} className="rounded-lg p-1.5 text-faint hover:bg-ink/5 hover:text-danger" title="Retirar del equipo"><Trash2 size={14} /></button>
+                          <button onClick={() => setRemoving(m)} className="rounded-lg p-1.5 text-faint hover:bg-ink/5 hover:text-danger" title="Remove from team"><Trash2 size={14} /></button>
                         ))}
                     </td>
                   </tr>
@@ -878,23 +891,23 @@ function StaffTab({ teamId }: { teamId: string }) {
             }}
           >
             <label className="text-xs text-muted">
-              Nuevo integrante
-              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre y apellido" className="mt-1 block h-9 w-56 rounded-xl border border-line-strong bg-ink/[0.05] px-3 text-sm outline-none focus:border-accent/60" />
+              New member
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="First and last name" className="mt-1 block h-9 w-56 rounded-xl border border-line-strong bg-ink/[0.05] px-3 text-sm outline-none focus:border-accent/60" />
             </label>
             <label className="text-xs text-muted">
-              Rol
-              <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Opcional" className="mt-1 block h-9 w-44 rounded-xl border border-line-strong bg-ink/[0.05] px-3 text-sm outline-none focus:border-accent/60" />
+              Role
+              <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Optional" className="mt-1 block h-9 w-44 rounded-xl border border-line-strong bg-ink/[0.05] px-3 text-sm outline-none focus:border-accent/60" />
             </label>
             <Button type="submit" variant="primary" disabled={!newName.trim() || team.members.includes(newName.trim())}>
-              <UserPlus size={14} /> Agregar
+              <UserPlus size={14} /> Add
             </Button>
-            <span className="text-[11px] text-faint">El responsable se cambia desde «Editar equipo».</span>
+            <span className="text-[11px] text-faint">The team lead is changed from “Edit team”.</span>
           </form>
         )}
       </section>
-      <Card title="Historial del equipo" icon={History} subtitle="Cambios de composición, roles, estado y turnos">
+      <Card title="Team history" icon={History} subtitle="Changes to members, roles, status and shifts">
         {history.length === 0 ? (
-          <p className="py-3 text-xs text-muted">Sin cambios registrados en la demo.</p>
+          <p className="py-3 text-xs text-muted">No changes recorded in the demo.</p>
         ) : (
           <ol className="scroll-thin max-h-[420px] space-y-2.5 overflow-y-auto pr-1">
             {history.map((h) => (
@@ -910,7 +923,7 @@ function StaffTab({ teamId }: { teamId: string }) {
   );
 }
 
-/* ───────────── auxiliares ───────────── */
+/* ───────────── helpers ───────────── */
 
 function Kpi({ icon: Icon, color, value, label, sub }: { icon: typeof Users; color: string; value: string; label: string; sub?: string }) {
   return (

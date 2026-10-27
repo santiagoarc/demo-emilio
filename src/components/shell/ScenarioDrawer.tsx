@@ -11,7 +11,7 @@ import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 
 export function ScenarioDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Drawer open={open} onClose={onClose} title="Escenario de demostración" width={460}>
+    <Drawer open={open} onClose={onClose} title="Demo scenario" width={460}>
       {open && <ScenarioForm onDone={onClose} />}
     </Drawer>
   );
@@ -32,19 +32,19 @@ function ScenarioForm({ onDone }: { onDone: () => void }) {
   return (
     <div className="space-y-6 p-5">
       <p className="text-xs leading-relaxed text-muted">
-        Todos los datos de esta demo son ficticios. El número de ejemplares por especie es un supuesto de presentación y no
-        representa el inventario real. Cambiarlo regenera el escenario completo.
+        All data in this demo is fictional. The number of penguins per species is a presentation assumption and does not
+        reflect the actual collection. Changing it regenerates the whole scenario.
       </p>
 
       <div>
-        <p className="eyebrow mb-3">Ejemplares por especie</p>
+        <p className="eyebrow mb-3">Penguins per species</p>
         <div className="space-y-2">
           {SPECIES.map((s) => (
             <label key={s.id} className="flex items-center gap-3 rounded-xl border border-line px-3 py-2">
               <PenguinIllustration speciesId={s.id} size={32} />
               <span className="flex-1 text-sm">
-                {s.nameEs}
-                <span className="block text-[11px] text-faint">{s.nameEn}</span>
+                {s.nameEn}
+                <span className="block text-[11px] italic text-faint">{s.scientific}</span>
               </span>
               <input
                 type="number"
@@ -65,8 +65,8 @@ function ScenarioForm({ onDone }: { onDone: () => void }) {
 
       <label className="flex items-center justify-between gap-3 text-sm">
         <span>
-          Semilla
-          <span className="block text-[11px] text-faint">Misma semilla, mismo escenario.</span>
+          Seed
+          <span className="block text-[11px] text-faint">Same seed, same scenario.</span>
         </span>
         <input
           type="number"
@@ -78,23 +78,23 @@ function ScenarioForm({ onDone }: { onDone: () => void }) {
 
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" onClick={() => apply({ ...config, seed, speciesCounts: counts })} disabled={total === 0}>
-          Aplicar y regenerar
+          Apply and regenerate
         </Button>
       </div>
 
       <div className="border-t border-line pt-5">
-        <p className="eyebrow mb-2">Reiniciar</p>
-        <p className="mb-3 text-xs text-muted">Descarta reasignaciones, observaciones y cambios de equipos, y vuelve al escenario inicial.</p>
+        <p className="eyebrow mb-2">Reset</p>
+        <p className="mb-3 text-xs text-muted">Discards reassignments, observations and team changes, and returns to the initial scenario.</p>
         {confirm ? (
           <div className="flex gap-2">
             <Button variant="danger" onClick={() => apply(DEFAULT_CONFIG)}>
-              <RotateCcw size={14} /> Confirmar reinicio
+              <RotateCcw size={14} /> Confirm reset
             </Button>
-            <Button variant="ghost" onClick={() => setConfirm(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button>
           </div>
         ) : (
           <Button variant="outline" onClick={() => setConfirm(true)}>
-            <RotateCcw size={14} /> Reiniciar datos de demostración
+            <RotateCcw size={14} /> Reset demo data
           </Button>
         )}
       </div>

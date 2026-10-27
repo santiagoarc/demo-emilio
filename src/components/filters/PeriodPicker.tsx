@@ -6,20 +6,20 @@ import { useDemo } from "@/state/DemoProvider";
 import { cx } from "@/components/ui/primitives";
 
 const OPTIONS: { value: RangePreset | "30d"; label: string }[] = [
-  { value: "today", label: "Hoy" },
+  { value: "today", label: "Today" },
   { value: "24h", label: "24 h" },
-  { value: "7d", label: "7 días" },
-  { value: "14d", label: "14 días" },
-  { value: "30d", label: "30 días" },
+  { value: "7d", label: "7 days" },
+  { value: "14d", label: "14 days" },
+  { value: "30d", label: "30 days" },
 ];
 
-/** Consulta de un día concreto (periodo personalizado de un solo día). */
+/** Look up a specific day (a custom one-day period). */
 export function DayPicker() {
   const { filters, setFilters, dataset, now } = useDemo();
   const single = filters.range === "custom" && filters.customFrom && filters.customFrom === filters.customTo ? filters.customFrom : "";
   return (
-    <label className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-line bg-ink/[0.05] px-2.5 text-xs text-muted" title="Consultar un día concreto">
-      Fecha
+    <label className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-line bg-ink/[0.05] px-2.5 text-xs text-muted" title="Look up a specific day">
+      Date
       <input
         type="date"
         value={single}
@@ -33,8 +33,8 @@ export function DayPicker() {
 }
 
 /**
- * Periodo de consulta compartido por toda la plataforma (el filtro global).
- * Los periodos que superan la historia disponible se muestran deshabilitados.
+ * Query period shared across the whole platform (the global filter).
+ * Periods longer than the available history are shown disabled.
  */
 export function PeriodPicker() {
   const { filters, setFilters, config } = useDemo();
@@ -48,7 +48,7 @@ export function PeriodPicker() {
           <button
             key={o.value}
             disabled={unavailable}
-            title={unavailable ? `El escenario guarda ${config.historyDays} días de lecturas` : undefined}
+            title={unavailable ? `This scenario keeps ${config.historyDays} days of readings` : undefined}
             onClick={() => o.value !== "30d" && setFilters({ range: o.value })}
             className={cx(
               "h-7 rounded-[10px] px-2.5 text-xs font-medium transition",

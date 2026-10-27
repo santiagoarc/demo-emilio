@@ -2,11 +2,12 @@ import type { DemoConfig } from "@/config/demo.config";
 import type { CareNote, CareTeam, HealthCase, Incident, Shift } from "@/domain/types";
 import type { Filters } from "@/logic/filters";
 
-const KEY = "penguin-demo/v1";
+// v2: the UI moved to English; older saves held Spanish seed cases and log text.
+const KEY = "penguin-demo/v2";
 
 /**
- * Lo único que se guarda en el navegador: las decisiones del usuario.
- * Las lecturas no se guardan; se regeneran desde la semilla.
+ * The only thing stored in the browser: the user's decisions.
+ * Readings are not stored; they are regenerated from the seed.
  */
 export interface PersistedState {
   v: 1;
@@ -14,14 +15,14 @@ export interface PersistedState {
   config: DemoConfig;
   assignments: Record<string, string>;
   log: Incident[];
-  /** Observaciones registradas en la demo (opcional: no existía en versiones anteriores). */
+  /** Observations logged in the demo (optional: absent in older versions). */
   userNotes?: CareNote[];
-  /** Equipos creados y editados en la demo, su historial y turnos (opcionales por compatibilidad). */
+  /** Teams created and edited in the demo, their history and shifts (optional for compatibility). */
   customTeams?: CareTeam[];
   teamEdits?: Record<string, Partial<CareTeam>>;
   teamLog?: { id: string; teamId: string; at: number; by: string; text: string }[];
   shifts?: Shift[];
-  /** Casos de seguimiento de salud (opcional por compatibilidad: si falta, se usan los del escenario). */
+  /** Health follow-up cases (optional for compatibility: if missing, the scenario's are used). */
   cases?: HealthCase[];
   filters: Filters;
 }
@@ -41,7 +42,7 @@ export function savePersisted(s: PersistedState) {
   try {
     window.localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
-    // Sin almacenamiento (modo privado, cuota): la demo sigue en memoria.
+    // No storage (private mode, quota): the demo keeps running in memory.
   }
 }
 
@@ -54,8 +55,8 @@ export function clearPersisted() {
 }
 
 /**
- * Corre en el tiempo todo lo guardado para que la sesión anterior quede igual
- * de "reciente" respecto al nuevo ahora del escenario.
+ * Shifts everything saved forward in time so the previous session stays just
+ * as "recent" relative to the scenario's new now.
  */
 export function shiftPersisted(s: PersistedState, delta: number): PersistedState {
   if (!delta) return s;

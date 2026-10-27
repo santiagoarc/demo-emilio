@@ -94,7 +94,7 @@ export function Chip({ active, color, children, onClick, onRemove, className }: 
       {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />}
       {children}
       {onRemove && (
-        <button onClick={(e) => (e.stopPropagation(), onRemove())} className="-mr-1 rounded-full p-0.5 hover:bg-ink/10" aria-label="Quitar">
+        <button onClick={(e) => (e.stopPropagation(), onRemove())} className="-mr-1 rounded-full p-0.5 hover:bg-ink/10" aria-label="Remove">
           <X size={12} />
         </button>
       )}
@@ -165,7 +165,7 @@ export function Stat({ label, value, hint, tone }: { label: string; value: React
 export function SimulatedTag({ className }: { className?: string }) {
   return (
     <span className={cx("inline-flex items-center gap-1 rounded-md border border-dashed border-line-strong px-1.5 py-px text-[10px] uppercase tracking-wider text-faint", className)}>
-      Simulado
+      Simulated
     </span>
   );
 }
@@ -178,7 +178,7 @@ export function Drawer({ open, onClose, children, width = 420, title }: { open: 
       <aside className="slide-in relative flex h-full flex-col border-l border-line bg-panel-solid shadow-2xl" style={{ width: `min(${width}px, 100vw)` }}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div className="text-sm font-semibold">{title}</div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Cerrar">
+          <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>

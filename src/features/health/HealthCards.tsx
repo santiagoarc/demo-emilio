@@ -10,12 +10,12 @@ import { Badge, Button, Select, cx } from "@/components/ui/primitives";
 import { askChat } from "@/features/chat/ask";
 
 export const REASON_LABEL: Record<HealthReason, string> = {
-  injury: "Lesión o cojera",
-  weight: "Peso",
-  molt: "Muda",
-  treatment: "Tratamiento",
-  behavior: "Comportamiento",
-  other: "Otro",
+  injury: "Injury or limp",
+  weight: "Weight",
+  molt: "Molt",
+  treatment: "Treatment",
+  behavior: "Behavior",
+  other: "Other",
 };
 
 export const LEVEL_TONE: Record<InsightLevel, "ok" | "warn" | "danger"> = { ok: "ok", watch: "warn", check: "danger" };
@@ -30,7 +30,7 @@ export function InsightBadge({ level }: { level: InsightLevel }) {
   );
 }
 
-/** "¿Cómo va?": veredicto, motivos en números y su agua/tierra contra la especie. */
+/** Activity check: verdict, reasons in numbers, and water/land time vs. the species. */
 export function InsightCard({ penguinId, compact }: { penguinId: string; compact?: boolean }) {
   const { insights, penguinById } = useDemo();
   const ins = insights.get(penguinId);
@@ -42,12 +42,12 @@ export function InsightCard({ penguinId, compact }: { penguinId: string; compact
       <div className="flex justify-between text-[11px] text-muted">
         <span>{label}</span>
         <span className="num">
-          <b className="font-semibold text-ink">{mine.toFixed(1)} h</b> · especie {species.toFixed(1)} h
+          <b className="font-semibold text-ink">{mine.toFixed(1)} h</b> · species {species.toFixed(1)} h
         </span>
       </div>
       <div className="relative h-2 rounded-full bg-ink/[0.06]">
         <div className="h-2 rounded-full" style={{ width: `${(mine / max) * 100}%`, background: color }} />
-        <div className="absolute -top-0.5 h-3 w-0.5 rounded bg-ink/60" style={{ left: `calc(${(species / max) * 100}% - 1px)` }} title="Promedio de la especie" />
+        <div className="absolute -top-0.5 h-3 w-0.5 rounded bg-ink/60" style={{ left: `calc(${(species / max) * 100}% - 1px)` }} title="Species average" />
       </div>
     </div>
   );
@@ -68,13 +68,14 @@ export function InsightCard({ penguinId, compact }: { penguinId: string; compact
       </ul>
       {!compact && (
         <div className="space-y-2.5 pt-1">
-          {bar("Agua · últimas 24 h", ins.water.mine, ins.water.species, "#2b7fd0")}
-          {bar("Tierra · últimas 24 h", ins.land.mine, ins.land.species, "#c7850c")}
-          <p className="text-[11px] text-faint">La rayita marca el promedio diario de su especie.</p>
+          {bar("Water · last 24 h", ins.water.mine, ins.water.species, "#2b7fd0")}
+          {bar("Land · last 24 h", ins.land.mine, ins.land.species, "#c7850c")}
+          <p className="text-[11px] text-faint">The tick marks the species&rsquo; daily average.</p>
         </div>
       )}
-      <Button size="sm" variant="outline" onClick={() => askChat(`Dame el reporte completo de ${p.id}: cómo va, qué cambió y qué conviene vigilar.`)}>
-        <MessageSquareText size={13} /> Pedir reporte completo
+      <p className="text-[11px] leading-snug text-faint">Inference from simulated activity data — not a clinical assessment.</p>
+      <Button size="sm" variant="outline" onClick={() => askChat(`Give me the full report on ${p.id}: how its activity looks, what changed and what's worth watching.`)}>
+        <MessageSquareText size={13} /> Ask for a full report
       </Button>
     </div>
   );
@@ -83,7 +84,7 @@ export function InsightCard({ penguinId, compact }: { penguinId: string; compact
 const lastWeight = (c: HealthCase) => c.entries.find((e) => e.weightKg !== undefined)?.weightKg;
 const firstWeight = (c: HealthCase) => [...c.entries].reverse().find((e) => e.weightKg !== undefined)?.weightKg;
 
-/** Un caso con su bitácora; permite registrar avances y cerrarlo. */
+/** A case with its log; lets you record progress and close it. */
 export function CaseCard({ hc, showPenguin, expandedByDefault }: { hc: HealthCase; showPenguin?: React.ReactNode; expandedByDefault?: boolean }) {
   const { addCaseEntry, closeCase, now } = useDemo();
   const [text, setText] = useState("");
@@ -101,7 +102,7 @@ export function CaseCard({ hc, showPenguin, expandedByDefault }: { hc: HealthCas
     const t = text.trim();
     const kg = weight ? Number(weight) : undefined;
     if (closing) closeCase(hc.id, t);
-    else if (t || kg !== undefined) addCaseEntry(hc.id, t || "Pesaje registrado.", kg !== undefined && !Number.isNaN(kg) ? kg : undefined);
+    else if (t || kg !== undefined) addCaseEntry(hc.id, t || "Weigh-in recorded.", kg !== undefined && !Number.isNaN(kg) ? kg : undefined);
     setText("");
     setWeight("");
     setClosing(false);
@@ -114,10 +115,10 @@ export function CaseCard({ hc, showPenguin, expandedByDefault }: { hc: HealthCas
           {showPenguin}
           <p className="text-sm font-semibold text-ink">{hc.title}</p>
           <p className="mt-0.5 text-[11px] text-muted">
-            {REASON_LABEL[hc.reason]} · responsable {hc.owner} · {open ? `abierto hace ${days} ${days === 1 ? "día" : "días"}` : `cerrado ${fmtDateTime(hc.closedAt!, now)} (${days} días)`}
+            {REASON_LABEL[hc.reason]} · owner {hc.owner} · {open ? `opened ${days} ${days === 1 ? "day" : "days"} ago` : `closed ${fmtDateTime(hc.closedAt!, now)} (${days} ${days === 1 ? "day" : "days"})`}
           </p>
         </div>
-        <Badge tone={open ? "accent" : "neutral"}>{open ? "En seguimiento" : "Cerrado"}</Badge>
+        <Badge tone={open ? "accent" : "neutral"}>{open ? "Open" : "Closed"}</Badge>
       </div>
 
       {w1 !== undefined && (
@@ -126,7 +127,7 @@ export function CaseCard({ hc, showPenguin, expandedByDefault }: { hc: HealthCas
           {w0 !== undefined && w0 !== w1 && (
             <span className={cx("num", w1 > w0 ? "text-ok" : "text-warn")}>
               ({w1 > w0 ? "+" : ""}
-              {(w1 - w0).toFixed(2)} kg desde el inicio)
+              {(w1 - w0).toFixed(2)} kg since start)
             </span>
           )}
         </p>
@@ -145,7 +146,7 @@ export function CaseCard({ hc, showPenguin, expandedByDefault }: { hc: HealthCas
       </ol>
       {hc.entries.length > 3 && (
         <button onClick={() => setExpanded(!expanded)} className="mt-1 text-[11px] text-accent hover:underline">
-          {expanded ? "Ver menos" : `Ver las ${hc.entries.length} entradas`}
+          {expanded ? "Show less" : `Show all ${hc.entries.length} entries`}
         </button>
       )}
 
@@ -155,7 +156,7 @@ export function CaseCard({ hc, showPenguin, expandedByDefault }: { hc: HealthCas
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={2}
-            placeholder={closing ? "Cómo se resolvió (opcional)" : "Registrar avance: qué se observó, qué se hizo…"}
+            placeholder={closing ? "How it was resolved (optional)" : "Log progress: what was observed, what was done…"}
             className="w-full resize-none rounded-lg border border-line-strong bg-panel-solid px-2.5 py-2 text-xs text-ink outline-none placeholder:text-faint focus:border-accent"
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -173,20 +174,20 @@ export function CaseCard({ hc, showPenguin, expandedByDefault }: { hc: HealthCas
             )}
             <span className="flex-1" />
             <Button type="button" size="sm" variant="ghost" onClick={() => setClosing(!closing)}>
-              {closing ? "Cancelar" : "Cerrar caso"}
+              {closing ? "Cancel" : "Close case"}
             </Button>
             <Button type="submit" size="sm" variant="primary" disabled={!closing && !text.trim() && !weight}>
-              {closing ? "Confirmar cierre" : "Registrar"}
+              {closing ? "Confirm close" : "Log entry"}
             </Button>
           </div>
         </form>
       )}
-      <p className="mt-2 text-[10px] text-faint">Actualizado {fmtAgo(hc.entries[0]?.at ?? hc.openedAt, now)}</p>
+      <p className="mt-2 text-[10px] text-faint">Updated {fmtAgo(hc.entries[0]?.at ?? hc.openedAt, now)}</p>
     </div>
   );
 }
 
-/** Formulario para poner a un pingüino en seguimiento. */
+/** Form to start a health follow-up for a penguin. */
 export function NewCaseForm({ penguinId, onDone }: { penguinId?: string; onDone: (caseId?: string) => void }) {
   const { dataset, openCase, teamOf } = useDemo();
   const [pid, setPid] = useState(penguinId ?? "");
@@ -208,8 +209,8 @@ export function NewCaseForm({ penguinId, onDone }: { penguinId?: string; onDone:
       penguinId: pid,
       reason,
       title: title.trim(),
-      owner: owner || team?.lead || "Equipo de cuidado",
-      text: text.trim() || "Caso abierto.",
+      owner: owner || team?.lead || "Care team",
+      text: text.trim() || "Case opened.",
       weightKg: kg !== undefined && !Number.isNaN(kg) ? kg : undefined,
     });
     onDone(id);
@@ -218,13 +219,13 @@ export function NewCaseForm({ penguinId, onDone }: { penguinId?: string; onDone:
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-accent/40 bg-accent/[0.04] p-4">
       <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-        <HeartPulse size={15} className="text-accent" /> Nuevo seguimiento de salud
+        <HeartPulse size={15} className="text-accent" /> New health follow-up
       </p>
       {!penguinId && (
         <label className="block text-[11px] text-muted">
-          Pingüino
+          Penguin
           <Select value={pid} onChange={(e) => setPid(e.target.value)} className={cx(field, "mt-1 h-9")}>
-            <option value="">Elige un ejemplar…</option>
+            <option value="">Choose a penguin…</option>
             {dataset.penguins.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.id}
@@ -236,7 +237,7 @@ export function NewCaseForm({ penguinId, onDone }: { penguinId?: string; onDone:
       )}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-[11px] text-muted">
-          Motivo
+          Reason
           <Select value={reason} onChange={(e) => setReason(e.target.value as HealthReason)} className={cx(field, "mt-1 h-9")}>
             {(Object.keys(REASON_LABEL) as HealthReason[]).map((r) => (
               <option key={r} value={r}>
@@ -246,9 +247,9 @@ export function NewCaseForm({ penguinId, onDone }: { penguinId?: string; onDone:
           </Select>
         </label>
         <label className="block text-[11px] text-muted">
-          Responsable
+          Owner
           <Select value={owner} onChange={(e) => setOwner(e.target.value)} className={cx(field, "mt-1 h-9")}>
-            <option value="">{team?.lead ? `${team.lead} (líder del equipo)` : "Equipo de cuidado"}</option>
+            <option value="">{team?.lead ? `${team.lead} (team lead)` : "Care team"}</option>
             {owners.map((m) => (
               <option key={m} value={m}>
                 {m}
@@ -258,31 +259,31 @@ export function NewCaseForm({ penguinId, onDone }: { penguinId?: string; onDone:
         </label>
       </div>
       <label className="block text-[11px] text-muted">
-        Qué se está siguiendo
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej. Cojera en pata derecha" className={cx(field, "mt-1 h-9")} />
+        What is being followed
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Limp, right foot" className={cx(field, "mt-1 h-9")} />
       </label>
       <label className="block text-[11px] text-muted">
-        Primera observación
+        First observation
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} className={cx(field, "mt-1 resize-none py-2")} />
       </label>
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5 text-[11px] text-muted">
-          <Scale size={12} /> Peso
+          <Scale size={12} /> Weight
           <input value={weight} onChange={(e) => setWeight(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="kg" className="h-8 w-20 rounded-md border border-line-strong bg-panel-solid px-2 text-xs text-ink outline-none focus:border-accent" />
         </label>
         <span className="flex-1" />
         <Button type="button" size="sm" variant="ghost" onClick={() => onDone()}>
-          Cancelar
+          Cancel
         </Button>
         <Button type="submit" size="sm" variant="primary" disabled={!pid || !title.trim()}>
-          <Plus size={13} /> Abrir seguimiento
+          <Plus size={13} /> Open follow-up
         </Button>
       </div>
     </form>
   );
 }
 
-/** Bloque de salud de una ficha: cómo va y sus casos de seguimiento. */
+/** Health block on a profile: activity check and follow-up cases. */
 export function PenguinHealth({ penguinId }: { penguinId: string }) {
   const { cases } = useDemo();
   const [adding, setAdding] = useState(false);
@@ -290,20 +291,20 @@ export function PenguinHealth({ penguinId }: { penguinId: string }) {
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <div>
-        <p className="eyebrow mb-3">¿Cómo va?</p>
+        <p className="eyebrow mb-3">Activity check</p>
         <InsightCard penguinId={penguinId} />
       </div>
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="eyebrow">Seguimiento de salud</p>
+          <p className="eyebrow">Health follow-ups</p>
           {!adding && (
             <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
-              <Plus size={13} /> Abrir seguimiento
+              <Plus size={13} /> Open follow-up
             </Button>
           )}
         </div>
         {adding && <NewCaseForm penguinId={penguinId} onDone={() => setAdding(false)} />}
-        {!mine.length && !adding && <p className="rounded-xl border border-dashed border-line-strong px-4 py-6 text-center text-xs text-muted">Sin casos de seguimiento. Ábrelo si el equipo necesita vigilar algo en particular.</p>}
+        {!mine.length && !adding && <p className="rounded-xl border border-dashed border-line-strong px-4 py-6 text-center text-xs text-muted">No follow-ups. Open one if the team needs to keep an eye on something specific.</p>}
         {mine.map((c) => (
           <CaseCard key={c.id} hc={c} />
         ))}

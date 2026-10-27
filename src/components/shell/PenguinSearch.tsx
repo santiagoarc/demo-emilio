@@ -57,12 +57,13 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
               if (e.key === "ArrowUp") setIdx((i) => Math.max(i - 1, 0));
               if (e.key === "Enter" && results[idx]) go(results[idx].id);
             }}
-            placeholder="ID, nombre, dispositivo, especie o equipo…"
+            placeholder="ID, name, tag, species or team…"
+            aria-label="Search penguins"
             className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
           />
         </div>
         <ul className="scroll-thin max-h-[50vh] overflow-y-auto p-1.5">
-          {results.length === 0 && <li className="px-3 py-6 text-center text-sm text-muted">Sin coincidencias.</li>}
+          {results.length === 0 && <li className="px-3 py-6 text-center text-sm text-muted">No matches.</li>}
           {results.map((p, i) => {
             const sp = SPECIES_BY_ID[p.speciesId];
             const snap = snapshots.get(p.id)!;
@@ -77,7 +78,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
                   <span className="num w-20 font-mono text-[13px]">{p.id}</span>
                   <span className="flex-1 truncate text-xs text-muted">
                     {p.name ? <span className="text-ink">{p.name} · </span> : null}
-                    {sp.nameEs} · {dataset.teams.find((t) => t.id === teamOf(p.id))?.name}
+                    {sp.nameEn} · {dataset.teams.find((t) => t.id === teamOf(p.id))?.name}
                   </span>
                   <StatusPill status={snap.status} compact />
                 </button>

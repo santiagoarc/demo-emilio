@@ -10,7 +10,7 @@ export function TeamReassign({ penguinId, compact }: { penguinId: string; compac
   const current = teamOf(penguinId);
   const [target, setTarget] = useState(current);
   const [done, setDone] = useState(false);
-  const team = dataset.teams.find((t) => t.id === current) ?? { name: "Sin asignar", color: "#56718a" };
+  const team = dataset.teams.find((t) => t.id === current) ?? { name: "Unassigned", color: "#56718a" };
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -27,12 +27,12 @@ export function TeamReassign({ penguinId, compact }: { penguinId: string; compac
           setDone(false);
         }}
         className="h-8 text-xs"
-        aria-label="Equipo"
+        aria-label="Team"
       >
         {dataset.teams.filter((t) => t.active !== false || t.id === current).map((t) => (
           <option key={t.id} value={t.id}>
             {t.name}
-            {t.id === current ? " (actual)" : ""}
+            {t.id === current ? " (current)" : ""}
           </option>
         ))}
       </Select>
@@ -45,11 +45,11 @@ export function TeamReassign({ penguinId, compact }: { penguinId: string; compac
             setDone(true);
           }}
         >
-          <ArrowRightLeft size={13} /> Reasignar
+          <ArrowRightLeft size={13} /> Reassign
         </Button>
       ) : done ? (
         <span className="inline-flex items-center gap-1 text-xs text-ok">
-          <Check size={13} /> Reasignado
+          <Check size={13} /> Reassigned
         </span>
       ) : null}
     </div>

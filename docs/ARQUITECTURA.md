@@ -94,3 +94,22 @@ Supuestos a validar con proveedores y en el hábitat real:
   posición.
 - Las compuertas RFID solo confirman el paso por un punto conocido.
 - Sin cámaras ni reconocimiento visual en esta fase.
+
+## Aviario (oct-2026)
+
+La interfaz pasó a inglés y se agregó el área del aviario. Las alertas y tareas
+operativas ya no existen; en su lugar hay **reglas propuestas**
+(`src/features/rules/`), ejemplos configurables que muestran a qué animales de
+la demo aplicarían, rotulados "Proposed · not active". Ninguna regla habla de
+fallas de dispositivo.
+
+| Capa | Archivo | Notas |
+| --- | --- | --- |
+| Dominio | `src/domain/aviary.ts` | `AviarySpecies` (estado de presencia, conteo confirmado `null` hasta que SeaWorld lo dé, `SourceRef` con fecha de publicación y de consulta), zonas ilustrativas, equipos ficticios, `Bird`, `BirdObservation`. |
+| Datos | `src/data/aviarySimulate.ts` | 500 registros que representan la estimación ≈500; avistamientos manuales a nivel zona. |
+| Lógica | `src/logic/aviary.ts` | Último avistamiento, días sin verlo, movimientos entre avistamientos consecutivos (el momento exacto se desconoce), conteos. |
+| Estado | `src/state/useAviary.ts` | Un dataset por "ahora" de la demo, compartido por todas las pantallas. |
+
+Para pasar a datos reales del aviario basta reemplazar `generateAviary` por una
+fuente que entregue `AviaryDataset` y llenar `confirmedCount`/`source` de cada
+especie con lo que envíe SeaWorld (`INVENTORY_REQUEST`).

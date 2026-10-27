@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * Gráficas propias en SVG/HTML. Reciben datos ya agregados; no calculan nada
- * por su cuenta, así siempre reflejan los filtros activos.
+ * In-house SVG/HTML charts. They receive pre-aggregated data and compute
+ * nothing themselves, so they always reflect the active filters.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "@/components/ui/primitives";
 
-/* ───────────── Tooltip flotante compartido ─────────────
- * Un solo cuadro para todas las gráficas: sigue al cursor, se coloca a un lado
- * (nunca encima de lo que se señala), cambia de lado cerca de los bordes y no
- * recibe el mouse, así no tapa ni bloquea otras tarjetas.
+/* ───────────── Shared floating tooltip ─────────────
+ * A single box for every chart: follows the cursor, sits to one side (never
+ * on top of what it points at), flips near the edges and ignores the mouse,
+ * so it never covers or blocks other cards.
  */
 export interface Tip {
   title: ReactNode;
@@ -28,7 +28,7 @@ export function hideTip() {
   setTipState?.(null);
 }
 
-/** Se monta una vez en la app (AppShell). */
+/** Mounted once in the app (AppShell). */
 export function ChartTipLayer() {
   const [state, setState] = useState<TipState>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -48,7 +48,7 @@ export function ChartTipLayer() {
     if (!state || !box.current) return;
     const { width, height } = box.current.getBoundingClientRect();
     const gap = 16;
-    // A la derecha del cursor; si no cabe, a la izquierda. Verticalmente centrado y dentro de la pantalla.
+    // Right of the cursor; if it doesn't fit, to the left. Vertically centered and kept on screen.
     const left = state.x + gap + width <= window.innerWidth - 8 ? state.x + gap : Math.max(8, state.x - gap - width);
     const top = Math.min(window.innerHeight - height - 8, Math.max(8, state.y - height / 2));
     setPos({ left, top });
@@ -100,7 +100,7 @@ export function Legend({ items, className }: { items: { color: string; label: st
   );
 }
 
-/** Barras horizontales con etiqueta. */
+/** Labeled horizontal bars. */
 export function BarList({ items, format = (v) => String(v), max, onSelect, selected }: {
   items: { key: string; label: ReactNode; value: number; color?: string; hint?: ReactNode }[];
   format?: (v: number) => string;
@@ -118,7 +118,7 @@ export function BarList({ items, format = (v) => String(v), max, onSelect, selec
             <button
               disabled={!onSelect}
               onClick={() => onSelect?.(i.key)}
-              onMouseMove={(e) => showTip(e, { title: i.label, rows: [{ color: i.color ?? "var(--accent)", label: "Valor", value: format(i.value) }], note: i.hint })}
+              onMouseMove={(e) => showTip(e, { title: i.label, rows: [{ color: i.color ?? "var(--accent)", label: "Value", value: format(i.value) }], note: i.hint })}
               onMouseLeave={hideTip}
               className={cx("group w-full text-left", onSelect && "cursor-pointer")}
             >
@@ -143,8 +143,8 @@ export function BarList({ items, format = (v) => String(v), max, onSelect, selec
   );
 }
 
-/** Barra apilada al 100%. */
-export function SplitBar({ parts, height = 10, className, title = "Distribución" }: { parts: { value: number; color: string; label: string }[]; height?: number; className?: string; title?: ReactNode }) {
+/** 100% stacked bar. */
+export function SplitBar({ parts, height = 10, className, title = "Breakdown" }: { parts: { value: number; color: string; label: string }[]; height?: number; className?: string; title?: ReactNode }) {
   const total = parts.reduce((a, p) => a + p.value, 0);
   const tip: Tip = { title, rows: parts.map((p) => ({ color: p.color, label: p.label, value: total ? `${Math.round((p.value / total) * 100)}%` : "—" })) };
   return (
@@ -206,7 +206,7 @@ export function Donut({ parts, size = 132, thickness = 14, center }: { parts: { 
   );
 }
 
-/** Columnas apiladas con tooltip, p. ej. actividad por hora. */
+/** Stacked columns with tooltip, e.g. activity by hour. */
 export function StackedColumns({ data, series, height = 180, labelEvery = 1, format = (v) => String(v), highlight }: {
   data: { label: string; values: Record<string, number>; tooltip?: string }[];
   series: { key: string; color: string; label: string }[];
@@ -264,7 +264,7 @@ export function StackedColumns({ data, series, height = 180, labelEvery = 1, for
   );
 }
 
-/** Líneas con área suave, eje Y propio y tooltip por punto. */
+/** Lines with a soft area fill, their own Y axis and a per-point tooltip. */
 export function LineChart({ data, series, height = 200, format = (v) => String(v), yMax }: {
   data: { label: string; values: Record<string, number | null> }[];
   series: { key: string; color: string; label: string; area?: boolean; dashed?: boolean }[];
@@ -342,7 +342,7 @@ export function LineChart({ data, series, height = 200, format = (v) => String(v
               onMouseMove={(e) =>
                 showTip(e, {
                   title: d.label,
-                  rows: series.map((s) => ({ color: s.color, label: s.label, value: d.values[s.key] == null ? "sin datos" : format(d.values[s.key]!) })),
+                  rows: series.map((s) => ({ color: s.color, label: s.label, value: d.values[s.key] == null ? "no data" : format(d.values[s.key]!) })),
                 })
               }
             />
@@ -366,7 +366,7 @@ export function LineChart({ data, series, height = 200, format = (v) => String(v
   );
 }
 
-/** Matriz origen → destino. */
+/** From → to matrix. */
 export function Matrix({ rows, cols, value, format = (v) => String(v), rowLabel, colLabel, colShort }: {
   rows: string[];
   cols: string[];
@@ -374,7 +374,7 @@ export function Matrix({ rows, cols, value, format = (v) => String(v), rowLabel,
   format?: (v: number) => string;
   rowLabel: (k: string) => ReactNode;
   colLabel: (k: string) => string;
-  /** Etiqueta corta de columna: la tabla ocupa el ancho disponible y el nombre completo queda en el título. */
+  /** Short column label: the table fills the available width and the full name goes in the tooltip. */
   colShort?: (k: string) => string;
 }) {
   const max = Math.max(1, ...rows.flatMap((r) => cols.map((c) => value(r, c))));
@@ -388,7 +388,7 @@ export function Matrix({ rows, cols, value, format = (v) => String(v), rowLabel,
         )}
         <thead>
           <tr>
-            <th className="text-left text-[10px] font-normal text-faint">desde ↓ / hacia →</th>
+            <th className="text-left text-[10px] font-normal text-faint">from ↓ / to →</th>
             {cols.map((c) =>
               colShort ? (
                 <th key={c} onMouseMove={(e) => showTip(e, { title: colLabel(c) })} onMouseLeave={hideTip} className="pb-1 text-center align-bottom text-[10px] font-medium text-muted">
@@ -415,7 +415,7 @@ export function Matrix({ rows, cols, value, format = (v) => String(v), rowLabel,
                   <td
                     key={c}
                     onMouseMove={(e) =>
-                      showTip(e, { title: <>{rowLabel(r)} → {colLabel(c)}</>, rows: [{ color: "rgba(47,216,200,0.8)", label: "Movimientos", value: r === c ? "—" : format(v) }] })
+                      showTip(e, { title: <>{rowLabel(r)} → {colLabel(c)}</>, rows: [{ color: "rgba(47,216,200,0.8)", label: "Moves", value: r === c ? "—" : format(v) }] })
                     }
                     onMouseLeave={hideTip}
                     className={cx("num h-8 rounded-md text-center text-[10px]", !colShort && "w-9")}
@@ -436,7 +436,7 @@ export function Matrix({ rows, cols, value, format = (v) => String(v), rowLabel,
   );
 }
 
-/** Mapa de calor día × hora. */
+/** Day × hour heatmap. */
 export function Heatmap({ rows, cols, value, color = "47,216,200", format = (v) => String(v), rowLabel, colLabel }: {
   rows: number[];
   cols: number[];
@@ -465,7 +465,7 @@ export function Heatmap({ rows, cols, value, color = "47,216,200", format = (v) 
               return (
                 <div
                   key={c}
-                  onMouseMove={(e) => showTip(e, { title: `${rowLabel(r)} · ${colLabel(c)}`, rows: [{ color: `rgb(${color})`, label: "Valor", value: v == null ? "sin datos" : format(v) }] })}
+                  onMouseMove={(e) => showTip(e, { title: `${rowLabel(r)} · ${colLabel(c)}`, rows: [{ color: `rgb(${color})`, label: "Value", value: v == null ? "no data" : format(v) }] })}
                   onMouseLeave={hideTip}
                   className="h-5 rounded-[4px]"
                   style={{

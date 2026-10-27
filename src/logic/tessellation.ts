@@ -1,9 +1,9 @@
 /**
- * Reparto del plano entre las zonas para dibujarlas unidas, sin huecos.
+ * Splits the plane among the zones so they are drawn edge to edge, with no gaps.
  *
- * Cada punto del recinto pertenece a la zona más cercana (con una ligera
- * ondulación para que los bordes se vean orgánicos). Es solo para el dibujo:
- * las lecturas siguen usando el polígono original de cada zona.
+ * Each point of the enclosure belongs to the nearest zone (with a slight
+ * wobble so borders look organic). Drawing only: readings still use each
+ * zone's original polygon.
  */
 import type { HabitatZone } from "@/domain/types";
 import { pointInPolygon, type Pt } from "./geometry";
@@ -26,15 +26,15 @@ function distToPolygon(x: number, y: number, poly: Pt[]): number {
   return Math.sqrt(best);
 }
 
-/** Ondulación suave y determinista, distinta para cada zona. */
+/** Smooth, deterministic wobble, different for each zone. */
 function wobble(x: number, y: number, k: number): number {
   return 22 * Math.sin(x * 0.011 + k * 1.7) * Math.cos(y * 0.014 + k * 0.9) + 9 * Math.sin((x - y) * 0.019 + k * 2.3);
 }
 
-/** Recorre el contorno de las celdas marcadas y devuelve el polígono exterior. */
+/** Walks the outline of the marked cells and returns the outer polygon. */
 function traceOutline(mask: Uint8Array, cols: number, rows: number, x0: number, y0: number): Pt[] {
   const at = (c: number, r: number) => c >= 0 && r >= 0 && c < cols && r < rows && mask[r * cols + c] === 1;
-  // Aristas dirigidas del borde (sentido horario), indexadas por su vértice de inicio.
+  // Directed border edges (clockwise), indexed by their start vertex.
   const next = new Map<number, number[]>();
   const key = (c: number, r: number) => r * (cols + 1) + c;
   const add = (a: number, b: number) => {
@@ -51,7 +51,7 @@ function traceOutline(mask: Uint8Array, cols: number, rows: number, x0: number, 
       if (!at(c - 1, r)) add(key(c, r + 1), key(c, r));
     }
   }
-  // Se queda con el lazo más largo (el contorno exterior).
+  // Keep the longest loop (the outer outline).
   let best: number[] = [];
   while (next.size) {
     const start = next.keys().next().value as number;
@@ -72,9 +72,9 @@ function traceOutline(mask: Uint8Array, cols: number, rows: number, x0: number, 
 }
 
 /**
- * Suavizado local (promedio con los vecinos, varias pasadas). Al ser local y
- * simétrico, dos zonas que comparten borde obtienen la misma curva; los puntos
- * del marco exterior no se mueven para que el recinto quede lleno.
+ * Local smoothing (neighbor averaging, several passes). Because it is local and
+ * symmetric, two zones sharing a border get the same curve; points on the
+ * outer frame stay put so the enclosure remains filled.
  */
 function relax(pts: Pt[], iterations: number, bounds: { x: number; y: number; w: number; h: number }): Pt[] {
   const onFrame = (p: Pt) => p[0] <= bounds.x || p[1] <= bounds.y || p[0] >= bounds.x + bounds.w || p[1] >= bounds.y + bounds.h;
@@ -93,7 +93,7 @@ function relax(pts: Pt[], iterations: number, bounds: { x: number; y: number; w:
 
 const cache = new WeakMap<HabitatZone[], Map<string, string>>();
 
-/** Trazo SVG de la región de cada zona dentro del rectángulo dado. */
+/** SVG path of each zone's region within the given rectangle. */
 export function tessellateZones(zones: HabitatZone[], bounds: { x: number; y: number; w: number; h: number }): Map<string, string> {
   const hit = cache.get(zones);
   if (hit) return hit;

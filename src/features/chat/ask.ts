@@ -1,4 +1,4 @@
-/** Abre el chat de reportes con una pregunta ya escrita (desde una ficha, el mapa, etc.). */
+/** Opens the reports chat with a question already typed (from a profile, the map, etc.). */
 export const ASK_EVENT = "penguin-chat:ask";
 
 export function askChat(question: string) {

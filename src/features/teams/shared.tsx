@@ -18,7 +18,7 @@ export function initials(name: string) {
     .toUpperCase();
 }
 
-/** Iniciales de los integrantes (no hay fotografías del personal en la demo). */
+/** Member initials (the demo has no staff photos). */
 export function Avatars({ team, max = 4, size = 28 }: { team: CareTeam; max?: number; size?: number }) {
   const shown = team.members.slice(0, max);
   const rest = team.members.length - shown.length;
@@ -48,7 +48,7 @@ export function ActiveBadge({ team }: { team: CareTeam }) {
   return (
     <span className={cx("inline-flex items-center gap-1.5 text-xs font-medium", on ? "text-ok" : "text-faint")}>
       <span className={cx("h-2 w-2 rounded-full", on ? "bg-ok" : "bg-faint")} />
-      {on ? "Activo" : "Inactivo"}
+      {on ? "Active" : "Inactive"}
     </span>
   );
 }
@@ -60,7 +60,7 @@ export interface TeamStats {
   zones: [string, number][];
 }
 
-/** Indicadores de cada equipo, calculados desde la asignación vigente (un equipo por ejemplar). */
+/** Per-team indicators, computed from the current assignment (one team per penguin). */
 export function useTeamStats(): TeamStats[] {
   const { dataset, teamOf, snapshots } = useDemo();
   return useMemo(
@@ -83,10 +83,10 @@ export function useTeamStats(): TeamStats[] {
   );
 }
 
-/** Formulario para crear o editar un equipo. La asignación de pingüinos se hace aparte. */
+/** Form to create or edit a team. Penguin assignment is done separately. */
 export function TeamFormDrawer({ open, onClose, team, onSaved }: { open: boolean; onClose: () => void; team?: CareTeam; onSaved?: (id: string) => void }) {
   return (
-    <Drawer open={open} onClose={onClose} width={520} title={team ? `Editar ${team.name}` : "Nuevo equipo"}>
+    <Drawer open={open} onClose={onClose} width={520} title={team ? `Edit ${team.name}` : "New team"}>
       {open && <TeamForm key={team?.id ?? "new"} team={team} onClose={onClose} onSaved={onSaved} />}
     </Drawer>
   );
@@ -104,7 +104,7 @@ function TeamForm({ team, onClose, onSaved }: { team?: CareTeam; onClose: () => 
   const duplicate = dataset.teams.some((t) => t.id !== team?.id && t.name.trim().toLowerCase() === name.trim().toLowerCase());
   const valid = name.trim() && lead.trim() && !duplicate;
 
-  if (!PERMISSIONS.manageTeams) return <p className="p-5 text-sm text-muted">Tu perfil no permite crear ni editar equipos.</p>;
+  if (!PERMISSIONS.manageTeams) return <p className="p-5 text-sm text-muted">Your role cannot create or edit teams.</p>;
 
   const save = () => {
     const input: TeamInput = {
@@ -134,24 +134,24 @@ function TeamForm({ team, onClose, onSaved }: { team?: CareTeam; onClose: () => 
       }}
     >
       <label className="block text-xs text-muted">
-        Nombre
+        Name
         <input value={name} onChange={(e) => setName(e.target.value)} className={field} placeholder="Team Delta" />
-        {duplicate && <span className="mt-1 block text-[11px] text-danger">Ya existe un equipo con ese nombre.</span>}
+        {duplicate && <span className="mt-1 block text-[11px] text-danger">A team with that name already exists.</span>}
       </label>
       <label className="block text-xs text-muted">
-        Descripción
-        <input value={focus} onChange={(e) => setFocus(e.target.value)} className={field} placeholder="Zona o enfoque del equipo" />
+        Description
+        <input value={focus} onChange={(e) => setFocus(e.target.value)} className={field} placeholder="The team's zone or focus" />
       </label>
       <label className="block text-xs text-muted">
-        Responsable
-        <input value={lead} onChange={(e) => setLead(e.target.value)} className={field} placeholder="Nombre y apellido" />
+        Team lead
+        <input value={lead} onChange={(e) => setLead(e.target.value)} className={field} placeholder="First and last name" />
       </label>
       <label className="block text-xs text-muted">
-        Integrantes <span className="text-faint">(uno por línea; el responsable se incluye solo)</span>
+        Members <span className="text-faint">(one per line; the lead is included automatically)</span>
         <textarea value={members} onChange={(e) => setMembers(e.target.value)} rows={4} className={cx(field, "resize-none")} />
       </label>
       <div>
-        <p className="text-xs text-muted">Zonas de responsabilidad</p>
+        <p className="text-xs text-muted">Zones of responsibility</p>
         <div className="mt-1.5 grid grid-cols-2 gap-1.5">
           {HABITAT.zones
             .filter((z) => z.kind !== "restricted")
@@ -169,7 +169,7 @@ function TeamForm({ team, onClose, onSaved }: { team?: CareTeam; onClose: () => 
         </div>
       </div>
       <div>
-        <p className="text-xs text-muted">Estado</p>
+        <p className="text-xs text-muted">Status</p>
         <div className="mt-1.5 flex gap-2">
           {[true, false].map((v) => (
             <button
@@ -178,22 +178,22 @@ function TeamForm({ team, onClose, onSaved }: { team?: CareTeam; onClose: () => 
               onClick={() => setActive(v)}
               className={cx("h-8 rounded-xl border px-3 text-xs", active === v ? "border-accent/50 bg-accent/10 text-ink" : "border-line-strong text-muted")}
             >
-              {v ? "Activo" : "Inactivo"}
+              {v ? "Active" : "Inactive"}
             </button>
           ))}
         </div>
         {team && !active && assigned > 0 && (
           <p className="mt-2 rounded-lg border border-warn/30 bg-warn/10 px-2.5 py-2 text-[11px] text-warn">
-            Sus {assigned} pingüinos seguirán asignados a este equipo. Reasígnalos de forma explícita desde la pestaña Pingüinos si es necesario.
+            Its {assigned} {assigned === 1 ? "penguin stays" : "penguins stay"} assigned to this team. Reassign them explicitly from the Penguins tab if needed.
           </p>
         )}
       </div>
       <p className="text-[11px] text-faint">
-        {team ? "Los cambios quedan en el historial del equipo; no se borra nada." : "Los pingüinos se asignan después, desde el detalle del equipo, con una reasignación explícita."}
+        {team ? "Changes are kept in the team's history; nothing is deleted." : "Penguins are assigned afterwards, from the team detail, through an explicit reassignment."}
       </p>
       <div className="flex justify-end gap-2 border-t border-line pt-4">
-        <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" variant="primary" disabled={!valid}>{team ? "Guardar cambios" : "Crear equipo"}</Button>
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button type="submit" variant="primary" disabled={!valid}>{team ? "Save changes" : "Create team"}</Button>
       </div>
     </form>
   );

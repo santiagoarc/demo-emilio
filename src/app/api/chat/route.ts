@@ -1,32 +1,34 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 /**
- * Chat de reportes por pingüino. El navegador manda la conversación y los datos
- * simulados de la demo (la demo los genera allá); aquí solo se arma la llamada a
- * Claude y se regresa el texto conforme llega.
+ * Per-penguin reports chat. The browser sends the conversation and the demo's
+ * simulated data (the demo generates it client-side); this route only builds the
+ * Claude call and streams the text back as it arrives.
  *
- * La llave sale de ANTHROPIC_API_KEY en .env.local, que no se sube al repo.
+ * The key comes from ANTHROPIC_API_KEY in .env.local, which is not committed.
  */
 
 const MODEL = "claude-opus-5-5";
 const MAX_TURNS = 40;
-const MAX_TEXT = 200_000; // caracteres por mensaje; los datos de un pingüino rondan 10–20 mil
+const MAX_TEXT = 200_000; // characters per message; one penguin's data is around 10–20k
 
-const INSTRUCTIONS = `Eres el asistente de reportes del equipo de cuidado de pingüinos de SeaWorld Abu Dhabi (demo "Penguin Tracking & Care").
-Respondes en español, con el tono de un colega del equipo de cuidado: claro, concreto y sin relleno.
+const INSTRUCTIONS = `You are the reports assistant for the penguin care team at SeaWorld Abu Dhabi (demo "Penguin Tracking & Care").
+Always answer in English, in the tone of a colleague on the care team: clear, concrete and without filler.
 
-Qué haces:
-- Das reportes detallados de un pingüino a partir de sus datos: ubicación actual, tiempo en agua y en tierra, tiempo sin movimiento, horarios de actividad, zonas que frecuenta y cómo se mueve entre ellas, su "¿cómo va?", sus casos de seguimiento de salud, notas del equipo e incidentes.
-- Comparas contra el promedio de su especie cuando ayuda a entender si algo es normal o no, y lo dices con números.
-- Si te piden comparar ejemplares, o la colonia, usas la lista de la colonia.
+What you do:
+- Give detailed reports on a penguin from its data: current location, time in water and on land, time without movement, activity hours, the zones it frequents and how it moves between them, its "How is it doing?" indicator, its health follow-up cases, team notes and incidents.
+- Compare against its species average when that helps show whether something is normal or not, and say so with numbers.
+- If asked to compare birds, or about the colony, use the colony roster.
 
-Reglas:
-- Solo usas los datos que vienen en la conversación. Si algo no está en los datos, dilo; no lo inventes ni lo supongas como hecho.
-- Los datos son simulados (es una demo); no hace falta repetirlo en cada respuesta, pero no presentes nada como diagnóstico veterinario.
-- Los reportes son sobre el pingüino, no sobre el equipo de rastreo: no reportes fallas, batería ni conectividad de dispositivos, ni las sugieras como causa de nada.
-- "Sin movimiento registrado" significa lecturas repetidas en la misma posición; no implica que el pingüino esté inmóvil fuera de las lecturas.
-- Si la pregunta no deja claro de qué pingüino se habla y no hay uno en contexto, pregunta cuál (código como KNG-005 o su nombre).
-- Formato: títulos cortos y viñetas o tablas en Markdown cuando el reporte es largo; horas con una decimal (p. ej. 3.5 h); fechas y horas como vienen en los datos.`;
+Rules:
+- Only use the data provided in the conversation. If something is not in the data, say so; don't make it up or present an assumption as fact.
+- Clearly separate what the data shows (observed: readings, hours, zones, notes) from what you infer from it. Label inferences as such (e.g. "this may suggest…") and keep them modest.
+- Never diagnose disease, injuries, fights, egg-laying or heart issues, and don't present anything as a veterinary diagnosis. If a question needs that, say the tracking data can't answer it and name the data that would be needed instead (e.g. a keeper or vet exam, weight records, behavioral observation, nest checks, clinical tests).
+- The data is simulated (this is a demo); no need to repeat that in every answer.
+- Reports are about the penguin, not the tracking equipment: never report device failures, battery or connectivity, and never suggest them as the cause of anything.
+- "No movement recorded" means repeated readings at the same position; it does not imply the penguin is motionless between readings.
+- If the question doesn't make clear which penguin it's about and there is none in context, ask which one (a code like KNG-005 or its name).
+- Format: short headings and bullet points or Markdown tables when the report is long; hours with one decimal (e.g. 3.5 h); dates and times as they appear in the data.`;
 
 type ChatTurn = { role: "user" | "assistant"; content: string };
 
@@ -42,7 +44,7 @@ function parseBody(body: unknown): { colony: string; messages: ChatTurn[] } | nu
     if ((role !== "user" && role !== "assistant") || typeof content !== "string" || !content.trim() || content.length > MAX_TEXT) return null;
     clean.push({ role, content });
   }
-  // La API exige que la conversación empiece con el usuario y termine con su pregunta.
+  // The API requires the conversation to start with the user and end with their question.
   while (clean.length && clean[0].role !== "user") clean.shift();
   if (!clean.length || clean[clean.length - 1].role !== "user") return null;
   return { colony, messages: clean };
@@ -50,22 +52,22 @@ function parseBody(body: unknown): { colony: string; messages: ChatTurn[] } | nu
 
 export async function POST(request: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return Response.json({ error: "Falta ANTHROPIC_API_KEY en .env.local. Agrégala y reinicia el servidor." }, { status: 503 });
+    return Response.json({ error: "ANTHROPIC_API_KEY is missing from .env.local. Add it and restart the server." }, { status: 503 });
   }
   const parsed = parseBody(await request.json().catch(() => null));
-  if (!parsed) return Response.json({ error: "Solicitud inválida." }, { status: 400 });
+  if (!parsed) return Response.json({ error: "Invalid request." }, { status: 400 });
 
   const client = new Anthropic();
   const stream = client.beta.messages.stream({
     model: MODEL,
     max_tokens: 16000,
     output_config: { effort: "medium" },
-    // Si un clasificador de seguridad rechaza la pregunta, el servidor la reintenta con el modelo recomendado.
+    // If a safety classifier declines the question, the server retries it with the recommended model.
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: [
       { type: "text", text: INSTRUCTIONS },
-      { type: "text", text: `Lista de la colonia (estado al corte de lecturas):\n${parsed.colony}`, cache_control: { type: "ephemeral" } },
+      { type: "text", text: `Colony roster (status as of the latest readings):\n${parsed.colony}`, cache_control: { type: "ephemeral" } },
     ],
     messages: parsed.messages,
   });
@@ -81,19 +83,19 @@ export async function POST(request: Request) {
         }
         const final = await stream.finalMessage();
         if (final.stop_reason === "refusal") {
-          controller.enqueue(encoder.encode("\n\n_No pude responder esa pregunta. Intenta formularla de otra manera._"));
+          controller.enqueue(encoder.encode("\n\n_I couldn't answer that question. Try phrasing it another way._"));
         } else if (final.stop_reason === "max_tokens") {
-          controller.enqueue(encoder.encode("\n\n_La respuesta se cortó por largo. Pide una parte más específica._"));
+          controller.enqueue(encoder.encode("\n\n_The answer was cut off for length. Ask for a more specific part._"));
         }
       } catch (error) {
         const msg =
           error instanceof Anthropic.AuthenticationError
-            ? "La llave de la API no es válida."
+            ? "The API key is not valid."
             : error instanceof Anthropic.RateLimitError
-              ? "Se alcanzó el límite de uso de la API; intenta en un momento."
+              ? "The API usage limit was reached; try again in a moment."
               : error instanceof Anthropic.APIError
-                ? `Error de la API (${error.status ?? "sin código"}).`
-                : "No se pudo conectar con Claude.";
+                ? `API error (${error.status ?? "no code"}).`
+                : "Could not connect to Claude.";
         console.error("[chat]", error);
         controller.enqueue(encoder.encode(`\n\n_${msg}_`));
       } finally {

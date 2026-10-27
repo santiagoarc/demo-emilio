@@ -1,6 +1,6 @@
 import type { CareTeam, SpeciesId } from "./types";
 
-/** Equipos ficticios. Nombres y personas son de demostración. */
+/** Fictional teams. Names and people are for demonstration only. */
 export const TEAMS: CareTeam[] = [
   {
     id: "alpha",
@@ -9,7 +9,7 @@ export const TEAMS: CareTeam[] = [
     members: ["Lucía Ferrer", "Diego Salas", "Ana Robles", "Marco Ibarra"],
     zoneIds: ["snow-beach", "ice-ridge"],
     color: "#38BDF8",
-    focus: "Pingüinos rey en la playa de nieve y la cresta de hielo",
+    focus: "King penguins on Snow Beach and Ice Ridge",
   },
   {
     id: "bravo",
@@ -18,7 +18,7 @@ export const TEAMS: CareTeam[] = [
     members: ["Tomás Herrera", "Sofía Lara", "Iván Medina", "Paula Núñez"],
     zoneIds: ["nesting-rocks", "observation-ledge"],
     color: "#F59E0B",
-    focus: "Saltarrocas en la zona rocosa y el mirador",
+    focus: "Rockhoppers on the Nesting Rocks and Observation Ledge",
   },
   {
     id: "charlie",
@@ -27,7 +27,7 @@ export const TEAMS: CareTeam[] = [
     members: ["Renata Campos", "Julián Vega", "Carla Ríos", "Nora Paz"],
     zoneIds: ["main-pool", "pebble-beach"],
     color: "#A78BFA",
-    focus: "Barbijos en la piscina principal y la playa de grava",
+    focus: "Chinstraps in the Main Pool and on Pebble Beach",
   },
   {
     id: "delta",
@@ -36,7 +36,7 @@ export const TEAMS: CareTeam[] = [
     members: ["Emilio Soto", "Mariana Olvera", "Hugo Peña"],
     zoneIds: ["wading-shore", "feeding-north"],
     color: "#FB7185",
-    focus: "Papúas en la orilla y la estación de alimentación norte",
+    focus: "Gentoos at the Wading Shore and Feeding Station North",
   },
   {
     id: "echo",
@@ -45,7 +45,7 @@ export const TEAMS: CareTeam[] = [
     members: ["Fernanda Quiroz", "Rodrigo Aguilar", "Lía Montes"],
     zoneIds: ["deep-dive"],
     color: "#84CC16",
-    focus: "Macaroni en la piscina profunda",
+    focus: "Macaronis in the Deep Dive Pool",
   },
   {
     id: "foxtrot",
@@ -54,20 +54,20 @@ export const TEAMS: CareTeam[] = [
     members: ["Gabriel Ortega", "Daniela Fuentes", "Samuel Rivas"],
     zoneIds: ["feeding-south"],
     color: "#6366F1",
-    focus: "Pingüinos de Adelia en la plataforma de alimentación sur",
+    focus: "Adélies at Feeding Platform South",
   },
   {
     id: "vet",
     name: "Veterinary Team",
-    lead: "Dra. Elena Brito",
-    members: ["Dra. Elena Brito", "Dr. Andrés Mora", "Valeria Cruz"],
+    lead: "Dr. Elena Brito",
+    members: ["Dr. Elena Brito", "Dr. Andrés Mora", "Valeria Cruz"],
     zoneIds: ["care-bay", "vet-holding"],
     color: "#2DD4BF",
-    focus: "Seguimiento de ejemplares en cuidado",
+    focus: "Follow-up of penguins under care",
   },
 ];
 
-/** Equipo por omisión de cada especie al generar el escenario. */
+/** Default team for each species when generating the scenario. */
 export const DEFAULT_TEAM_BY_SPECIES: Record<SpeciesId, string> = {
   king: "alpha",
   gentoo: "delta",

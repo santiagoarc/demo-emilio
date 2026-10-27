@@ -1,17 +1,17 @@
 /**
- * Generador del escenario simulado.
+ * Simulated scenario generator.
  *
- * Produce un Dataset completo y coherente a partir de una semilla y una hora de
- * referencia ("ahora"). Todo lo que sale de aquí es ficticio: las lecturas
- * llevan `simulated: true` y la interfaz lo indica.
+ * Produces a complete, consistent Dataset from a seed and a reference time
+ * ("now"). Everything produced here is fictional: readings carry
+ * `simulated: true` and the UI says so.
  *
- * Reglas de coherencia que respeta:
- * - IDs únicos por ejemplar y por dispositivo.
- * - Un ejemplar pertenece a exactamente un equipo.
- * - Las lecturas están en orden cronológico y nunca antes del alta.
- * - Bajo el agua no hay posición fina: la fuente es acústica y la precisión baja.
- * - La falta de lectura queda registrada como hueco con su causa
- *   (sin posición vs. sin comunicación); no se rellena interpolando.
+ * Consistency rules it follows:
+ * - Unique IDs per penguin and per device.
+ * - Each penguin belongs to exactly one team.
+ * - Readings are in chronological order and never before admission.
+ * - There is no fine position underwater: the source is acoustic and accuracy is lower.
+ * - Missing readings are recorded as a gap with its cause
+ *   (no fix vs. no signal); they are never filled in by interpolation.
  */
 import type { DemoConfig } from "@/config/demo.config";
 import { HABITAT, ZONE_BY_ID } from "@/domain/habitat";
@@ -54,27 +54,27 @@ const BEHAVIOR: Record<SpeciesId, Behavior> = {
 const BAND_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7", "#ec4899", "#f8fafc"];
 
 const NOTE_TEXTS = [
-  "Participó en la sesión de alimentación de la mañana.",
-  "Revisión visual de rutina registrada.",
-  "Pesaje programado completado.",
-  "Se verificó la sujeción del dispositivo.",
-  "Observado en interacción habitual con el grupo.",
-  "Cambio de banda de identificación registrado.",
-  "Participó en la sesión de alimentación de la tarde.",
-  "Entrenamiento de acercamiento a báscula completado.",
+  "Took part in the morning feeding session.",
+  "Routine visual check logged.",
+  "Scheduled weigh-in completed.",
+  "Tag attachment checked.",
+  "Seen interacting normally with the group.",
+  "ID band change logged.",
+  "Took part in the afternoon feeding session.",
+  "Scale-approach training session completed.",
 ];
 
-/** Nombres ficticios. Se reparten sin repetir dentro de cada especie. */
+/** Fictional names. Assigned without repeats within each species. */
 const PENGUIN_NAMES = [
-  "Aurora", "Atlas", "Nami", "Luna", "Kai", "Sol", "Mako", "Tara", "Nilo", "Brisa", "Coral", "Dante", "Elio", "Frida", "Gala", "Hielo",
-  "Iris", "Jade", "Koda", "Lumi", "Milo", "Nube", "Oslo", "Perla", "Quila", "Rocco", "Sami", "Tobi", "Umi", "Vega", "Wilo", "Yuki",
-  "Zafiro", "Alba", "Bruno", "Cielo", "Duna", "Eco", "Faro", "Gris", "Halo", "Indi", "Juno", "Kiwi", "Lago", "Mar", "Nieve", "Olas",
-  "Pipo", "Runa", "Sora", "Tundra", "Valo", "Ártico", "Bora", "Cora", "Delta", "Fiordo", "Glaciar", "Pingo",
+  "Aurora", "Atlas", "Nami", "Luna", "Kai", "Sol", "Mako", "Tara", "Nilo", "Breeze", "Coral", "Dante", "Elio", "Frida", "Gala", "Frost",
+  "Iris", "Jade", "Koda", "Lumi", "Milo", "Cloud", "Oslo", "Pearl", "Quila", "Rocco", "Sami", "Tobi", "Umi", "Vega", "Wilo", "Yuki",
+  "Sapphire", "Alba", "Bruno", "Sky", "Duna", "Eco", "Beacon", "Gris", "Halo", "Indi", "Juno", "Kiwi", "Lake", "Marina", "Snow", "Wave",
+  "Pipo", "Runa", "Sora", "Tundra", "Valo", "Arctic", "Bora", "Cora", "Delta", "Fjord", "Glacier", "Pingo",
 ];
 
 /**
- * Nombre de cada ejemplar. Usa su propio generador para no alterar las
- * lecturas ya generadas con la misma semilla; ~1 de cada 8 queda sin nombre.
+ * Name for each penguin. Uses its own generator so readings generated with
+ * the same seed don't change; ~1 in 8 stays unnamed.
  */
 function namesFor(seed: number, speciesId: string, count: number): (string | undefined)[] {
   const rng = mulberry32(hashSeed(seed, "names", speciesId));
@@ -139,7 +139,7 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
       const id = `${sp.code}-${String(i).padStart(3, "0")}`;
       const deviceId = `TAG-${sp.code[0]}${String(hashSeed(id) % 9000 + 1000)}`;
 
-      // Alta ficticia: la mayoría hace años, unos pocos recién dados de alta.
+      // Fictional admission date: most years ago, a few recently admitted.
       const recent = chance(rng, 0.04);
       const registeredAt = recent
         ? Math.floor((now - between(rng, 2, 9) * DAY) / slot) * slot
@@ -149,8 +149,8 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
       const teamId = isVet ? "vet" : DEFAULT_TEAM_BY_SPECIES[sp.id];
       if (isVet) vetPenguins.push(id);
 
-      // En la demo todos los dispositivos funcionan. Los sorteos se conservan para que
-      // el resto del escenario (nombres, trayectorias) no cambie.
+      // In the demo every device works. The random draws are kept so the rest
+      // of the scenario (names, trajectories) doesn't change.
       rng();
       const profile: DeviceProfile = "stable";
       between(rng, 7, 40);
@@ -179,7 +179,7 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
         batteryPct: Math.round(between(rng, 45, 98)),
       });
 
-      // --- Trayectoria simulada ---
+      // --- Simulated trajectory ---
       const list: LocationReading[] = [];
       let medium: "water" | "land" = "land";
       let zoneId = pick(rng, beh.land);
@@ -229,7 +229,7 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
           if (medium === "land" && prevZone === zoneId) stationary = chance(rng, 0.35);
         }
 
-        // El punto de descanso nocturno cambia de vez en cuando.
+        // The overnight resting spot changes now and then.
         if (!night && medium === "land" && ZONE_BY_ID[zoneId].kind === "land" && chance(rng, 0.03)) {
           restZone = zoneId;
           restPos = randomPointIn(rng, zoneId);
@@ -242,7 +242,7 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
           pos = jitterIn(rng, zoneId, pos, medium === "water" ? 90 : 30);
         }
 
-        // Cada intervalo tiene lectura: los dispositivos no fallan en la demo.
+        // Every interval has a reading: devices never fail in the demo.
         if (zoneId === "deep-dive") chance(rng, 0.1);
         chance(rng, 0.015);
 
@@ -285,15 +285,15 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
       gaps.set(id, []);
       activity.set(id, buildActivity(list, slot));
 
-      // --- Registros ficticios de cuidado ---
+      // --- Fictional care records ---
       const nNotes = 2 + Math.floor(rng() * 3);
       for (let k = 0; k < nNotes; k++) {
         const at = now - between(rng, 0.3, config.historyDays) * DAY;
         if (at < registeredAt) continue;
         notes.push({ id: `NOTE-${id}-${k}`, penguinId: id, at, by: pick(rng, TEAMS.find((t) => t.id === teamId)!.members), text: pick(rng, NOTE_TEXTS), simulated: true });
       }
-      incidents.push({ id: `INC-${id}-reg`, penguinId: id, at: registeredAt, kind: "registry", text: "Alta en el registro de la demo." });
-      incidents.push({ id: `INC-${id}-rev`, penguinId: id, at: lastReviewAt, kind: "care", text: "Revisión de rutina completada." });
+      incidents.push({ id: `INC-${id}-reg`, penguinId: id, at: registeredAt, kind: "registry", text: "Added to the demo registry." });
+      incidents.push({ id: `INC-${id}-rev`, penguinId: id, at: lastReviewAt, kind: "care", text: "Routine check completed." });
       if (!recent && chance(rng, 0.12)) between(rng, 20, 200);
     }
   }

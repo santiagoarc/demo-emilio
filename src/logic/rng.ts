@@ -1,4 +1,4 @@
-/** Generador pseudoaleatorio determinista: la misma semilla da el mismo escenario. */
+/** Deterministic pseudo-random generator: the same seed yields the same scenario. */
 export function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {

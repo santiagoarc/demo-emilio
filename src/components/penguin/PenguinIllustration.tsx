@@ -2,9 +2,9 @@ import type { SpeciesId } from "@/domain/types";
 import { SPECIES_BY_ID } from "@/domain/species";
 
 /**
- * Ilustración representativa por especie (no es una foto del ejemplar).
- * Rasgos de cada especie: parches del rey, banda blanca del papúa, crestas del
- * saltarrocas y macaroni, línea del barbijo y anillo ocular del Adelia.
+ * Representative illustration per species (not a photo of the individual).
+ * Species traits: king's ear patches, gentoo's white headband, rockhopper and
+ * macaroni crests, chinstrap's chin line and Adélie's eye ring.
  */
 export function PenguinIllustration({ speciesId, size = 96, framed = true }: { speciesId: SpeciesId; size?: number; framed?: boolean }) {
   const sp = SPECIES_BY_ID[speciesId];
@@ -14,7 +14,7 @@ export function PenguinIllustration({ speciesId, size = 96, framed = true }: { s
   const whiteFace = speciesId === "chinstrap";
 
   return (
-    <svg width={size} height={size} viewBox="0 0 120 120" role="img" aria-label={`Ilustración: ${sp.nameEs}`}>
+    <svg width={size} height={size} viewBox="0 0 120 120" role="img" aria-label={`Illustration: ${sp.nameEn}`}>
       <defs>
         <radialGradient id={`${id}-bg`} cx="50%" cy="35%" r="70%">
           <stop offset="0%" stopColor={sp.color} stopOpacity="0.35" />
@@ -29,17 +29,17 @@ export function PenguinIllustration({ speciesId, size = 96, framed = true }: { s
       {framed && <rect x="0" y="0" width="120" height="120" rx="28" fill={`url(#${id}-bg)`} />}
       {framed && <rect x="0.5" y="0.5" width="119" height="119" rx="27.5" fill="none" stroke={sp.color} strokeOpacity="0.25" />}
 
-      {/* pies */}
+      {/* feet */}
       <ellipse cx="50" cy="106" rx="9" ry="3.5" fill={speciesId === "gentoo" ? "#ff8a3d" : speciesId === "king" ? "#2b2b33" : "#f2a7a0"} />
       <ellipse cx="70" cy="106" rx="9" ry="3.5" fill={speciesId === "gentoo" ? "#ff8a3d" : speciesId === "king" ? "#2b2b33" : "#f2a7a0"} />
-      {/* cuerpo */}
+      {/* body */}
       <path d="M60 30 C 84 30 92 58 90 80 C 88 98 76 106 60 106 C 44 106 32 98 30 80 C 28 58 36 30 60 30 Z" fill={back} />
-      {/* aletas */}
+      {/* flippers */}
       <path d="M33 58 C 22 68 20 82 24 92 C 30 86 34 76 36 66 Z" fill={back} />
       <path d="M87 58 C 98 68 100 82 96 92 C 90 86 86 76 84 66 Z" fill={back} />
-      {/* vientre */}
+      {/* belly */}
       <path d="M60 46 C 76 46 82 64 81 80 C 80 96 72 102 60 102 C 48 102 40 96 39 80 C 38 64 44 46 60 46 Z" fill={`url(#${id}-belly)`} />
-      {/* cabeza */}
+      {/* head */}
       <circle cx="60" cy="34" r="20" fill={back} />
       {whiteFace && <path d="M43 36 C 44 26 52 22 60 22 C 68 22 76 26 77 36 C 76 48 68 54 60 54 C 52 54 44 48 43 36 Z" fill={belly} />}
       {whiteFace && <path d="M45 30 C 50 22 70 22 75 30 C 70 27 50 27 45 30 Z" fill={back} />}
@@ -65,7 +65,7 @@ export function PenguinIllustration({ speciesId, size = 96, framed = true }: { s
         </>
       )}
 
-      {/* ojos */}
+      {/* eyes */}
       {speciesId === "adelie" && (
         <>
           <circle cx="52" cy="33" r="3.6" fill="none" stroke={belly} strokeWidth="1.8" />
@@ -77,7 +77,7 @@ export function PenguinIllustration({ speciesId, size = 96, framed = true }: { s
       <circle cx="52.6" cy="32.4" r="0.6" fill="#fff" />
       <circle cx="68.6" cy="32.4" r="0.6" fill="#fff" />
 
-      {/* pico */}
+      {/* beak */}
       {speciesId === "king" ? (
         <path d="M56 39 C 58 38 62 38 64 39 L 60 50 Z" fill="#1f1f27" stroke="#ff9a2e" strokeWidth="1.1" />
       ) : speciesId === "adelie" || speciesId === "chinstrap" ? (

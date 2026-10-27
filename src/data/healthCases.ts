@@ -1,6 +1,6 @@
 /**
- * Casos de seguimiento de salud con los que arranca la demo. Son ficticios y
- * salen de la misma semilla que el resto del escenario.
+ * Health follow-up cases the demo starts with. They are fictional care logs
+ * generated from the same seed as the rest of the scenario.
  */
 import type { Dataset, HealthCase, HealthReason } from "@/domain/types";
 import { between, hashSeed, mulberry32, pick } from "@/logic/rng";
@@ -10,41 +10,41 @@ interface Template {
   reason: HealthReason;
   title: string;
   notes: string[];
-  weight?: [number, number]; // kg inicial y cambio total durante el caso
+  weight?: [number, number]; // starting kg and total change over the case
 }
 
 const TEMPLATES: Template[] = [
   {
     reason: "injury",
-    title: "Cojera leve en pata izquierda",
-    notes: ["Se observa cojera al caminar en la playa; nada sin dificultad.", "Revisión veterinaria: sin fractura, inflamación leve. Reposo relativo.", "Camina mejor; se mantiene en observación."],
+    title: "Mild limp, left foot",
+    notes: ["Limp observed while walking on the beach; swims without difficulty.", "Vet check logged: no fracture, mild swelling. Limited activity.", "Walking better; remains under observation."],
   },
   {
     reason: "weight",
-    title: "Baja de peso en las últimas semanas",
-    notes: ["Pesaje por debajo de su rango habitual.", "Se ajusta ración y se registra cuánto come en cada alimentación.", "Come completo en las dos últimas alimentaciones."],
+    title: "Weight loss over recent weeks",
+    notes: ["Weigh-in below its usual range.", "Ration adjusted; intake now logged at every feeding.", "Ate its full ration at the last two feedings."],
     weight: [4.9, 0.25],
   },
   {
     reason: "molt",
-    title: "Muda catastrófica",
-    notes: ["Inicia muda; pasa más tiempo en tierra y no entra al agua.", "Se refuerza la alimentación durante la muda.", "Muda avanzada, plumaje nuevo en el dorso."],
+    title: "Catastrophic molt",
+    notes: ["Molt begins; spending more time on land and not entering the water.", "Extra feeding during the molt.", "Molt well advanced; new plumage on the back."],
     weight: [5.6, -0.45],
   },
   {
     reason: "treatment",
-    title: "Tratamiento por pododermatitis",
-    notes: ["Lesión en planta de la pata derecha; inicia tratamiento tópico.", "Curación diaria; la lesión se ve más limpia.", "Se cambia el sustrato de su zona de descanso."],
+    title: "Bumblefoot treatment",
+    notes: ["Lesion on the sole of the right foot; topical treatment started.", "Daily dressing; the lesion looks cleaner.", "Substrate changed in its resting area."],
   },
   {
     reason: "behavior",
-    title: "Pasa poco tiempo en el agua",
-    notes: ["El equipo nota que entra poco al agua comparado con su grupo.", "Sin signos clínicos a la vista; se sigue su actividad diaria en el sistema."],
+    title: "Spending little time in the water",
+    notes: ["Team notes it enters the water less than its group.", "No visible clinical signs; daily activity being followed in the system."],
   },
   {
     reason: "weight",
-    title: "Control de peso postratamiento",
-    notes: ["Terminó tratamiento; se pesa cada tercer día.", "Recupera peso dentro de lo esperado."],
+    title: "Post-treatment weight check",
+    notes: ["Treatment finished; weighed every third day.", "Regaining weight as expected."],
     weight: [3.8, 0.3],
   },
 ];
@@ -63,9 +63,9 @@ export function seedHealthCases(ds: Dataset, seed: number): HealthCase[] {
     if (used.has(p.id)) return;
     used.add(p.id);
     const team = ds.teams.find((t) => t.id === p.initialTeamId);
-    const owner = OWNER_BY_REASON[tpl.reason] === "vet" ? (vet?.lead ?? "Equipo veterinario") : (team?.lead ?? "Equipo de cuidado");
+    const owner = OWNER_BY_REASON[tpl.reason] === "vet" ? (vet?.lead ?? "Veterinary team") : (team?.lead ?? "Care team");
     const openedAt = ds.now - between(rng, 3, 12) * DAY;
-    const closed = i === TEMPLATES.length - 1; // uno ya cerrado, para que haya historial
+    const closed = i === TEMPLATES.length - 1; // one already closed, so there is some history
     const span = (closed ? openedAt + 6 * DAY : ds.now - 2 * HOUR) - openedAt;
     const entries = tpl.notes.map((text, k) => {
       const at = Math.round(openedAt + (span * k) / Math.max(1, tpl.notes.length - 1));

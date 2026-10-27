@@ -3,11 +3,11 @@ import type { Dataset } from "@/domain/types";
 import { generateDataset } from "./simulate";
 
 /**
- * Punto único por donde la interfaz obtiene datos.
+ * Single entry point through which the UI gets its data.
  *
- * Hoy solo existe la fuente simulada. Una fuente real (servicio propio que
- * reciba lecturas normalizadas, ver `src/integration/`) implementaría la misma
- * interfaz y la interfaz no tendría que cambiar.
+ * Today only the simulated source exists. A real source (an in-house service
+ * receiving normalized readings, see `src/integration/`) would implement the
+ * same interface and the UI would not need to change.
  */
 export interface PenguinDataSource {
   readonly kind: "simulated" | "live";
@@ -18,7 +18,7 @@ export interface PenguinDataSource {
 export function createSimulatedSource(config: DemoConfig): PenguinDataSource {
   return {
     kind: "simulated",
-    label: "Demo · Datos simulados",
+    label: "Demo · Simulated data",
     load: (now) => generateDataset(config, now),
   };
 }

@@ -42,14 +42,14 @@ import { TeamReassign } from "@/components/penguin/TeamReassign";
 import { PenguinHealth } from "@/features/health/HealthCards";
 
 const SECTIONS = [
-  { id: "resumen", label: "Resumen" },
-  { id: "salud", label: "Salud" },
-  { id: "localizacion", label: "Localización" },
-  { id: "actividad", label: "Actividad" },
-  { id: "lecturas", label: "Lecturas" },
-  { id: "equipo", label: "Equipo" },
-  { id: "historial", label: "Historial" },
-  { id: "cuidado", label: "Cuidado" },
+  { id: "overview", label: "Overview" },
+  { id: "health", label: "Health" },
+  { id: "location", label: "Location" },
+  { id: "activity", label: "Activity" },
+  { id: "readings", label: "Readings" },
+  { id: "team", label: "Team" },
+  { id: "history", label: "History" },
+  { id: "care", label: "Care" },
 ];
 
 export function PenguinProfileView() {
@@ -60,8 +60,8 @@ export function PenguinProfileView() {
     return (
       <div className="p-8">
         <Card>
-          <EmptyState icon={SearchX} title={`No existe el ejemplar ${id}`} action={<Link href="/penguins" className="text-sm text-accent hover:underline">Ir al registro</Link>}>
-            Puede que el escenario se haya regenerado con otra cantidad de ejemplares.
+          <EmptyState icon={SearchX} title={`Penguin ${id} not found`} action={<Link href="/penguins" className="text-sm text-accent hover:underline">Go to the registry</Link>}>
+            The scenario may have been regenerated with a different number of penguins.
           </EmptyState>
         </Card>
       </div>
@@ -85,43 +85,46 @@ function Profile({ penguinId }: { penguinId: string }) {
 
   return (
     <div className="pb-10">
-      {/* 1. Encabezado */}
+      {/* 1. Header */}
       <div className="px-6 pt-6 lg:px-8">
         <nav className="flex flex-wrap items-center gap-1 text-xs text-muted">
           <Link href="/species" className="hover:text-ink">Species</Link>
           <ChevronRight size={12} className="text-faint" />
-          <Link href={`/species/${sp.id}`} className="hover:text-ink">{sp.nameEs}</Link>
+          <Link href={`/species/${sp.id}`} className="hover:text-ink">{sp.nameEn}</Link>
           <ChevronRight size={12} className="text-faint" />
           <span className="text-ink">{title}</span>
         </nav>
       </div>
 
-      <div id="resumen" className="mx-6 mt-3 scroll-mt-20 lg:mx-8">
+      <div id="overview" className="mx-6 mt-3 scroll-mt-20 lg:mx-8">
         <div className="panel relative overflow-hidden p-5">
           <div className="absolute inset-y-0 right-0 w-2/3 opacity-[0.07]" style={{ background: `radial-gradient(circle at 85% 30%, ${sp.color}, transparent 65%)` }} />
           <div className="relative flex flex-wrap items-start gap-5">
             <figure className="shrink-0">
               <PenguinIllustration speciesId={p.speciesId} size={116} />
-              <figcaption className="mt-1 max-w-[116px] text-center text-[10px] leading-tight text-faint">Imagen representativa de la especie</figcaption>
+              <figcaption className="mt-1 max-w-[116px] text-center text-[10px] leading-tight text-faint">Representative image of the species</figcaption>
             </figure>
             <div className="min-w-0 flex-1">
-              <p className="eyebrow">Ficha individual</p>
+              <p className="eyebrow">Individual profile</p>
               <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
-                <h1 className="text-[30px] font-semibold leading-tight tracking-tight">{p.name ?? <span className="text-muted">Sin nombre registrado</span>}</h1>
+                <h1 className="text-[30px] font-semibold leading-tight tracking-tight">{p.name ?? <span className="text-muted">No name on record</span>}</h1>
                 <span className="font-mono text-lg text-muted">{p.id}</span>
               </div>
               <p className="mt-1 text-sm">
-                {sp.nameEs} <span className="text-muted">· {sp.nameEn} ·</span> <i className="text-muted">{sp.scientific}</i>
+                {sp.nameEn} <span className="text-muted">·</span> <i className="text-muted">{sp.scientific}</i>
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StatusPill status={snap.status} />
                 <Badge tone={p.recordStatus === "active" ? "ok" : p.recordStatus === "recent" ? "info" : "warn"}>{RECORD_STATUS_LABEL[p.recordStatus]}</Badge>
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-ink/[0.05] px-2 py-0.5 text-[11px] text-muted">
-                  <span className="h-2 w-2 rounded-full" style={{ background: team?.color ?? "#56718a" }} /> {team?.name ?? "Sin asignar"}
+                  <span className="h-2 w-2 rounded-full" style={{ background: team?.color ?? "#56718a" }} /> {team?.name ?? "Unassigned"}
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-ink/[0.05] px-2 py-0.5 text-[11px] text-muted">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-md bg-ink/[0.05] px-2 py-0.5 text-[11px] text-muted"
+                  title={r ? `Last reading: ${fmtDateTime(r.timestamp, now)} · ${SOURCE_LABEL[r.source]} · ${QUALITY_LABEL[r.quality]} quality (±${r.accuracyM} m)` : undefined}
+                >
                   <MapPin size={11} />
-                  {r ? `${ZONE_BY_ID[r.zoneId].name} · ${fmtDateTime(r.timestamp, now)}` : "Sin ubicación registrada"}
+                  {r ? `${ZONE_BY_ID[r.zoneId].name} · ${fmtDateTime(r.timestamp, now)} · ${QUALITY_LABEL[r.quality]} quality` : "No location recorded"}
                 </span>
                 <SimulatedTag />
               </div>
@@ -129,10 +132,10 @@ function Profile({ penguinId }: { penguinId: string }) {
             <div className="flex flex-col items-end gap-2">
               <div className="flex flex-wrap justify-end gap-2">
                 <Link href={`/species/${sp.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong px-3 text-sm text-ink hover:border-accent/50">
-                  <ArrowLeft size={14} /> Listado de la especie
+                  <ArrowLeft size={14} /> Species list
                 </Link>
                 <Link href={`/map?penguin=${p.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3.5 text-sm font-semibold text-white hover:bg-[#0b8178]">
-                  <MapPinned size={15} /> Ver en el mapa
+                  <MapPinned size={15} /> View on map
                 </Link>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 text-[11px] text-faint">
@@ -140,10 +143,10 @@ function Profile({ penguinId }: { penguinId: string }) {
                   <ShieldCheck size={12} /> {PERMISSIONS.role}
                 </span>
                 {PERMISSIONS.reassignTeam && (
-                  <a href="#equipo" className="rounded-md border border-line px-1.5 py-0.5 text-muted hover:text-ink">Reasignar equipo</a>
+                  <a href="#team" className="rounded-md border border-line px-1.5 py-0.5 text-muted hover:text-ink">Reassign team</a>
                 )}
                 {PERMISSIONS.addObservation && (
-                  <a href="#cuidado" className="rounded-md border border-line px-1.5 py-0.5 text-muted hover:text-ink">Registrar observación</a>
+                  <a href="#care" className="rounded-md border border-line px-1.5 py-0.5 text-muted hover:text-ink">Log observation</a>
                 )}
               </div>
             </div>
@@ -151,7 +154,7 @@ function Profile({ penguinId }: { penguinId: string }) {
         </div>
       </div>
 
-      {/* Navegación entre secciones */}
+      {/* Section navigation */}
       <div className="sticky top-0 z-20 mt-4 border-y border-line bg-bg/85 px-6 backdrop-blur lg:px-8">
         <div className="scroll-thin flex items-center gap-1 overflow-x-auto py-2">
           {SECTIONS.map((s) => (
@@ -166,16 +169,16 @@ function Profile({ penguinId }: { penguinId: string }) {
       </div>
 
       <div className="mt-5 space-y-5 px-6 lg:px-8">
-        {/* 2. Indicadores */}
-        {/* Cuatro indicadores: dos por fila en pantallas medianas, una sola fila en grandes. */}
+        {/* 2. Indicators */}
+        {/* Four indicators: two per row on medium screens, a single row on large ones. */}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Kpi label="Última ubicación" value={r ? ZONE_BY_ID[r.zoneId].name : "Sin datos"} sub={r ? `Precisión ±${r.accuracyM} m` : undefined} small />
-          <Kpi label="Tiempo en agua" value={t.readings ? fmtHours(t.water) : "Sin datos"} sub={range.label} color={SERIES.water} />
-          <Kpi label="Tiempo en tierra" value={t.readings ? fmtHours(t.land) : "Sin datos"} sub={range.label} color="#f5b84b" />
-          <Kpi label="Última lectura" value={r ? fmtDateTime(r.timestamp, now) : "Sin datos"} sub={r ? fmtAgo(r.timestamp, now) : undefined} small />
+          <Kpi label="Last location" value={r ? ZONE_BY_ID[r.zoneId].name : "No data"} sub={r ? `${QUALITY_LABEL[r.quality]} quality · ±${r.accuracyM} m` : undefined} small />
+          <Kpi label="Time in water" value={t.readings ? fmtHours(t.water) : "No data"} sub={range.label} color={SERIES.water} />
+          <Kpi label="Time on land" value={t.readings ? fmtHours(t.land) : "No data"} sub={range.label} color="#f5b84b" />
+          <Kpi label="Last reading" value={r ? fmtDateTime(r.timestamp, now) : "No data"} sub={r ? `${fmtAgo(r.timestamp, now)} · ${SOURCE_SHORT[r.source]}` : undefined} small />
         </div>
 
-        <Card title={<span id="salud" className="scroll-mt-20">Salud</span>} icon={HeartPulse}>
+        <Card title={<span id="health" className="scroll-mt-20">Health</span>} icon={HeartPulse}>
           <PenguinHealth penguinId={penguinId} />
         </Card>
 
@@ -183,7 +186,7 @@ function Profile({ penguinId }: { penguinId: string }) {
         <ActivitySection penguinId={penguinId} />
         <ReadingsSection penguinId={penguinId} />
 
-        {/* El historial toma el alto de la tarjeta de equipo; cuidado va completo debajo. */}
+        {/* The history takes the height of the team card; care goes full width below. */}
         <div className="grid gap-5 xl:grid-cols-12">
           <TeamSection penguinId={penguinId} className="xl:col-span-5" />
           <TimelineSection penguinId={penguinId} className="xl:col-span-7" />
@@ -195,7 +198,7 @@ function Profile({ penguinId }: { penguinId: string }) {
   );
 }
 
-/* ───────────── 3. Localización ───────────── */
+/* ───────────── 3. Location ───────────── */
 
 function LocationSection({ penguinId }: { penguinId: string }) {
   const { dataset, penguinById, snapshots, range, now } = useDemo();
@@ -224,12 +227,12 @@ function LocationSection({ penguinId }: { penguinId: string }) {
 
   return (
     <Card
-      title={<span id="localizacion" className="scroll-mt-20">Localización e historial de movimientos</span>}
+      title={<span id="location" className="scroll-mt-20">Location and movement history</span>}
       icon={MapPinned}
-      subtitle="Recorrido de las últimas 24 h. Cada punto es una lectura registrada; las líneas solo unen lecturas consecutivas, no son un trayecto medido."
+      subtitle="Path over the last 24 h. Each dot is a recorded reading; the lines only join consecutive readings and are not a measured route."
       action={
         <Link href={`/map?penguin=${p.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-line-strong px-2.5 text-xs text-ink hover:border-accent/50">
-          <MapPinned size={13} /> Ver en Habitat Map
+          <MapPinned size={13} /> View on Habitat Map
         </Link>
       }
     >
@@ -244,19 +247,19 @@ function LocationSection({ penguinId }: { penguinId: string }) {
               layers={{ zones: true, labels: true, landmarks: false, markers: true, restricted: true, trail: true }}
             />
           ) : (
-            <EmptyState icon={MapPinned} title="Sin ubicación registrada" />
+            <EmptyState icon={MapPinned} title="No location recorded" />
           )}
         </div>
         <dl className="space-y-2.5 text-sm">
-          <Row k="Última zona registrada" v={r ? ZONE_BY_ID[r.zoneId].name : "Sin datos"} />
-          <Row k="Fecha y hora" v={r ? `${fmtDateTime(r.timestamp, now)} · ${fmtAgo(r.timestamp, now)}` : "Sin datos"} />
-          <Row k="Fuente" v={r ? SOURCE_LABEL[r.source] : "Sin datos"} />
-          <Row k="Calidad / precisión" v={r ? <><Badge tone={QUALITY_TONE[r.quality]}>{QUALITY_LABEL[r.quality]}</Badge> <span className="text-[11px] text-faint">±{r.accuracyM} m</span></> : "Sin datos"} />
-          <Row k="Estado actual" v={<StatusPill status={snap.status} compact />} />
-          <Row k="Dispositivo" v={<span className="font-mono">{p.deviceId}</span>} />
+          <Row k="Last recorded zone" v={r ? ZONE_BY_ID[r.zoneId].name : "No data"} />
+          <Row k="Date and time" v={r ? `${fmtDateTime(r.timestamp, now)} · ${fmtAgo(r.timestamp, now)}` : "No data"} />
+          <Row k="Source" v={r ? SOURCE_LABEL[r.source] : "No data"} />
+          <Row k="Quality / accuracy" v={r ? <><Badge tone={QUALITY_TONE[r.quality]}>{QUALITY_LABEL[r.quality]}</Badge> <span className="text-[11px] text-faint">±{r.accuracyM} m</span></> : "No data"} />
+          <Row k="Current status" v={<StatusPill status={snap.status} compact />} />
+          <Row k="Device" v={<span className="font-mono">{p.deviceId}</span>} />
         </dl>
         <div>
-          <p className="mb-2 text-xs font-medium">Cambios entre zonas · {range.label.toLowerCase()}</p>
+          <p className="mb-2 text-xs font-medium">Zone changes · {range.label.toLowerCase()}</p>
           <div className="scroll-thin max-h-[330px] overflow-y-auto pr-1">
             <MovementHistory penguinId={penguinId} from={range.from} to={range.to} limit={40} />
           </div>
@@ -266,7 +269,7 @@ function LocationSection({ penguinId }: { penguinId: string }) {
   );
 }
 
-/* ───────────── 4. Actividad ───────────── */
+/* ───────────── 4. Activity ───────────── */
 
 function ActivitySection({ penguinId }: { penguinId: string }) {
   const { dataset, range } = useDemo();
@@ -284,7 +287,7 @@ function ActivitySection({ penguinId }: { penguinId: string }) {
     return n;
   }, [dataset, penguinId, from, to]);
   const t = agg.totals;
-  // La proporción por día muestra siempre la última semana, sin importar el periodo elegido.
+  // The daily share always shows the last week, regardless of the selected period.
   const byDay = useMemo(
     () =>
       computeActivity(dataset, [penguinId], Math.max(dataset.windowStart, startOfDay(dataset.now) - 6 * DAY), dataset.now)
@@ -295,44 +298,44 @@ function ActivitySection({ penguinId }: { penguinId: string }) {
 
   return (
     <Card
-      title={<span id="actividad" className="scroll-mt-20">Actividad</span>}
+      title={<span id="activity" className="scroll-mt-20">Activity</span>}
       icon={Activity}
-      subtitle={`${range.label} · horas registradas por las lecturas.`}
+      subtitle={`${range.label} · hours recorded by the readings.`}
       action={<SimulatedTag />}
     >
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricBlock label="En agua · observado" value={t.readings ? fmtHours(t.water) : "Sin datos"} sub="Sensor de inmersión del dispositivo (simulado)" color={SERIES.water} />
-        <MetricBlock label="En tierra · observado" value={t.readings ? fmtHours(t.land) : "Sin datos"} sub="Lecturas en tierra, con o sin desplazamiento" color={SERIES.land} />
-        <MetricBlock label="Sin movimiento · inferido" value={t.readings ? fmtHours(t.stationary) : "Sin datos"} sub="Parte del tiempo en tierra con posiciones repetidas" color={SERIES.stationary} />
-        <MetricBlock label="Cambios agua ↔ tierra" value={String(changes)} sub="Entre tramos consecutivos" color="#a78bfa" />
+        <MetricBlock label="In water · observed" value={t.readings ? fmtHours(t.water) : "No data"} sub="Device immersion sensor (simulated)" color={SERIES.water} />
+        <MetricBlock label="On land · observed" value={t.readings ? fmtHours(t.land) : "No data"} sub="Land readings, moving or not" color={SERIES.land} />
+        <MetricBlock label="No movement · inferred" value={t.readings ? fmtHours(t.stationary) : "No data"} sub="Share of land time with repeated positions" color={SERIES.stationary} />
+        <MetricBlock label="Water ↔ land changes" value={String(changes)} sub="Between consecutive stretches" color="#a78bfa" />
       </div>
       <SplitBar
         className="mt-4"
         parts={[
-          { value: t.water, color: SERIES.water, label: "Agua" },
-          { value: t.land, color: SERIES.land, label: "Tierra" },
+          { value: t.water, color: SERIES.water, label: "Water" },
+          { value: t.land, color: SERIES.land, label: "Land" },
         ]}
       />
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div>
-          <p className="mb-3 text-xs text-muted">Distribución por hora del día · horas registradas</p>
+          <p className="mb-3 text-xs text-muted">Distribution by hour of day · recorded hours</p>
           <StackedColumns
             height={140}
             labelEvery={6}
             format={fmtHours}
             series={[
-              { key: "water", color: SERIES.water, label: "Agua" },
-              { key: "land", color: SERIES.land, label: "Tierra" },
+              { key: "water", color: SERIES.water, label: "Water" },
+              { key: "land", color: SERIES.land, label: "Land" },
             ]}
             data={agg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))}
           />
         </div>
         <div>
           <p className="mb-3 flex justify-between gap-2 text-xs text-muted">
-            <span>% del tiempo en agua por día · últimos {byDay.length} días</span>
+            <span>% of time in water per day · last {byDay.length} {byDay.length === 1 ? "day" : "days"}</span>
             {byDay.length > 0 && (
               <span>
-                promedio <b className="num font-semibold text-ink">{Math.round((byDay.reduce((a, d) => a + d.share, 0) / byDay.length) * 100)}%</b> en agua
+                average <b className="num font-semibold text-ink">{Math.round((byDay.reduce((a, d) => a + d.share, 0) / byDay.length) * 100)}%</b> in water
               </span>
             )}
           </p>
@@ -341,38 +344,38 @@ function ActivitySection({ penguinId }: { penguinId: string }) {
             labelEvery={byDay.length > 8 ? 2 : 1}
             format={(v) => `${Math.round(v * 100)}%`}
             series={[
-              { key: "water", color: SERIES.water, label: "Agua" },
-              { key: "land", color: SERIES.land, label: "Tierra" },
+              { key: "water", color: SERIES.water, label: "Water" },
+              { key: "land", color: SERIES.land, label: "Land" },
             ]}
-            data={byDay.map((d) => ({ label: fmtDate(d.day).split(" ")[0], tooltip: fmtWeekday(d.day), values: { water: d.share, land: 1 - d.share } }))}
+            data={byDay.map((d) => ({ label: String(new Date(d.day).getDate()), tooltip: fmtWeekday(d.day), values: { water: d.share, land: 1 - d.share } }))}
           />
         </div>
       </div>
       <div className="mt-5 rounded-xl border border-line p-4">
-        <p className="mb-2 text-xs font-medium">Comparación con el periodo anterior de igual duración</p>
+        <p className="mb-2 text-xs font-medium">Compared with the previous period of equal length</p>
         {prev ? (
           <div className="grid grid-cols-3 gap-4 text-sm">
-            <Compare label="Agua" cur={t.water} prev={prev.water} />
-            <Compare label="Tierra" cur={t.land} prev={prev.land} />
-            <Compare label="Sin movimiento" cur={t.stationary} prev={prev.stationary} />
+            <Compare label="Water" cur={t.water} prev={prev.water} />
+            <Compare label="Land" cur={t.land} prev={prev.land} />
+            <Compare label="No movement" cur={t.stationary} prev={prev.stationary} />
           </div>
         ) : (
-          <p className="text-xs text-muted">Sin datos suficientes: el escenario no guarda un periodo anterior completo.</p>
+          <p className="text-xs text-muted">Not enough data: the scenario does not keep a complete previous period.</p>
         )}
         <p className="mt-2 text-[11px] text-faint">
-          Observado: lo indica una lectura. Inferido: «sin movimiento» se deduce de posiciones repetidas. Una diferencia de actividad no implica por sí misma ningún estado de salud.
+          Observed: indicated by a reading. Inferred: “no movement” is deduced from repeated positions. A difference in activity does not by itself imply any health condition.
         </p>
       </div>
     </Card>
   );
 }
 
-/* ───────────── 5. Historial de lecturas ───────────── */
+/* ───────────── 5. Reading history ───────────── */
 
 type ReadingFlag = "repeated" | "low";
 const FLAG_LABEL: Record<ReadingFlag, string> = {
-  repeated: "Posición repetida",
-  low: "Precisión baja",
+  repeated: "Repeated position",
+  low: "Low accuracy",
 };
 
 function ReadingsSection({ penguinId }: { penguinId: string }) {
@@ -405,21 +408,21 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
 
   return (
     <Card
-      title={<span id="lecturas" className="scroll-mt-20">Historial de lecturas</span>}
+      title={<span id="readings" className="scroll-mt-20">Reading history</span>}
       icon={ListOrdered}
-      subtitle={`${rows.length} lecturas en el rango. No se inventan coordenadas: cada fila es una lectura registrada.`}
+      subtitle={`${rows.length} ${rows.length === 1 ? "reading" : "readings"} in range. No coordinates are made up: each row is a recorded reading.`}
       action={
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="flex items-center gap-1.5 text-muted">
-            Desde
+            From
             <input type="date" value={fromDay} min={minDay} max={toDay} onChange={(e) => (setFromDay(e.target.value || minDay), setLimit(25))} className="h-8 rounded-lg border border-line-strong bg-panel-solid px-2 text-xs text-ink [color-scheme:dark]" />
           </label>
           <label className="flex items-center gap-1.5 text-muted">
-            Hasta
+            To
             <input type="date" value={toDay} min={fromDay} max={maxDay} onChange={(e) => (setToDay(e.target.value || maxDay), setLimit(25))} className="h-8 rounded-lg border border-line-strong bg-panel-solid px-2 text-xs text-ink [color-scheme:dark]" />
           </label>
           <Button size="sm" variant="outline" onClick={() => setNewest((v) => !v)}>
-            {newest ? "Más reciente primero" : "Más antigua primero"}
+            {newest ? "Newest first" : "Oldest first"}
           </Button>
         </div>
       }
@@ -428,13 +431,13 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
         <table className="w-full min-w-[860px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] text-muted">
-              <th className="py-2 pr-3 font-medium">Fecha y hora</th>
-              <th className="py-2 pr-3 font-medium">Zona · posición</th>
-              <th className="py-2 pr-3 font-medium">Estado de localización</th>
-              <th className="py-2 pr-3 font-medium">Fuente</th>
-              <th className="py-2 pr-3 font-medium">Calidad</th>
-              <th className="py-2 pr-3 font-medium">Dispositivo</th>
-              <th className="py-2 font-medium">Observaciones</th>
+              <th className="py-2 pr-3 font-medium">Date and time</th>
+              <th className="py-2 pr-3 font-medium">Zone · position</th>
+              <th className="py-2 pr-3 font-medium">Location state</th>
+              <th className="py-2 pr-3 font-medium">Source</th>
+              <th className="py-2 pr-3 font-medium">Quality</th>
+              <th className="py-2 pr-3 font-medium">Device</th>
+              <th className="py-2 font-medium">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -450,7 +453,7 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
                 <td className="py-2 pr-3 text-xs">
                   <span className="inline-flex items-center gap-1.5">
                     {r.medium === "water" ? <Droplets size={12} color={SERIES.water} /> : <Mountain size={12} color={SERIES.land} />}
-                    {r.medium === "water" ? "En agua" : "En tierra"}
+                    {r.medium === "water" ? "In water" : "On land"}
                   </span>
                 </td>
                 <td className="py-2 pr-3 text-xs text-muted">{SOURCE_SHORT[r.source]}</td>
@@ -476,19 +479,19 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
             ))}
           </tbody>
         </table>
-        {rows.length === 0 && <p className="py-6 text-center text-xs text-muted">No hay registros en este rango.</p>}
+        {rows.length === 0 && <p className="py-6 text-center text-xs text-muted">No readings in this range.</p>}
       </div>
       {rows.length > limit && (
         <button onClick={() => setLimit((l) => l + 50)} className="mt-3 inline-flex items-center gap-1 text-xs text-accent hover:underline">
-          <ChevronDown size={13} /> Mostrar más ({rows.length - limit} restantes)
+          <ChevronDown size={13} /> Show more ({rows.length - limit} remaining)
         </button>
       )}
-      <p className="mt-2 text-[10px] text-faint">Lecturas simuladas.</p>
+      <p className="mt-2 text-[10px] text-faint">Simulated readings.</p>
     </Card>
   );
 }
 
-/* ───────────── 6. Equipo ───────────── */
+/* ───────────── 6. Team ───────────── */
 
 function TeamSection({ penguinId, className }: { penguinId: string; className?: string }) {
   const { dataset, penguinById, teamOf, log, now } = useDemo();
@@ -498,7 +501,7 @@ function TeamSection({ penguinId, className }: { penguinId: string; className?: 
   const changes = log.filter((l) => l.penguinId === penguinId && l.kind === "assignment").sort((a, b) => b.at - a.at);
 
   return (
-    <Card className={className} title={<span id="equipo" className="scroll-mt-20">Equipo responsable</span>} icon={Users}>
+    <Card className={className} title={<span id="team" className="scroll-mt-20">Responsible team</span>} icon={Users}>
       {team ? (
         <div className="rounded-xl border border-line p-3">
           <div className="flex items-center gap-3">
@@ -509,29 +512,29 @@ function TeamSection({ penguinId, className }: { penguinId: string; className?: 
               <p className="font-semibold">{team.name}</p>
               <p className="text-xs text-muted">{team.focus}</p>
             </div>
-            <Link href={`/teams?team=${team.id}`} className="text-xs text-accent hover:underline">Ver perfil</Link>
+            <Link href={`/teams?team=${team.id}`} className="text-xs text-accent hover:underline">View team</Link>
           </div>
           <dl className="mt-3 space-y-2 text-sm">
-            <Row k="Responsable" v={team.lead} />
-            <Row k="Integrantes" v={team.members.length} />
-            <Row k="Fecha de asignación" v={changes[0] ? fmtDateTime(changes[0].at, now) : <span className="text-faint">Sin datos (asignación inicial)</span>} />
+            <Row k="Team lead" v={team.lead} />
+            <Row k="Members" v={team.members.length} />
+            <Row k="Assigned on" v={changes[0] ? fmtDateTime(changes[0].at, now) : <span className="text-faint">No data (initial assignment)</span>} />
           </dl>
         </div>
       ) : (
-        <p className="text-sm text-warn">Sin asignar</p>
+        <p className="text-sm text-warn">Unassigned</p>
       )}
 
       {PERMISSIONS.reassignTeam ? (
         <div className="mt-4">
-          <p className="mb-1.5 text-[11px] text-muted">Reasignar (el cambio se refleja en toda la plataforma)</p>
+          <p className="mb-1.5 text-[11px] text-muted">Reassign (the change applies across the whole platform)</p>
           <TeamReassign key={penguinId} penguinId={penguinId} compact />
         </div>
       ) : (
-        <p className="mt-4 text-[11px] text-faint">Tu perfil no permite reasignar ejemplares.</p>
+        <p className="mt-4 text-[11px] text-faint">Your role cannot reassign penguins.</p>
       )}
 
       <div className="mt-5">
-        <p className="eyebrow mb-2">Historial de asignaciones</p>
+        <p className="eyebrow mb-2">Assignment history</p>
         <ol className="space-y-2 text-xs">
           {changes.map((c) => (
             <li key={c.id} className="flex gap-2">
@@ -545,8 +548,8 @@ function TeamSection({ penguinId, className }: { penguinId: string; className?: 
           <li className="flex gap-2">
             <Users size={13} className="mt-0.5 shrink-0 text-faint" />
             <div>
-              <p>Asignación inicial: {initial?.name ?? "Sin datos"}</p>
-              <p className="text-[11px] text-faint">Fecha sin registrar en el escenario</p>
+              <p>Initial assignment: {initial?.name ?? "No data"}</p>
+              <p className="text-[11px] text-faint">Date not recorded in the scenario</p>
             </div>
           </li>
         </ol>
@@ -555,7 +558,7 @@ function TeamSection({ penguinId, className }: { penguinId: string; className?: 
   );
 }
 
-/* ───────────── 7. Cuidado y observaciones ───────────── */
+/* ───────────── 7. Care and observations ───────────── */
 
 function CareSection({ penguinId, className }: { penguinId: string; className?: string }) {
   const { dataset, userNotes, log, lastReviewOf, config, addNote, now } = useDemo();
@@ -563,7 +566,7 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
   const notes = [...userNotes, ...dataset.notes].filter((n) => n.penguinId === penguinId).sort((a, b) => b.at - a.at);
   const reviews = dataset.incidents
     .filter((i) => i.penguinId === penguinId && i.kind === "care")
-    .map((i) => ({ id: i.id, at: i.at, text: i.text, by: "Equipo de cuidado" }))
+    .map((i) => ({ id: i.id, at: i.at, text: i.text, by: "Care team" }))
     .sort((a, b) => b.at - a.at);
   const routineDue = lastReviewOf(penguinId) + config.rules.careReviewIntervalDays * DAY;
   const incidents = [
@@ -572,7 +575,7 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
   ].sort((a, b) => b.at - a.at);
 
   return (
-    <Card className={className} title={<span id="cuidado" className="scroll-mt-20">Cuidado y observaciones</span>} icon={NotebookPen}>
+    <Card className={className} title={<span id="care" className="scroll-mt-20">Care and observations</span>} icon={NotebookPen}>
       {PERMISSIONS.addObservation ? (
         <form
           onSubmit={(e) => {
@@ -583,36 +586,36 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
           }}
           className="mb-5 rounded-xl border border-line p-3"
         >
-          <label className="text-[11px] text-muted" htmlFor="obs">Nueva observación operativa</label>
+          <label className="text-[11px] text-muted" htmlFor="obs">New operational observation</label>
           <textarea
             id="obs"
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={2}
-            placeholder="Describe lo observado (sin diagnósticos)…"
+            placeholder="Describe what you observed (no diagnoses)…"
             className="mt-1 w-full resize-none rounded-lg border border-line-strong bg-ink/[0.05] px-3 py-2 text-sm outline-none placeholder:text-faint focus:border-accent/60"
           />
           <div className="mt-2 flex items-center justify-between gap-2">
-            <p className="text-[10px] text-faint">Se registra con tu usuario y la hora actual del escenario. Queda separada de los registros veterinarios.</p>
-            <Button size="sm" variant="primary" type="submit" disabled={!text.trim()}>Registrar</Button>
+            <p className="text-[10px] text-faint">Logged under your user at the current scenario time. Kept separate from veterinary records.</p>
+            <Button size="sm" variant="primary" type="submit" disabled={!text.trim()}>Log</Button>
           </div>
         </form>
       ) : (
-        <p className="mb-4 text-[11px] text-faint">Tu perfil no permite registrar observaciones.</p>
+        <p className="mb-4 text-[11px] text-faint">Your role cannot log observations.</p>
       )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div>
-          <p className="eyebrow mb-2">Observaciones de cuidadores</p>
+          <p className="eyebrow mb-2">Keeper observations</p>
           {notes.length === 0 ? (
-            <p className="text-xs text-muted">Sin datos.</p>
+            <p className="text-xs text-muted">No data.</p>
           ) : (
             <ul className="scroll-thin max-h-[260px] space-y-3 overflow-y-auto pr-1">
               {notes.map((n) => (
                 <li key={n.id} className={cx("border-l-2 pl-3", n.simulated ? "border-line-strong" : "border-accent")}>
                   <p className="text-sm">{n.text}</p>
                   <p className="mt-0.5 text-[11px] text-faint">
-                    {n.by} · {fmtDateTime(n.at, now)} · {n.simulated ? "registro ficticio" : "registrado en esta demo"}
+                    {n.by} · {fmtDateTime(n.at, now)} · {n.simulated ? "fictional record" : "logged in this demo"}
                   </p>
                 </li>
               ))}
@@ -621,9 +624,9 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
         </div>
         <div className="space-y-5">
           <div>
-            <p className="eyebrow mb-2">Revisiones realizadas</p>
+            <p className="eyebrow mb-2">Completed checks</p>
             {reviews.length === 0 ? (
-              <p className="text-xs text-muted">Sin datos.</p>
+              <p className="text-xs text-muted">No data.</p>
             ) : (
               <ul className="space-y-1.5 text-xs">
                 {reviews.slice(0, 4).map((r) => (
@@ -636,14 +639,14 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
             )}
           </div>
           <div>
-            <p className="eyebrow mb-2">Próxima revisión de rutina</p>
+            <p className="eyebrow mb-2">Next routine check</p>
             <p className="text-xs">{fmtDateTime(routineDue, now)}</p>
-            <p className="text-[11px] text-faint">Según el intervalo de {config.rules.careReviewIntervalDays} días</p>
+            <p className="text-[11px] text-faint">Based on the {config.rules.careReviewIntervalDays}-day interval</p>
           </div>
           <div>
-            <p className="eyebrow mb-2">Incidencias relacionadas</p>
+            <p className="eyebrow mb-2">Related incidents</p>
             {incidents.length === 0 ? (
-              <p className="text-xs text-muted">Sin datos.</p>
+              <p className="text-xs text-muted">No data.</p>
             ) : (
               <ul className="space-y-1.5 text-xs">
                 {incidents.slice(0, 4).map((i) => (
@@ -661,24 +664,24 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
       <div className="mt-5 flex gap-3 rounded-xl border border-dashed border-line-strong p-3">
         <Stethoscope size={16} className="mt-0.5 shrink-0 text-faint" />
         <div className="text-xs">
-          <p className="font-medium">Registros veterinarios</p>
-          <p className="mt-0.5 text-muted">Sin datos en la demo. Se mantienen separados de las observaciones operativas y vendrán del sistema veterinario cuando se integre.</p>
-          <p className="mt-1 text-[11px] text-faint">La plataforma no genera diagnósticos ni recomendaciones clínicas.</p>
+          <p className="font-medium">Veterinary records</p>
+          <p className="mt-0.5 text-muted">No data in the demo. They are kept separate from operational observations and will come from the veterinary system once integrated.</p>
+          <p className="mt-1 text-[11px] text-faint">The platform does not generate diagnoses or clinical recommendations.</p>
         </div>
       </div>
     </Card>
   );
 }
 
-/* ───────────── 8. Historial de cambios ───────────── */
+/* ───────────── 8. Change history ───────────── */
 
 type EventKind = "zone" | "readings" | "team" | "review" | "note";
 const EVENT_LABEL: Record<EventKind, string> = {
-  zone: "Cambio de zona",
-  readings: "Lecturas",
-  team: "Equipo",
-  review: "Revisión",
-  note: "Observación",
+  zone: "Zone change",
+  readings: "Readings",
+  team: "Team",
+  review: "Check",
+  note: "Observation",
 };
 const EVENT_ICON: Record<EventKind, typeof MapPin> = { zone: MapPin, readings: Radio, team: ArrowRightLeft, review: ShieldCheck, note: NotebookPen };
 
@@ -701,7 +704,7 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
       const d = startOfDay(list[i].timestamp);
       perDay.set(d, (perDay.get(d) ?? 0) + 1);
     }
-    for (const [d, n] of perDay) out.push({ at: Math.min(d + DAY - MIN, now), kind: "readings", text: `${n} lecturas recibidas el ${fmtDate(d)}` });
+    for (const [d, n] of perDay) out.push({ at: Math.min(d + DAY - MIN, now), kind: "readings", text: `${n} ${n === 1 ? "reading" : "readings"} received on ${fmtDate(d)}` });
     for (const l of log.filter((x) => x.penguinId === penguinId)) out.push({ at: l.at, kind: l.kind === "assignment" ? "team" : "review", text: l.text });
     for (const i of dataset.incidents.filter((x) => x.penguinId === penguinId && x.kind === "care")) out.push({ at: i.at, kind: "review", text: i.text });
     for (const n of userNotes.filter((x) => x.penguinId === penguinId)) out.push({ at: n.at, kind: "note", text: `${n.by}: ${n.text}` });
@@ -713,9 +716,9 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
   return (
     <Card
       className={className}
-      title={<span id="historial" className="scroll-mt-20">Historial de cambios</span>}
+      title={<span id="history" className="scroll-mt-20">Change history</span>}
       icon={History}
-      subtitle={`Zonas y lecturas: ${range.label.toLowerCase()}. Equipo, revisiones y observaciones: todo el registro.`}
+      subtitle={`Zones and readings: ${range.label.toLowerCase()}. Team, checks and observations: full record.`}
     >
       <div className="mb-3 flex flex-wrap gap-1.5">
         {(Object.keys(EVENT_LABEL) as EventKind[]).map((k) => {
@@ -732,9 +735,9 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
         })}
       </div>
       {shown.length === 0 ? (
-        <p className="py-4 text-center text-xs text-muted">Sin eventos.</p>
+        <p className="py-4 text-center text-xs text-muted">No events.</p>
       ) : (
-        // En pantalla ancha la lista llena el alto que deja la tarjeta de equipo a su lado.
+        // On wide screens the list fills the height left by the team card beside it.
         <div className="xl:relative xl:min-h-[240px] xl:flex-1">
           <ol className="scroll-thin relative max-h-[440px] space-y-1 overflow-y-auto pr-1 xl:absolute xl:inset-0 xl:max-h-none before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-line-strong">
             {shown.slice(0, limit).map((e, i) => {
@@ -758,14 +761,14 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
       )}
       {shown.length > limit && (
         <button onClick={() => setLimit((l) => l + 40)} className="mt-2 inline-flex items-center gap-1 text-xs text-accent hover:underline">
-          <ChevronDown size={13} /> Mostrar más ({shown.length - limit})
+          <ChevronDown size={13} /> Show more ({shown.length - limit})
         </button>
       )}
     </Card>
   );
 }
 
-/* ───────────── auxiliares ───────────── */
+/* ───────────── helpers ───────────── */
 
 function Kpi({ label, value, sub, color, small }: { label: string; value: string; sub?: string; color?: string; small?: boolean }) {
   return (
@@ -808,7 +811,7 @@ function Compare({ label, cur, prev }: { label: string; cur: number; prev: numbe
       <p className="text-[11px] text-muted">{label}</p>
       <p className="num font-semibold">{fmtHours(cur)}</p>
       <p className="num text-[11px] text-faint">
-        antes {fmtHours(prev)} · {diff >= 0 ? "+" : "−"}
+        before {fmtHours(prev)} · {diff >= 0 ? "+" : "−"}
         {fmtHours(Math.abs(diff))}
       </p>
     </div>

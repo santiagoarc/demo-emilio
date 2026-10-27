@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cx } from "@/components/ui/primitives";
 
-/** Desplegable compacto de selección múltiple: muestra "Todas" o lo elegido. */
-export function FilterMenu<T extends string>({ label, allLabel = "Todos", options, value, onChange, className }: {
+/** Compact multi-select dropdown: shows "All" or the current selection. */
+export function FilterMenu<T extends string>({ label, allLabel = "All", options, value, onChange, className }: {
   label: string;
   allLabel?: string;
   options: { value: T; label: string; color?: string }[];
@@ -29,7 +29,7 @@ export function FilterMenu<T extends string>({ label, allLabel = "Todos", option
   }, [open]);
 
   const summary =
-    value.length === 0 ? allLabel : value.length === 1 ? (options.find((o) => o.value === value[0])?.label ?? allLabel) : `${value.length} seleccionadas`;
+    value.length === 0 ? allLabel : value.length === 1 ? (options.find((o) => o.value === value[0])?.label ?? allLabel) : `${value.length} selected`;
 
   return (
     <div ref={ref} className={cx("relative", className)}>
