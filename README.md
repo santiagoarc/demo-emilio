@@ -31,7 +31,7 @@ La barra lateral cambia entre **Penguins** y **Aviary** y se puede plegar a solo
 | | `/` | Redirige a Penguins. |
 | | `/roadmap` | Estado de los datos, *Potential capabilities* (salud, comportamiento, alimentación, reproducción, asignación) y *Technology to validate*. |
 | **Penguins** | `/penguins/overview` | Indicadores, especies, zonas y actividad. |
-| | `/map` | Mapa del hábitat, recorrido y paradas numeradas de un ejemplar. |
+| | `/map` | Mapa del hábitat, recorrido y paradas numeradas de un ejemplar. El recorrido es una línea discontinua cuyas rayas avanzan en el sentido en que se movió el animal (también en el aviario: imagen, 3D y vista superior, en el color de la especie). |
 | | `/species`, `/penguins`, `/penguins/[id]`, `/teams` | Especies, registro, ficha individual y equipos. |
 | | `/health` | Seguimiento de casos (simulados) y chequeo de actividad (inferencia, no diagnóstico). |
 | | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |

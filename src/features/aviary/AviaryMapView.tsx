@@ -296,6 +296,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
                 highlightZoneId={highlightZone || null}
                 precision={selFix?.det?.pos && selFix.det.precisionM ? { pos: selFix.det.pos, r: selFix.det.precisionM } : null}
                 trail={trail}
+                trailColor={selFix ? MONITOR_SPECIES_BY_ID[selFix.bird.speciesId].color : undefined}
                 level={level}
                 mode={mode}
                 focus={focus}

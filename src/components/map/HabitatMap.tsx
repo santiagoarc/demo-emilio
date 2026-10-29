@@ -8,6 +8,7 @@ import { bbox, centroid, pointInPolygon, smoothPath } from "@/logic/geometry";
 import type { LiveStatus } from "@/logic/status";
 import { tessellateZones } from "@/logic/tessellation";
 import { hideTip, showTip } from "@/components/charts/Charts";
+import { FlowPolyline } from "./FlowLine";
 
 export interface MapMarker {
   id: string;
@@ -457,32 +458,8 @@ export function HabitatMap({
 
         {layers.trail && trail && trail.length > 0 && (
           <g pointerEvents="none" strokeLinecap="round" strokeLinejoin="round">
-            {/* Light outline under the line so it stands out over water and sand. */}
-            <polyline points={trail.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={8 * k} />
-            {/* Segment by segment: oldest (light) to most recent (strong). */}
-            {trail.slice(1).map((p, i) => {
-              const a = trail[i];
-              const f = (i + 1) / trail.length;
-              return <line key={p.t} x1={a.x} y1={a.y} x2={p.x} y2={p.y} stroke="#0b6f68" strokeOpacity={0.35 + f * 0.65} strokeWidth={(3 + f * 2.2) * k} />;
-            })}
-            {/* Direction arrows midway along some segments. */}
-            {trail.slice(1).map((p, i) => {
-              const a = trail[i];
-              const len = Math.hypot(p.x - a.x, p.y - a.y);
-              if (len < 30 * k || i % 2) return null;
-              const ang = (Math.atan2(p.y - a.y, p.x - a.x) * 180) / Math.PI;
-              const s = 6 * k;
-              return (
-                <path
-                  key={`arr-${p.t}`}
-                  d={`M${-s} ${-s * 0.8} L${s} 0 L${-s} ${s * 0.8}`}
-                  transform={`translate(${(a.x + p.x) / 2},${(a.y + p.y) / 2}) rotate(${ang})`}
-                  fill="none"
-                  stroke="#ffffff"
-                  strokeWidth={2.2 * k}
-                />
-              );
-            })}
+            {/* Dashes flow from the oldest reading to the latest: the direction of travel. */}
+            <FlowPolyline points={trail} color="#0b6f68" width={3 * k} dash={7 * k} gap={5 * k} />
             {trail.map((p, i) => (
               <circle
                 key={p.t}

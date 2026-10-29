@@ -6,6 +6,7 @@ import { FOOTPRINT, INNER_RATIO, MONITOR_ZONES, MONITOR_ZONE_BY_ID, type Monitor
 import { GREAT_TREE } from "@/domain/aviaryLayout";
 import { REFERENCE_IMAGE, groundScale, toImage } from "@/domain/aviaryImageProjection";
 import { cx } from "@/components/ui/primitives";
+import { FlowPolyline } from "@/components/map/FlowLine";
 import type { AviarySceneProps, ScenePoint } from "./AviaryScene";
 
 const IW = REFERENCE_IMAGE.width;
@@ -268,7 +269,7 @@ export function AviaryImageMap(props: Props) {
               onMouseLeave={() => setTip(null)}
             />
           ))}
-          {trailPts && <polyline points={trailPts.map((p) => `${p.u},${p.v}`).join(" ")} fill="none" stroke="#2563eb" strokeWidth={2 / v.k} opacity={0.85} />}
+          {trailPts && <FlowPolyline points={trailPts.map((p) => ({ x: p.u, y: p.v }))} color={selBird?.p.color ?? "#2563eb"} width={2.2 / v.k} dash={8 / v.k} gap={6 / v.k} />}
           {prec && <circle cx={prec.u} cy={prec.v} r={Math.max(prec.r, 6 / v.k)} fill="#2563eb" opacity={0.16} />}
           <BirdDots dots={singles} k={v.k} selectedId={selectedBirdId} smooth={props.smooth !== false} onBird={(id) => !drag.current?.moved && props.onSelectBird(id)} onTip={setTip} />
           {groups.map((g) => (

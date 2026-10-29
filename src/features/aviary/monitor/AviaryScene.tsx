@@ -55,6 +55,8 @@ export interface AviarySceneProps {
   /** Uncertainty sphere around the selected bird. */
   precision: { pos: Vec3; r: number } | null;
   trail: Vec3[] | null;
+  /** Colour of the path: the selected bird's species colour. */
+  trailColor?: string;
   level: LevelId | "all";
   mode: "3d" | "2d";
   /** Change `key` to fly the camera to `pos`. */
@@ -267,6 +269,8 @@ interface Rig {
   precision: THREE.Mesh;
   treeRing: THREE.Mesh;
   trail: THREE.Line;
+  /** Distances along the path, before the flowing offset is applied. */
+  trailBase: Float32Array | null;
   /** Bird markers: shown position glides toward the target position. */
   marks: { ids: string[]; cur: Float32Array; tgt: Float32Array; scale: Float32Array; dim: Uint8Array };
   fly: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t0: number } | null;
@@ -599,14 +603,15 @@ export function AviaryScene(props: AviarySceneProps) {
     treeRing.position.y = 0.15;
     treeRing.visible = false;
     scene.add(treeRing);
-    const trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: "#2563eb", transparent: true, opacity: 0.85, depthTest: false }));
+    // The selected bird's path: dashes that flow from the oldest position to the latest.
+    const trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: "#2563eb", dashSize: 1.4, gapSize: 1, transparent: true, opacity: 0.95, depthTest: false }));
     trail.renderOrder = 8;
     trail.visible = false;
     scene.add(trail);
 
     const rig: Rig = {
       renderer, scene, persp, ortho, ctl3, ctl2, markers, pool: [], clusterPool: [], clusters: [], hidden: new Set(), spriteMat, tex: new Map(),
-      treeParts, zoneFills, zoneEdges, dome, levelBand, selRing, selDrop, precision, treeRing, trail,
+      treeParts, zoneFills, zoneEdges, dome, levelBand, selRing, selDrop, precision, treeRing, trail, trailBase: null,
       marks: { ids: [], cur: new Float32Array(0), tgt: new Float32Array(0), scale: new Float32Array(0), dim: new Uint8Array(0) },
       fly: null,
     };
@@ -634,6 +639,8 @@ export function AviaryScene(props: AviarySceneProps) {
     // Loop: glide dots, fold overlaps into groups, camera, labels.
     const v = new THREE.Vector3();
     const dropPos = selDrop.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let flow = 0;
     let lastT = 0;
     renderer.setAnimationLoop((time) => {
       const p = propsRef.current;
@@ -721,6 +728,16 @@ export function AviaryScene(props: AviarySceneProps) {
           lbl.dataset.x = String(cur[o]);
           lbl.dataset.y = String(cur[o + 1] + LIFT);
           lbl.dataset.z = String(cur[o + 2]);
+        }
+      }
+
+      // Shift the dash pattern along the path, in the direction of travel.
+      if (trail.visible && rig.trailBase && !reduceMotion) {
+        flow = (flow + dt * 0.0024) % 2.4;
+        const attr = trail.geometry.getAttribute("lineDistance") as THREE.BufferAttribute | undefined;
+        if (attr && attr.count === rig.trailBase.length) {
+          for (let i = 0; i < attr.count; i++) attr.setX(i, rig.trailBase[i] - flow);
+          attr.needsUpdate = true;
         }
       }
 
@@ -930,8 +947,15 @@ export function AviaryScene(props: AviarySceneProps) {
       rig.precision.scale.setScalar(Math.max(0.6, precision.r));
     }
     rig.trail.visible = !!trail && trail.length > 1;
-    if (trail && trail.length > 1) rig.trail.geometry.setFromPoints(trail.map((p) => new THREE.Vector3(p.x, p.y + LIFT, p.z)));
-  }, [precision, trail, ready]);
+    rig.trailBase = null;
+    if (trail && trail.length > 1) {
+      rig.trail.geometry.dispose();
+      rig.trail.geometry = new THREE.BufferGeometry().setFromPoints(trail.map((p) => new THREE.Vector3(p.x, p.y + LIFT, p.z)));
+      rig.trail.computeLineDistances();
+      rig.trailBase = Float32Array.from((rig.trail.geometry.getAttribute("lineDistance") as THREE.BufferAttribute).array);
+    }
+    (rig.trail.material as THREE.LineDashedMaterial).color.set(props.trailColor ?? "#2563eb");
+  },[precision, trail, props.trailColor, ready]);
 
   useEffect(() => {
     const rig = rigRef.current;
