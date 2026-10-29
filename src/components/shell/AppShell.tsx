@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { Activity, Bird, ChevronLeft, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { Activity, Bird, ChevronLeft, Feather, HeartPulse, IdCard, LayoutDashboard, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { cx } from "@/components/ui/primitives";
 import { PenguinSearch } from "./PenguinSearch";
 import { BirdSearch } from "./BirdSearch";
@@ -45,7 +45,7 @@ type ModuleId = "penguins" | "aviary";
 
 const MODULES: { id: ModuleId; label: string; home: string }[] = [
   { id: "penguins", label: "Penguins", home: "/penguins/overview" },
-  { id: "aviary", label: "Aviary", home: "/aviary/map" },
+  { id: "aviary", label: "Aviary", home: "/aviary/overview" },
 ];
 
 const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exact?: boolean }[]> = {
@@ -57,9 +57,9 @@ const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exa
     { href: "/teams", label: "Care teams", icon: Users },
     { href: "/health", label: "Health follow-up", icon: HeartPulse },
     { href: "/analytics", label: "Activity analytics", icon: Activity },
-    { href: "/penguins/rules", label: "Proposed rules", icon: ListChecks },
   ],
   aviary: [
+    { href: "/aviary/overview", label: "Overview", icon: LayoutDashboard },
     { href: "/aviary/map", label: "Map", icon: MapIcon },
     { href: "/aviary/species", label: "Species", icon: Feather },
     { href: "/aviary/birds", label: "Individuals", icon: IdCard },

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// Retired section: the aviary menu is Map, Species, Individuals, Trees, Teams and Health follow-up.
+// The aviary starts at its overview.
 export default function AviaryPage() {
-  redirect("/aviary/map");
+  redirect("/aviary/overview");
 }

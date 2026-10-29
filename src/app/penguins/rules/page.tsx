@@ -1,13 +1,6 @@
-import { Suspense } from "react";
-import { PenguinRulesView } from "@/features/rules/PenguinRulesView";
+import { redirect } from "next/navigation";
 
-// The demo generates its data in the browser; there is no UI to validate on the server.
-export const instant = false;
-
+// Retired section: proposed rules are no longer part of the penguin menu.
 export default function PenguinRulesPage() {
-  return (
-    <Suspense>
-      <PenguinRulesView />
-    </Suspense>
-  );
+  redirect("/penguins/overview");
 }
