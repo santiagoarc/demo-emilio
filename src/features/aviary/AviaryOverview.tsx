@@ -40,6 +40,7 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
         .map((f) => ({
           id: f.bird.id,
           pos: f.det!.pos!,
+          species: MONITOR_SPECIES_BY_ID[f.bird.speciesId].code,
           color: FIX_STATUS[f.status].color,
           dim: false,
           label: `${f.bird.id} · ${MONITOR_SPECIES_BY_ID[f.bird.speciesId].common}`,

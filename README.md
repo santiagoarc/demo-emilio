@@ -37,7 +37,7 @@ La barra lateral cambia entre dos áreas con la misma estructura: **Penguins** y
 | | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |
 | | `/penguins/rules` | Reglas propuestas (ejemplos configurables, no alertas operativas). |
 | **Aviary** | `/aviary` | Overview como el de pingüinos: cifras, mapa 3D en tarjeta, desglose por especie, movimientos recientes, zonas, alturas y actividad. |
-| | `/aviary/map` | Habitat map como el de pingüinos: mapa 3D a pantalla completa, panel derecho (buscador, cifras, filtros, capas, leyenda, ficha del ave y del árbol con vista lateral) y reloj simulado abajo (play/pausa, 1×/5×/20×, 20× por defecto, movimiento suave). |
+| | `/aviary/map` | Habitat map (tema oscuro, como la imagen de referencia): especies con foto a la izquierda; mapa 3D al centro con filtros (zona, nivel, estado, especie) y **marcadores con la foto de cada especie** (el color solo es el anillo de estado); a la derecha el **árbol seleccionado** ilustrado de raíces a copa con escala en metros, niveles y las aves a su altura, más la tabla de aves del árbol; la ficha del ave tiene **Back to tree**. Reloj simulado (1×/5×/20×) y paneles por especie, altura y actividad. |
 | | `/aviary/species` | Catálogo de 32 especies (pedidas vs. generadas, sexo, edad), árboles y validaciones de los datos. |
 | | `/aviary/species/[id]` | Ficha de la especie: foto de referencia (Wikimedia Commons, con autor y licencia), resumen de Wikipedia, cifras de la demo y una tarjeta por cada ave. |
 | | `/aviary/birds` | Registro de las 500 aves; cada fila abre el ave en el Habitat map. |
@@ -55,6 +55,14 @@ La barra lateral cambia entre dos áreas con la misma estructura: **Penguins** y
 
 El aviario es una **demo con datos simulados**: el movimiento corre sobre un reloj
 simulado y no representa rastreo real en tiempo real.
+
+## Imágenes de especies
+
+Las miniaturas de `public/aviary/species/` son copias (330 px) de fotos de
+Wikimedia Commons con licencias libres; autor, licencia y enlace de cada una están
+en `src/data/aviarySpeciesInfo.ts` y se muestran en la ficha de cada especie. El
+recorte circular de cada marcador se ajusta en `src/data/aviarySpeciesIcons.ts`.
+Los nombres de árbol (Ceiba, Mango…) son ilustrativos de la demo.
 
 ## Escenario de demostración
 

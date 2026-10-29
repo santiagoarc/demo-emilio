@@ -91,7 +91,7 @@ export type TreeForm = "emergent" | "broadleaf" | "palm";
 export interface AviaryTree {
   /** Working code (T1, T2…). Final codes would come with a real tree inventory. */
   id: string;
-  /** Plant species; null in the demo. */
+  /** Plant species: an illustrative demo name until a tree inventory exists. */
   plantSpecies: string | null;
   form: TreeForm;
   x: number;

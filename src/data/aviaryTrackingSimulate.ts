@@ -88,6 +88,19 @@ const TREES_PER_ZONE: Record<string, { n: number; forms: [TreeForm, number][] }>
   lagoon: { n: 5, forms: [["palm", 1]] },
 };
 
+/** Illustrative plant names for demo trees, by form. Not a survey of the aviary. */
+const DEMO_PLANTS: Record<TreeForm, string[]> = {
+  emergent: ["Ceiba", "Kapok", "Mahogany", "Rain tree"],
+  broadleaf: ["Strangler fig", "Cecropia", "Inga", "Banyan", "Mango"],
+  palm: ["Royal palm", "Foxtail palm", "Areca palm", "Coconut palm"],
+};
+
+/** Demo plant name for a tree, stable for its ID. */
+export function demoPlant(t: Pick<AviaryTree, "id" | "form">) {
+  const list = DEMO_PLANTS[t.form];
+  return list[hashSeed("plant", t.id) % list.length];
+}
+
 function generateTrees(rng: Rng): AviaryTree[] {
   const placed: { x: number; z: number; zoneId: string; form: TreeForm }[] = [];
   for (const zone of MONITOR_ZONES) {
@@ -109,7 +122,7 @@ function generateTrees(rng: Rng): AviaryTree[] {
     const crown = p.form === "emergent" ? between(rng, 6, 8) : p.form === "broadleaf" ? between(rng, 4, 6) : between(rng, 2.8, 3.8);
     return {
       id: `T${i + 1}`,
-      plantSpecies: null,
+      plantSpecies: demoPlant({ id: `T${i + 1}`, form: p.form }),
       form: p.form,
       x: Math.round(p.x * 10) / 10,
       z: Math.round(p.z * 10) / 10,

@@ -1,6 +1,6 @@
 import type { DemoRegistry } from "@/domain/aviaryTracking";
 import { DEMO_TOTAL_BIRDS, MONITOR_SPECIES } from "@/data/aviaryCatalog";
-import { REGISTRY_VERSION, generateRegistry } from "@/data/aviaryTrackingSimulate";
+import { REGISTRY_VERSION, demoPlant, generateRegistry } from "@/data/aviaryTrackingSimulate";
 
 /**
  * Persistence for the aviary demo. The project has no database, so the
@@ -36,7 +36,11 @@ export function loadRegistry(): { registry: DemoRegistry; origin: RegistryOrigin
   try {
     const raw = window.localStorage.getItem(REGISTRY_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : null;
-    if (looksValid(parsed)) return { registry: parsed, origin: "storage" };
+    if (looksValid(parsed)) {
+      // Registries saved before trees had demo plant names get them filled in; birds are untouched.
+      const trees = parsed.trees.map((t) => (t.plantSpecies ? t : { ...t, plantSpecies: demoPlant(t) }));
+      return { registry: { ...parsed, trees }, origin: "storage" };
+    }
   } catch {
     // Unreadable storage: fall through and generate.
   }

@@ -127,7 +127,8 @@ export const SPECIES_INFO: Record<string, SpeciesInfo> = {
   ARG: {
     article: "https://en.wikipedia.org/wiki/Great_argus",
     summary: "The great argus or greater argus is a large species of pheasant native to the jungles of Borneo, Sumatra and the Malay Peninsula in southeast Asia. It is known for its impressive plumage and courtship behavior.",
-    photo: { src: "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4f/Argusianus_argus%2C_Khao_Sok%2C_Thailand_1.jpg/960px-Argusianus_argus%2C_Khao_Sok%2C_Thailand_1.jpg", page: "https://commons.wikimedia.org/wiki/File:Argusianus_argus,_Khao_Sok,_Thailand_1.jpg", author: "Francesco Veronesi from Italy", license: "CC BY-SA 2.0", licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0" },
+    // Replaced the article photo (bird too small to recognise in a marker).
+    photo: { src: "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Great_Argus_male_RWD.jpg/960px-Great_Argus_male_RWD.jpg", page: "https://commons.wikimedia.org/wiki/File:Great_Argus_male_RWD.jpg", author: "DickDaniels", license: "CC BY-SA 3.0", licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0" },
   },
   PBC: {
     article: "https://en.wikipedia.org/wiki/Crested_partridge",

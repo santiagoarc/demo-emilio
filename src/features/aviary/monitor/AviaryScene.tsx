@@ -18,10 +18,79 @@ import {
 import { LAGOON, WATERFALL_POOL, type STRUCTURES } from "@/data/aviaryTrackingSimulate";
 import { hashSeed, mulberry32 } from "@/logic/rng";
 import { cx } from "@/components/ui/primitives";
+import { SPECIES_ICON } from "@/data/aviarySpeciesIcons";
+
+/**
+ * Markers keep the same size on screen at any zoom, like map pins.
+ * MARK is the share of the view height (perspective); LIFT floats them just above the point.
+ */
+const MARK = 0.05;
+const LIFT = 0.6;
+
+/** Round species image with a white edge, drawn once per species. */
+function speciesTexture(code: string, cache: Map<string, THREE.CanvasTexture>) {
+  const hit = cache.get(code);
+  if (hit) return hit;
+  const S = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#33485a";
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2);
+  g.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const icon = SPECIES_ICON[code];
+  if (icon) {
+    const img = new Image();
+    img.onload = () => {
+      const side = Math.min(img.width, img.height) * icon.zoom;
+      const sx = Math.min(img.width - side, Math.max(0, icon.fx * img.width - side / 2));
+      const sy = Math.min(img.height - side, Math.max(0, icon.fy * img.height - side / 2));
+      g.clearRect(0, 0, S, S);
+      g.save();
+      g.beginPath();
+      g.arc(S / 2, S / 2, S / 2 - 7, 0, Math.PI * 2);
+      g.clip();
+      g.drawImage(img, sx, sy, side, side, 0, 0, S, S);
+      g.restore();
+      g.strokeStyle = "#ffffff";
+      g.lineWidth = 6;
+      g.beginPath();
+      g.arc(S / 2, S / 2, S / 2 - 7, 0, Math.PI * 2);
+      g.stroke();
+      tex.needsUpdate = true;
+    };
+    img.src = icon.src;
+  }
+  cache.set(code, tex);
+  return tex;
+}
+
+/** Status ring drawn behind the species image. */
+function statusRingTexture(color: string, cache: Map<string, THREE.CanvasTexture>) {
+  const hit = cache.get(color);
+  if (hit) return hit;
+  const S = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d")!;
+  g.fillStyle = color;
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
+  g.fill();
+  const tex = new THREE.CanvasTexture(c);
+  cache.set(color, tex);
+  return tex;
+}
 
 export interface ScenePoint {
   id: string;
   pos: Vec3;
+  /** Species code: the marker shows that species' image. */
+  species: string;
+  /** Status ring colour (secondary; species are told apart by image). */
   color: string;
   dim: boolean;
   label: string;
@@ -135,7 +204,11 @@ interface Rig {
   ortho: THREE.OrthographicCamera;
   ctl3: OrbitControls;
   ctl2: OrbitControls;
-  birds: THREE.InstancedMesh;
+  markers: THREE.Group;
+  pool: { icon: THREE.Sprite; ring: THREE.Sprite }[];
+  spriteMat: (key: string, make: () => THREE.SpriteMaterial) => THREE.SpriteMaterial;
+  iconTex: Map<string, THREE.CanvasTexture>;
+  ringTex: Map<string, THREE.CanvasTexture>;
   treeParts: Map<string, THREE.Mesh[]>;
   zoneFills: Map<string, THREE.Mesh>;
   dome: THREE.Group;
@@ -178,8 +251,8 @@ export function AviaryScene(props: AviarySceneProps) {
     renderer.domElement.className = "block h-full w-full outline-none";
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#e6efec");
-    scene.fog = new THREE.Fog("#e6efec", 170, 320);
+    scene.background = new THREE.Color("#0b1824");
+    scene.fog = new THREE.Fog("#0b1824", 190, 340);
     scene.add(new THREE.HemisphereLight("#ffffff", "#8c7d5c", 1.25));
     const sun = new THREE.DirectionalLight("#fff6e6", 1.7);
     sun.position.set(40, 90, 30);
@@ -356,7 +429,7 @@ export function AviaryScene(props: AviarySceneProps) {
     // Dome (conceptual enclosure)
     const dome = new THREE.Group();
     const domeGeo = new THREE.SphereGeometry(1, 40, 10, 0, Math.PI * 2, 0, Math.PI / 2);
-    const lattice = new THREE.Mesh(domeGeo, new THREE.MeshBasicMaterial({ color: "#45667a", wireframe: true, transparent: true, opacity: 0.14, depthWrite: false }));
+    const lattice = new THREE.Mesh(domeGeo, new THREE.MeshBasicMaterial({ color: "#7fb2c9", wireframe: true, transparent: true, opacity: 0.12, depthWrite: false }));
     const glass = new THREE.Mesh(domeGeo, new THREE.MeshBasicMaterial({ color: "#bfe3f0", transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false }));
     for (const m of [lattice, glass]) {
       m.scale.set(FOOTPRINT.rx + 3, FOOTPRINT.domeHeight, FOOTPRINT.rz + 3);
@@ -380,14 +453,17 @@ export function AviaryScene(props: AviarySceneProps) {
     scene.add(levelBand);
 
     // Birds: always drawn on top of foliage so they stay visible.
-    const birds = new THREE.InstancedMesh(new THREE.SphereGeometry(0.85, 12, 8), new THREE.MeshBasicMaterial({ depthTest: false, transparent: true }), 1200);
-    birds.renderOrder = 10;
-    birds.count = 0;
-    birds.frustumCulled = false;
-    scene.add(birds);
+    // Birds: species-image sprites, always drawn over the foliage so they stay visible.
+    const markers = new THREE.Group();
+    scene.add(markers);
+    const mats = new Map<string, THREE.SpriteMaterial>();
+    const spriteMat = (key: string, make: () => THREE.SpriteMaterial) => {
+      let m = mats.get(key);
+      if (!m) mats.set(key, (m = make()));
+      return m;
+    };
 
-    const selRing = new THREE.Sprite(new THREE.SpriteMaterial({ map: ringTexture(), depthTest: false, transparent: true }));
-    selRing.scale.set(4.2, 4.2, 1);
+    const selRing = new THREE.Sprite(new THREE.SpriteMaterial({ map: ringTexture(), depthTest: false, transparent: true, sizeAttenuation: false }));
     selRing.renderOrder = 12;
     selRing.visible = false;
     scene.add(selRing);
@@ -408,7 +484,7 @@ export function AviaryScene(props: AviarySceneProps) {
     trail.visible = false;
     scene.add(trail);
 
-    const rig: Rig = { renderer, scene, persp, ortho, ctl3, ctl2, birds, treeParts, zoneFills, dome, levelBand, selRing, selDrop, precision, treeRing, trail, zoneEdges, marks: { ids: [], cur: new Float32Array(0), tgt: new Float32Array(0), scale: new Float32Array(0) }, fly: null };
+    const rig: Rig = { renderer, scene, persp, ortho, ctl3, ctl2, markers, pool: [], spriteMat, iconTex: new Map(), ringTex: new Map(), treeParts, zoneFills, dome, levelBand, selRing, selDrop, precision, treeRing, trail, zoneEdges, marks: { ids: [], cur: new Float32Array(0), tgt: new Float32Array(0), scale: new Float32Array(0) }, fly: null };
     rigRef.current = rig;
 
     // Size
@@ -430,9 +506,6 @@ export function AviaryScene(props: AviarySceneProps) {
 
     // Loop: controls, fly-to, HTML labels
     const v = new THREE.Vector3();
-    const m4b = new THREE.Matrix4();
-    const qId = new THREE.Quaternion();
-    const sv = new THREE.Vector3();
     const dropPos = selDrop.geometry.getAttribute("position") as THREE.BufferAttribute;
     let lastT = 0;
     renderer.setAnimationLoop((time) => {
@@ -442,21 +515,27 @@ export function AviaryScene(props: AviarySceneProps) {
       lastT = time;
       const k = p.smooth === false ? 1 : 1 - Math.exp(-dt / 350);
       const { ids, cur, tgt, scale } = rig.marks;
+      // Perspective: size as a share of the view. Orthographic has no distance, so convert to metres.
+      const unit = p.mode === "2d" ? MARK * ((ortho.top - ortho.bottom) / ortho.zoom) : MARK * 2 * Math.tan(((persp.fov / 2) * Math.PI) / 180);
+      selRing.scale.setScalar(unit * 2.1);
       let selIdx = -1;
       for (let i = 0; i < ids.length; i++) {
         const o = i * 3;
         cur[o] += (tgt[o] - cur[o]) * k;
         cur[o + 1] += (tgt[o + 1] - cur[o + 1]) * k;
         cur[o + 2] += (tgt[o + 2] - cur[o + 2]) * k;
-        m4b.compose(v.set(cur[o], cur[o + 1] + 0.4, cur[o + 2]), qId, sv.setScalar(scale[i]));
-        birds.setMatrixAt(i, m4b);
+        const mk = rig.pool[i];
+        mk.icon.position.set(cur[o], cur[o + 1] + LIFT, cur[o + 2]);
+        mk.ring.position.copy(mk.icon.position);
+        const sz = unit * scale[i];
+        mk.icon.scale.set(sz, sz, 1);
+        mk.ring.scale.set(sz * 1.22, sz * 1.22, 1);
         if (ids[i] === p.selectedBirdId) selIdx = i;
       }
-      if (ids.length) birds.instanceMatrix.needsUpdate = true;
       if (selIdx >= 0) {
         const o = selIdx * 3;
-        selRing.position.set(cur[o], cur[o + 1] + 0.4, cur[o + 2]);
-        dropPos.setXYZ(0, cur[o], cur[o + 1] + 0.4, cur[o + 2]);
+        selRing.position.set(cur[o], cur[o + 1] + LIFT, cur[o + 2]);
+        dropPos.setXYZ(0, cur[o], cur[o + 1] + LIFT, cur[o + 2]);
         dropPos.setXYZ(1, cur[o], 0.1, cur[o + 2]);
         dropPos.needsUpdate = true;
         selDrop.computeLineDistances();
@@ -464,7 +543,7 @@ export function AviaryScene(props: AviarySceneProps) {
         const lbl = wrap.querySelector<HTMLElement>("[data-follow]");
         if (lbl) {
           lbl.dataset.x = String(cur[o]);
-          lbl.dataset.y = String(cur[o + 1] + 3.2);
+          lbl.dataset.y = String(cur[o + 1] + LIFT);
           lbl.dataset.z = String(cur[o + 2]);
         }
       }
@@ -484,7 +563,7 @@ export function AviaryScene(props: AviarySceneProps) {
         v.set(+el.dataset.x!, +el.dataset.y!, +el.dataset.z!).project(cam);
         const visible = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
         el.style.opacity = visible ? "" : "0";
-        el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) translate(-50%, -50%)`;
+        el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h + Number(el.dataset.dy ?? 0)}px) translate(-50%, -50%)`;
       });
     });
 
@@ -497,9 +576,9 @@ export function AviaryScene(props: AviarySceneProps) {
       const rect = renderer.domElement.getBoundingClientRect();
       const x = cx - rect.left, y = cy - rect.top;
       let best: ScenePoint | null = null;
-      let bestD = 11;
+      let bestD = 16;
       for (const pt of p.points) {
-        v.set(pt.pos.x, pt.pos.y, pt.pos.z).project(cam);
+        v.set(pt.pos.x, pt.pos.y + LIFT, pt.pos.z).project(cam);
         if (v.z > 1) continue;
         const d = Math.hypot(((v.x + 1) / 2) * rect.width - x, ((1 - v.y) / 2) * rect.height - y) - (pt.dim ? 3 : 0);
         if (d < bestD) {
@@ -599,8 +678,6 @@ export function AviaryScene(props: AviarySceneProps) {
   useEffect(() => {
     const rig = rigRef.current;
     if (!rig) return;
-    const c = new THREE.Color();
-    const grey = new THREE.Color("#c5cfd6");
     // Keep each bird's shown position so it glides from where it was; new birds appear in place.
     const prev = rig.marks;
     const prevIdx = new Map(prev.ids.map((id, i) => [id, i]));
@@ -612,14 +689,27 @@ export function AviaryScene(props: AviarySceneProps) {
       tgt.set([p.pos.x, p.pos.y, p.pos.z], i * 3);
       const j = prevIdx.get(p.id);
       cur.set(j === undefined ? [p.pos.x, p.pos.y, p.pos.z] : prev.cur.subarray(j * 3, j * 3 + 3), i * 3);
-      scale[i] = p.id === selectedBirdId ? 1.7 : p.dim ? 0.55 : 1;
-      c.set(p.color);
-      if (p.dim) c.lerp(grey, 0.7);
-      rig.birds.setColorAt(i, c);
+      scale[i] = p.id === selectedBirdId ? 1.6 : p.dim ? 0.6 : 1;
+      while (rig.pool.length <= i) {
+        const icon = new THREE.Sprite();
+        const ring = new THREE.Sprite();
+        icon.renderOrder = 11;
+        ring.renderOrder = 10;
+        rig.markers.add(ring, icon);
+        rig.pool.push({ icon, ring });
+      }
+      const mk = rig.pool[i];
+      const dim = p.dim ? "d" : "";
+      mk.icon.material = rig.spriteMat(`i:${p.species}:${dim}`, () => new THREE.SpriteMaterial({ map: speciesTexture(p.species, rig.iconTex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.28 : 1 }));
+      mk.ring.material = rig.spriteMat(`r:${p.color}:${dim}`, () => new THREE.SpriteMaterial({ map: statusRingTexture(p.color, rig.ringTex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.2 : 1 }));
+      const top = p.id === selectedBirdId;
+      mk.icon.renderOrder = top ? 15 : p.dim ? 9 : 11;
+      mk.ring.renderOrder = top ? 14 : p.dim ? 8 : 10;
+      mk.icon.visible = mk.ring.visible = true;
+      if (j === undefined) mk.icon.position.set(p.pos.x, p.pos.y + LIFT, p.pos.z);
     });
+    for (let i = n; i < rig.pool.length; i++) rig.pool[i].icon.visible = rig.pool[i].ring.visible = false;
     rig.marks = { ids: points.map((p) => p.id), cur, tgt, scale };
-    rig.birds.count = n;
-    if (rig.birds.instanceColor) rig.birds.instanceColor.needsUpdate = true;
     const sel = points.some((p) => p.id === selectedBirdId);
     rig.selRing.visible = rig.selDrop.visible = sel;
   }, [points, selectedBirdId, ready]);
@@ -756,7 +846,7 @@ export function AviaryScene(props: AviarySceneProps) {
               onClick={() => props.onSelectZone(z.id)}
               title={`${z.code} · ${z.name}`}
               className={cx(
-                "pointer-events-auto absolute left-0 top-0 rounded-md border bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur transition-opacity hover:bg-white",
+                "pointer-events-auto absolute left-0 top-0 rounded-md border bg-panel-solid/90 px-1.5 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur transition-opacity hover:bg-panel-solid",
                 highlightZoneId === z.id ? "border-ink/40 text-ink" : "border-line-strong text-muted",
               )}
               style={{ borderLeft: `3px solid ${z.color}` }}
@@ -772,7 +862,7 @@ export function AviaryScene(props: AviarySceneProps) {
           </span>
         )}
         {selBird && (
-          <span key={`bird-${selBird.id}`} data-follow data-x={selBird.pos.x} data-y={selBird.pos.y + 3.2} data-z={selBird.pos.z} className="absolute left-0 top-0 rounded-md bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
+          <span key={`bird-${selBird.id}`} data-follow data-dy={-30} data-x={selBird.pos.x} data-y={selBird.pos.y} data-z={selBird.pos.z} className="absolute left-0 top-0 rounded-md bg-panel-solid px-1.5 py-0.5 text-[10px] font-semibold text-ink shadow ring-1 ring-line-strong">
             {selBird.id}
           </span>
         )}
@@ -780,12 +870,12 @@ export function AviaryScene(props: AviarySceneProps) {
         <div ref={tipRef} className="absolute left-0 top-0 rounded-md bg-ink/90 px-2 py-1 text-[11px] text-white opacity-0 shadow transition-opacity" />
       </div>
 
-      <div className="absolute bottom-3 right-3 flex flex-col overflow-hidden rounded-xl border border-line-strong bg-white/90 shadow-sm backdrop-blur">
+      <div className="absolute bottom-3 right-3 flex flex-col overflow-hidden rounded-xl border border-line-strong bg-panel-solid/90 shadow-sm backdrop-blur">
         <button onClick={() => zoom(1.25)} className="grid h-9 w-9 place-items-center text-muted hover:bg-ink/5 hover:text-ink" aria-label="Zoom in"><Plus size={16} /></button>
         <button onClick={() => zoom(0.8)} className="grid h-9 w-9 place-items-center border-t border-line text-muted hover:bg-ink/5 hover:text-ink" aria-label="Zoom out"><Minus size={16} /></button>
         <button onClick={reset} className="grid h-9 w-9 place-items-center border-t border-line text-muted hover:bg-ink/5 hover:text-ink" aria-label="Reset view"><RotateCcw size={15} /></button>
       </div>
-      <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg bg-white/85 px-2 py-1 text-[10px] text-muted shadow-sm backdrop-blur">
+      <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg bg-panel-solid/85 px-2 py-1 text-[10px] text-muted shadow-sm backdrop-blur">
         <Box size={12} /> {FOOTPRINT.label} · {mode === "3d" ? "drag to rotate · Ctrl + scroll to zoom · right-drag to pan" : "drag to pan · Ctrl + scroll to zoom"}
       </div>
       {highlightZoneId && <span className="sr-only">Zone {MONITOR_ZONE_BY_ID[highlightZoneId]?.name} highlighted</span>}
