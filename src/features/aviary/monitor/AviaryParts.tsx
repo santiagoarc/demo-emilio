@@ -31,6 +31,7 @@ import { resetDemoData, useTracking } from "@/state/useTracking";
 import { Badge, Segmented, cx } from "@/components/ui/primitives";
 import { BarList, Donut, LineChart, SplitBar } from "@/components/charts/Charts";
 import { TreeSideView, type SideBird } from "./TreeSideView";
+import { BirdActivity } from "./BirdActivity";
 
 // WebGL only runs in the browser.
 export const AviaryScene = dynamic(() => import("./AviaryScene").then((m) => m.AviaryScene), {
@@ -282,12 +283,14 @@ export function Field({ k, v }: { k: string; v: ReactNode }) {
   );
 }
 
+export type BirdTab = "info" | "location" | "activity" | "history";
+
 export function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, onTrail, onClose, onCenter, onTree }: {
   fix: Fix;
   asOf: number;
   now: number;
-  tab: "info" | "location" | "history";
-  onTab: (t: "info" | "location" | "history") => void;
+  tab: BirdTab;
+  onTab: (t: BirdTab) => void;
   win: WindowId;
   onWin: (w: WindowId) => void;
   showTrail: boolean;
@@ -335,7 +338,7 @@ export function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, on
         </div>
 
         <div className="mt-3 flex border-b border-line text-xs" role="tablist">
-          {(["info", "location", "history"] as const).map((t) => (
+          {(["info", "location", "activity", "history"] as const).map((t) => (
             <button
               key={t}
               role="tab"
@@ -412,6 +415,16 @@ export function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, on
               <Crosshair size={15} /> Center on map
             </button>
           </div>
+        )}
+
+        {tab === "activity" && (
+          <BirdActivity
+            bird={bird}
+            asOf={asOf}
+            windowMs={WINDOWS[win]}
+            windowLabel={win === "7d" ? "last 7 days" : `last ${win.replace("h", " h")}`}
+            control={<Segmented size="sm" value={win} onChange={onWin} options={[{ value: "6h" as const, label: "6 h" }, { value: "24h" as const, label: "24 h" }, { value: "7d" as const, label: "7 days" }]} />}
+          />
         )}
 
         {tab === "history" && (

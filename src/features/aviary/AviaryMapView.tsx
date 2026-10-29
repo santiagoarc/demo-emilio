@@ -24,7 +24,7 @@ import { useSimClock, useTracking, type TrackingState } from "@/state/useTrackin
 import { Segmented, cx } from "@/components/ui/primitives";
 import { Donut, LineChart } from "@/components/charts/Charts";
 import { DEFAULT_SCENE_LAYERS, type SceneLayers, type ScenePoint } from "./monitor/AviaryScene";
-import { AviaryScene, BirdCard, SPEEDS, STATUS_ORDER, WINDOWS, type WindowId } from "./monitor/AviaryParts";
+import { AviaryScene, BirdCard, type BirdTab, SPEEDS, STATUS_ORDER, WINDOWS, type WindowId } from "./monitor/AviaryParts";
 import { AviaryImageMap, type ZoneStat } from "./monitor/AviaryImageMap";
 import { SpeciesAvatar } from "./SpeciesAvatar";
 import { TreeIllustration, type TreeBird } from "./TreeIllustration";
@@ -102,7 +102,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
   // On the picture, birds are summarised by area first; picking an area shows its dots.
   const [aggregate, setAggregate] = useState(true);
   const [smooth, setSmooth] = useState(true);
-  const [tab, setTab] = useState<"info" | "location" | "history">("location");
+  const [tab, setTab] = useState<BirdTab>("location");
   const [win, setWin] = useState<WindowId>("6h");
 
   const matches = (f: Fix) => {
