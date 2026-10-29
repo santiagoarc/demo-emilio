@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImageIcon, Minus, Plus, RotateCcw } from "lucide-react";
-import { FOOTPRINT, MONITOR_ZONES, type MonitorZone, type Vec3 } from "@/domain/aviaryTracking";
+import { FOOTPRINT, INNER_RATIO, MONITOR_ZONES, MONITOR_ZONE_BY_ID, type MonitorZone, type Vec3 } from "@/domain/aviaryTracking";
 import { GREAT_TREE } from "@/domain/aviaryLayout";
 import { REFERENCE_IMAGE, groundScale, toImage } from "@/domain/aviaryImageProjection";
 import { cx } from "@/components/ui/primitives";
@@ -15,7 +15,34 @@ const DOT = 4.5;
 const CELL = 22;
 const MAX_ZOOM = 6;
 
-type Props = Pick<
+/** Birds in one zone, after the active filters (except the zone itself). */
+export interface ZoneStat {
+  zoneId: string;
+  count: number;
+  detected: number;
+  noSignal: number;
+  species: { name: string; color: string; n: number }[];
+}
+
+/** Zone outline on the ground, projected onto the picture. */
+function zoneOutline(zone: MonitorZone): string {
+  const { rx, rz } = FOOTPRINT;
+  const pts: Vec3[] = [];
+  if (!zone.sector) {
+    for (let d = 0; d < 360; d += 10) pts.push({ x: Math.cos((d * Math.PI) / 180) * rx * INNER_RATIO, y: 0, z: Math.sin((d * Math.PI) / 180) * rz * INNER_RATIO });
+  } else {
+    const [a0, a1] = zone.sector;
+    for (let d = a0; d <= a1 + 0.01; d += 4) pts.push({ x: Math.cos((d * Math.PI) / 180) * rx * 0.97, y: 0, z: Math.sin((d * Math.PI) / 180) * rz * 0.97 });
+    for (let d = a1; d >= a0 - 0.01; d -= 4) pts.push({ x: Math.cos((d * Math.PI) / 180) * rx * INNER_RATIO, y: 0, z: Math.sin((d * Math.PI) / 180) * rz * INNER_RATIO });
+  }
+  return pts.map((p) => toImage(p)).map((p) => `${p.u.toFixed(1)},${p.v.toFixed(1)}`).join(" ");
+}
+
+type Props = {
+  /** Summarise birds by area; only the chosen area shows its dots. */
+  aggregate?: boolean;
+  zoneStats?: ZoneStat[];
+} & Pick<
   AviarySceneProps,
   "trees" | "points" | "selectedBirdId" | "selectedTreeId" | "highlightZoneId" | "precision" | "trail" | "focus" | "smooth" | "layers" | "cluster" | "onSelectBird" | "onSelectTree" | "onSelectZone" | "onSelectGroup"
 >;
@@ -96,9 +123,15 @@ export function AviaryImageMap(props: Props) {
     return () => el.removeEventListener("wheel", onWheel);
   });
 
-  const { points, selectedBirdId, cluster } = props;
+  const { points, selectedBirdId, cluster, aggregate, zoneStats } = props;
+  const showDots = !aggregate || !!props.highlightZoneId;
   // Picture positions of the birds, and groups of dots that overlap at this zoom.
-  const placed = useMemo(() => points.map((p) => ({ p, ...toImage(p.pos) })), [points]);
+  const placed = useMemo(
+    () => (showDots ? points.filter((p) => !aggregate || !p.dim) : []).map((p) => ({ p, ...toImage(p.pos) })),
+    [points, showDots, aggregate],
+  );
+  const outlines = useMemo(() => MONITOR_ZONES.map((z) => ({ z, pts: zoneOutline(z) })), []);
+  const [hoverZone, setHoverZone] = useState<string | null>(null);
   const { singles, groups } = useMemo(() => {
     if (cluster === false) return { singles: placed, groups: [] as { u: number; v: number; ids: string[] }[] };
     const cells = new Map<number, typeof placed>();
@@ -182,8 +215,28 @@ export function AviaryImageMap(props: Props) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={REFERENCE_IMAGE.src} alt="Reference render of the aviary (illustrative)" width={IW} height={IH} draggable={false} className="pointer-events-none block" />
         <svg width={IW} height={IH} viewBox={`0 0 ${IW} ${IH}`} className="absolute inset-0 overflow-visible">
+          {(aggregate || layers.zones) &&
+            outlines.map(({ z, pts }) => {
+              const on = props.highlightZoneId === z.id;
+              const hot = hoverZone === z.id;
+              return (
+                <polygon
+                  key={z.id}
+                  points={pts}
+                  fill={z.color}
+                  fillOpacity={aggregate ? (on ? 0.3 : hot ? 0.24 : props.highlightZoneId ? 0.06 : 0.14) : 0.05}
+                  stroke={z.color}
+                  strokeOpacity={on || hot ? 0.95 : 0.55}
+                  strokeWidth={(on ? 3 : 1.5) / v.k}
+                  className={aggregate ? "cursor-pointer" : "pointer-events-none"}
+                  onClick={() => aggregate && !drag.current?.moved && props.onSelectZone(z.id)}
+                  onMouseEnter={() => setHoverZone(z.id)}
+                  onMouseLeave={() => setHoverZone(null)}
+                />
+              );
+            })}
           {/* Tree crowns: clickable, outlined when selected or hovered. */}
-          {treeSpots.map((s) => (
+          {showDots && treeSpots.map((s) => (
             <circle
               key={s.t.id}
               cx={s.u}
@@ -226,7 +279,42 @@ export function AviaryImageMap(props: Props) {
 
       {/* Screen-space labels: zone chips, tree IDs, selection. */}
       <div className="pointer-events-none absolute inset-0">
-        {layers.labels &&
+        {aggregate &&
+          zoneStats?.map((st) => {
+            const z = MONITOR_ZONE_BY_ID[st.zoneId];
+            const a = toImage(zoneAnchor(z));
+            const p = screen(a.u, a.v);
+            const on = props.highlightZoneId === z.id;
+            const total = Math.max(1, st.count);
+            return (
+              <button
+                key={z.id}
+                onClick={() => props.onSelectZone(z.id)}
+                onMouseEnter={() => setHoverZone(z.id)}
+                onMouseLeave={() => setHoverZone(null)}
+                className={cx(
+                  "pointer-events-auto absolute w-[132px] -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-panel-solid/95 px-2 py-1.5 text-left shadow-md backdrop-blur transition",
+                  on ? "border-ink/50 ring-2 ring-accent/40" : "border-line-strong hover:border-ink/30",
+                  props.highlightZoneId && !on && "opacity-70",
+                )}
+                style={{ left: p.x, top: p.y, borderLeft: `4px solid ${z.color}` }}
+                title={`${z.code} · ${z.name}: ${st.count} birds`}
+              >
+                <span className="block truncate text-[11px] font-semibold text-ink">{z.code} · {z.name}</span>
+                <span className="num flex items-baseline gap-1 text-[10px] text-muted">
+                  <span className="text-[13px] font-semibold text-ink">{st.count}</span> birds · {st.species.length} sp.
+                  {st.noSignal > 0 && <span className="ml-auto text-danger">{st.noSignal}⚠</span>}
+                </span>
+                <span className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-ink/[0.06]">
+                  {st.species.map((sp) => (
+                    <span key={sp.name} style={{ width: `${(sp.n / total) * 100}%`, background: sp.color }} />
+                  ))}
+                </span>
+              </button>
+            );
+          })}
+        {!aggregate &&
+          layers.labels &&
           MONITOR_ZONES.map((z) => {
             const a = toImage(zoneAnchor(z));
             const p = screen(a.u, a.v);
@@ -284,7 +372,7 @@ export function AviaryImageMap(props: Props) {
         </button>
       </div>
       <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg bg-panel-solid/85 px-2 py-1 text-[10px] text-muted shadow-sm backdrop-blur">
-        <ImageIcon size={12} /> Reference render · positions approximate · drag to pan · Ctrl + scroll to zoom
+        <ImageIcon size={12} /> Reference render · positions approximate · {aggregate ? "click an area to see its birds" : "drag to pan · Ctrl + scroll to zoom"}
       </div>
     </div>
   );
