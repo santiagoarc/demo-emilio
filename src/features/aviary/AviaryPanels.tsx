@@ -184,11 +184,11 @@ export function TeamsSection({ fixes, teamOf, onAssign, teamFilter, onTeamFilter
   const assigned = [...byTeam.values()].reduce((a, l) => a + l.length, 0);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col" aria-label="Monitoring teams">
+    <section className="flex min-h-0 flex-1 flex-col" aria-label="Care teams">
       <div className="flex items-center justify-between gap-2 border-b border-line px-3 pb-2.5 pt-3">
         <div>
           <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
-            <Users size={15} className="text-accent" /> Monitoring teams
+            <Users size={15} className="text-accent" /> Care teams
           </h2>
           <p className="text-[11px] text-muted" title="Each bird belongs to exactly one team">
             {MONITOR_TEAMS.length} teams · {assigned}/{total} birds assigned

@@ -64,7 +64,7 @@ const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exa
     { href: "/aviary/species", label: "Species", icon: Feather },
     { href: "/aviary/birds", label: "Individuals", icon: IdCard },
     { href: "/aviary/trees", label: "Trees", icon: TreePine },
-    { href: "/aviary/teams", label: "Teams", icon: Users },
+    { href: "/aviary/teams", label: "Care teams", icon: Users },
     { href: "/aviary/health", label: "Health follow-up", icon: HeartPulse },
   ],
 };

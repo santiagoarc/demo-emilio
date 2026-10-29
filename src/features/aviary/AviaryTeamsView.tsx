@@ -134,8 +134,8 @@ export function AviaryTeamsView() {
     <div className="pb-10">
       <div className="flex flex-wrap items-end justify-between gap-4 px-6 pb-4 pt-6 lg:px-8">
         <div className="min-w-0">
-          <p className="eyebrow mb-1">Monitoring Teams · Aviary</p>
-          <h1 className="text-[28px] font-semibold tracking-tight">Monitoring teams</h1>
+          <p className="eyebrow mb-1">Care Teams · Aviary</p>
+          <h1 className="text-[28px] font-semibold tracking-tight">Care teams</h1>
           <p className="mt-1 text-sm text-muted">Teams, assigned birds and recorded activity.</p>
         </div>
         <Segmented size="sm" value={period} onChange={setPeriod} options={[{ value: "24h", label: "24 h" }, { value: "7d", label: "7 days" }]} />
@@ -143,7 +143,7 @@ export function AviaryTeamsView() {
 
       <div className="space-y-5 px-6 lg:px-8">
         <div className="grid gap-3 sm:grid-cols-3">
-          <Kpi icon={Users} color="#a78bfa" value={String(MONITOR_TEAMS.length)} label="Monitoring teams" sub={`${MONITOR_TEAMS.length} active · 0 inactive`} />
+          <Kpi icon={Users} color="#a78bfa" value={String(MONITOR_TEAMS.length)} label="Care teams" sub={`${MONITOR_TEAMS.length} active · 0 inactive`} />
           <Kpi icon={Users} color="#5cb8ff" value={String(stats.reduce((a, x) => a + x.birds.length, 0))} label="Assigned birds" sub={`${Math.round((stats.reduce((a, x) => a + x.birds.length, 0) / Math.max(1, total)) * 100)}% of total · one team per bird`} />
           <Kpi icon={Radio} color="#2fd8c8" value={`${Math.round((detected / Math.max(1, total)) * 100)}%`} label="Detected now" sub={`${detected} of ${total} · current assignment`} />
         </div>
@@ -151,7 +151,7 @@ export function AviaryTeamsView() {
         <section>
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="text-[17px] font-semibold tracking-tight">Monitoring teams</h2>
+              <h2 className="text-[17px] font-semibold tracking-tight">Care teams</h2>
               <p className="text-xs text-muted">Select a team to see its details. Names are configurable and do not reflect the real structure.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -326,7 +326,7 @@ function TeamDetail({ teamId }: { teamId: TeamId }) {
             <ChevronLeft size={18} className="text-accent" /> All teams
           </Link>
           <nav className="flex items-center gap-1 text-xs text-muted">
-            <Link href="/aviary/teams" className="hover:text-ink">Monitoring Teams</Link>
+            <Link href="/aviary/teams" className="hover:text-ink">Care Teams</Link>
             <ChevronRight size={12} className="text-faint" />
             <span className="text-ink">{team.name}</span>
           </nav>

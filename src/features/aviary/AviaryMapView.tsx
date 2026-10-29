@@ -397,7 +397,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
           <aside className={cx("panel h-[410px] shrink-0 flex-col overflow-hidden", selFix && !maxed ? "hidden" : "flex")} aria-label="Species">
             <SpeciesSection fixes={all} speciesFilter={speciesId} onSpeciesFilter={setSpeciesId} onBird={openBird} selectedBird={birdId} />
           </aside>
-          <aside className={cx("panel min-h-[230px] flex-1 flex-col overflow-hidden", selFix && !maxed ? "hidden" : "flex")} aria-label="Monitoring teams">
+          <aside className={cx("panel min-h-[230px] flex-1 flex-col overflow-hidden", selFix && !maxed ? "hidden" : "flex")} aria-label="Care teams">
             <TeamsSection fixes={all} teamOf={teamOf} onAssign={assign} teamFilter={teamFilter} onTeamFilter={setTeamFilter} onBird={openBird} />
           </aside>
         </div>
