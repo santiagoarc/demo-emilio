@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ButtonHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import { X, type LucideIcon } from "lucide-react";
 
 export function cx(...c: (string | false | null | undefined)[]) {
@@ -176,31 +176,6 @@ export function Drawer({ open, onClose, children, width = 420, title }: { open: 
         </div>
         <div className="scroll-thin flex-1 overflow-y-auto">{children}</div>
       </aside>
-    </div>
-  );
-}
-
-/** Centered popup over the page, with the same look as the drawer. Esc or the backdrop closes it. */
-export function Modal({ open, onClose, children, width = 640, title }: { open: boolean; onClose: () => void; children: ReactNode; width?: number; title?: ReactNode }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
-      <section className="relative flex max-h-[min(860px,calc(100vh-2rem))] w-full flex-col overflow-hidden rounded-2xl border border-line bg-panel-solid shadow-2xl" style={{ maxWidth: width }}>
-        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
-          <div className="min-w-0 text-sm font-semibold">{title}</div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="scroll-thin flex-1 overflow-y-auto">{children}</div>
-      </section>
     </div>
   );
 }

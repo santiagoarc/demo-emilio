@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { Activity, Bird, ChevronLeft, TreePine, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { Activity, Bird, ChevronLeft, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { cx } from "@/components/ui/primitives";
 import { PenguinSearch } from "./PenguinSearch";
 import { BirdSearch } from "./BirdSearch";
@@ -63,7 +63,6 @@ const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exa
     { href: "/aviary/map", label: "Map", icon: MapIcon },
     { href: "/aviary/species", label: "Species", icon: Feather },
     { href: "/aviary/birds", label: "Individuals", icon: IdCard },
-    { href: "/aviary/trees", label: "Trees", icon: TreePine },
     { href: "/aviary/teams", label: "Care teams", icon: Users },
     { href: "/aviary/health", label: "Health follow-up", icon: HeartPulse },
   ],

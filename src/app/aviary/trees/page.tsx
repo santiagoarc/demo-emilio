@@ -1,13 +1,6 @@
-import { Suspense } from "react";
-import { AviaryTreesView } from "@/features/aviary/AviaryTreesView";
+import { redirect } from "next/navigation";
 
-// The demo generates its data in the browser; there is no UI to validate on the server.
-export const instant = false;
-
+// Retired section: trees are opened from the map.
 export default function AviaryTreesPage() {
-  return (
-    <Suspense>
-      <AviaryTreesView />
-    </Suspense>
-  );
+  redirect("/aviary/map");
 }
