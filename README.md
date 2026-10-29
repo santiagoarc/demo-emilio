@@ -37,7 +37,7 @@ La barra lateral cambia entre dos áreas con la misma estructura: **Penguins** y
 | | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |
 | | `/penguins/rules` | Reglas propuestas (ejemplos configurables, no alertas operativas). |
 | **Aviary** | `/aviary` | Overview como el de pingüinos: cifras, mapa 3D en tarjeta, desglose por especie, movimientos recientes, zonas, alturas y actividad. |
-| | `/aviary/map` | Habitat map: especies con foto a la izquierda; mapa 3D al centro con filtros (zona, nivel, estado, especie) y **un punto por ave con el color de su especie** (el mismo que el anillo de la foto en la lista); a la derecha el **árbol seleccionado** ilustrado de raíces a copa con escala en metros, niveles y las aves a su altura, más la tabla de aves del árbol; la ficha del ave tiene **Back to tree**. Reloj simulado (1×/5×/20×) y paneles por especie, altura y actividad. |
+| | `/aviary/map` | Habitat map: mapa 3D con filtros (zona, nivel, estado, especie) y un punto por ave con el color de su especie. Panel derecho: **Species** (buscador, ~8 visibles con scroll; cada especie se despliega con su resumen y sus ejemplares) y **Monitoring teams** (Alpha, Bravo, Charlie con aves, especies, detectadas y sin señal; se despliegan con sus aves y, con *Edit assignments*, se reasignan). Clic en un árbol: tarjeta sobre el mapa y vista del árbol (raíces a copa, escala, niveles, aves a su altura) en panel deslizable. Reloj simulado (1×/5×/20×). |
 | | `/aviary/species` | Catálogo de 32 especies (pedidas vs. generadas, sexo, edad), árboles y validaciones de los datos. |
 | | `/aviary/species/[id]` | Ficha de la especie: foto de referencia (Wikimedia Commons, con autor y licencia), resumen de Wikipedia, cifras de la demo y una tarjeta por cada ave. |
 | | `/aviary/birds` | Registro de las 500 aves; cada fila abre el ave en el Habitat map. |
@@ -63,6 +63,13 @@ Wikimedia Commons con licencias libres; autor, licencia y enlace de cada una est
 en `src/data/aviarySpeciesInfo.ts` y se muestran en la ficha de cada especie. El
 recorte circular de cada foto se ajusta en `src/data/aviarySpeciesIcons.ts`.
 Los nombres de árbol (Ceiba, Mango…) son ilustrativos de la demo.
+
+## Equipos del aviario
+
+Cada ave pertenece a un solo equipo (`src/data/aviaryTeams.ts`). Por defecto:
+Alpha = tucanes, loros y guacamayos; Bravo = ibis, espátula, cigüeña y turacos;
+Charlie = palomas, faisanes y el resto. Las reasignaciones hechas en la pantalla
+se guardan en el `localStorage` (`aviary-demo/teams/v1`) y pueden deshacerse.
 
 ## Escenario de demostración
 
