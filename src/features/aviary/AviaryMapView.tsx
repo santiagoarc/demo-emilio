@@ -69,7 +69,11 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
   });
 
   const [group, setGroup] = useState<GroupFilter>("all");
-  const [speciesId, setSpeciesId] = useState("");
+  // ?species=ID comes from a species page: open with that filter.
+  const [speciesId, setSpeciesId] = useState(() => {
+    const s = params.get("species");
+    return s && MONITOR_SPECIES_BY_ID[s] ? s : "";
+  });
   const [zoneId, setZoneId] = useState("");
   const [treeFilter, setTreeFilter] = useState("");
   const [level, setLevel] = useState<LevelId | "all">("all");

@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 import { ClipboardList, TreePine } from "lucide-react";
 import { GROUP_LABEL, MONITOR_ZONE_BY_ID, type AgeClass } from "@/domain/aviaryTracking";
 import { DEMO_TOTAL_BIRDS, REQUESTED_TOTAL } from "@/data/aviaryCatalog";
+import { SPECIES_INFO } from "@/data/aviarySpeciesInfo";
 import { runDemoChecks } from "@/logic/aviaryDemoChecks";
 import { treeOccupants } from "@/logic/aviaryTracking";
 import { Card, cx } from "@/components/ui/primitives";
@@ -66,10 +68,16 @@ export function AviaryInventory() {
                       <span className="inline-grid h-6 w-10 place-items-center rounded-md text-[10px] font-bold text-white" style={{ background: s.color }}>{s.code}</span>
                     </td>
                     <td className="px-2 py-1.5">
-                      <span className="font-medium text-ink">{s.common}</span>
-                      <span className="block text-[11px] text-muted">
-                        <i>{s.scientific}</i> · {s.commonEs}
-                      </span>
+                      <Link href={`/aviary/species/${s.id}`} className="group flex items-center gap-2.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={SPECIES_INFO[s.code].photo.src} alt="" loading="lazy" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                        <span className="min-w-0">
+                          <span className="font-medium text-ink group-hover:text-accent">{s.common}</span>
+                          <span className="block text-[11px] text-muted">
+                            <i>{s.scientific}</i> · {s.commonEs}
+                          </span>
+                        </span>
+                      </Link>
                     </td>
                     <td className="px-2 py-1.5 text-muted">{GROUP_LABEL[s.group]}</td>
                     <td className={cx("num px-2 py-1.5 text-right", s.requestedCount !== n ? "text-warn" : "text-muted")}>{s.requestedCount}</td>
@@ -87,7 +95,7 @@ export function AviaryInventory() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-[11px] text-faint">Sex is recorded only for species where males and females look different; juveniles of those species are not sexed yet.</p>
+          <p className="mt-2 text-[11px] text-faint">Open a species to see its photo, summary and every bird. Sex is recorded only for species where males and females look different; juveniles of those species are not sexed yet.</p>
         </Card>
 
         <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">

@@ -189,12 +189,12 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
             <ul className="space-y-2">
               {bySpecies.slice(0, 8).map(({ s, n }) => (
                 <li key={s.id}>
-                  <div className="flex items-center gap-2.5">
+                  <Link href={`/aviary/species/${s.id}`} className="flex items-center gap-2.5 hover:text-accent">
                     <span className="grid h-7 w-9 shrink-0 place-items-center rounded-md text-[10px] font-bold text-white" style={{ background: s.color }}>{s.code}</span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{s.common}</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px]">{s.common}</span>
                     <span className="num text-[13px] font-semibold">{n}</span>
                     <span className="num w-8 text-right text-[11px] text-faint">{pct(n, total)}%</span>
-                  </div>
+                  </Link>
                   <div className="ml-[46px] mt-1 h-1 overflow-hidden rounded-full bg-ink/[0.05]">
                     <div className="h-full rounded-full" style={{ width: `${(n / bySpecies[0].n) * 100}%`, background: s.color }} />
                   </div>

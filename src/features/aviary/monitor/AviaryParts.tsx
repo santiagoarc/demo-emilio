@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, type ReactNode } from "react";
-import { Activity, ArrowRight, CheckCircle2, Crosshair, Feather, Layers, MapPin, ShieldCheck, TreePine, X, XCircle } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, Crosshair, Layers, MapPin, ShieldCheck, TreePine, X, XCircle } from "lucide-react";
 import {
   AGE_LABEL,
   DEVICE_STATUS_LABEL,
@@ -23,6 +23,7 @@ import {
 } from "@/domain/aviaryTracking";
 import { MONITOR_SPECIES_BY_ID } from "@/data/aviaryCatalog";
 import { HISTORY_DAYS } from "@/data/aviaryTrackingSimulate";
+import { SPECIES_INFO } from "@/data/aviarySpeciesInfo";
 import { activityByHour, dataQuality, fmtHeight, historyRows, recentMoves, treeHistory, treeOccupants, type Fix } from "@/logic/aviaryTracking";
 import { runDemoChecks } from "@/logic/aviaryDemoChecks";
 import { DAY, HOUR, MIN, fmtAgo, fmtDateTime, fmtTime } from "@/logic/time";
@@ -305,9 +306,18 @@ export function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, on
 
   return (
     <section className="panel overflow-hidden" aria-label={`Bird ${bird.id}`}>
-      <div className="relative grid h-28 place-items-center" style={{ background: `linear-gradient(135deg, ${sp.color}33, ${sp.color}88)` }}>
-        <Feather size={34} style={{ color: sp.color }} aria-hidden />
-        <span className="absolute bottom-2 left-3 rounded bg-white/85 px-1.5 py-0.5 text-[10px] text-muted">Reference photo · to be provided by SeaWorld</span>
+      <div className="relative h-36 overflow-hidden" style={{ background: sp.color }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={SPECIES_INFO[sp.code].photo.src} alt={`${sp.common}, species reference photo`} className="h-full w-full object-cover" />
+        <a
+          href={SPECIES_INFO[sp.code].photo.page}
+          target="_blank"
+          rel="noreferrer"
+          className="absolute bottom-2 left-2 rounded bg-white/85 px-1.5 py-0.5 text-[10px] text-muted hover:text-ink"
+          title={`${SPECIES_INFO[sp.code].photo.author} · ${SPECIES_INFO[sp.code].photo.license}`}
+        >
+          Species photo · not this bird · Wikimedia Commons
+        </a>
         <button onClick={onClose} className="absolute right-2 top-2 rounded-lg bg-white/80 p-1 text-muted hover:text-ink" aria-label="Close bird">
           <X size={15} />
         </button>
