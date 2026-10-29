@@ -57,8 +57,8 @@ export function clearDemoStorage() {
   } catch {}
 }
 
-/** Speeds offered by the clock controls (simulated seconds per real second). */
-export const CLOCK_SPEEDS = [1, 5, 20];
+/** Default clock speed (simulated seconds per real second). */
+export const DEFAULT_SPEED = 20;
 
 export interface ClockState {
   simTime: number;
@@ -68,11 +68,12 @@ export interface ClockState {
 }
 
 export function loadClock(registry: DemoRegistry): ClockState {
-  const fallback: ClockState = { simTime: registry.anchor, speed: 5, playing: true };
+  // Every load starts at the default speed; only the clock position and play state are restored.
+  const fallback: ClockState = { simTime: registry.anchor, speed: DEFAULT_SPEED, playing: true };
   try {
     const raw = window.localStorage.getItem(CLOCK_KEY);
     const c = raw ? (JSON.parse(raw) as ClockState & { anchor?: number }) : null;
-    if (c && c.anchor === registry.anchor && typeof c.simTime === "number" && typeof c.speed === "number") return { simTime: c.simTime, speed: CLOCK_SPEEDS.includes(c.speed) ? c.speed : fallback.speed, playing: !!c.playing };
+    if (c && c.anchor === registry.anchor && typeof c.simTime === "number" && typeof c.speed === "number") return { simTime: c.simTime, speed: DEFAULT_SPEED, playing: !!c.playing };
   } catch {}
   return fallback;
 }

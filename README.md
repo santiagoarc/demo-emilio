@@ -37,7 +37,7 @@ La barra lateral cambia entre dos áreas con la misma estructura: **Penguins** y
 | | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |
 | | `/penguins/rules` | Reglas propuestas (ejemplos configurables, no alertas operativas). |
 | **Aviary** | `/aviary` | Overview como el de pingüinos: cifras, mapa 3D en tarjeta, desglose por especie, movimientos recientes, zonas, alturas y actividad. |
-| | `/aviary/map` | Habitat map como el de pingüinos: mapa 3D a pantalla completa, panel derecho (buscador, cifras, filtros, capas, leyenda, ficha del ave y del árbol con vista lateral) y reloj simulado abajo (play/pausa, 1×/5×/20×, movimiento suave). |
+| | `/aviary/map` | Habitat map como el de pingüinos: mapa 3D a pantalla completa, panel derecho (buscador, cifras, filtros, capas, leyenda, ficha del ave y del árbol con vista lateral) y reloj simulado abajo (play/pausa, 1×/5×/20×, 20× por defecto, movimiento suave). |
 | | `/aviary/species` | Catálogo de 32 especies (pedidas vs. generadas, sexo, edad), árboles y validaciones de los datos. |
 | | `/aviary/birds` | Registro de las 500 aves; cada fila abre el ave en el Habitat map. |
 | | `/aviary/rules` | Reglas propuestas del aviario. |
