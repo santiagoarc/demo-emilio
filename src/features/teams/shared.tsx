@@ -1,0 +1,200 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { HABITAT } from "@/domain/habitat";
+import type { CareTeam } from "@/domain/types";
+import { PERMISSIONS, useDemo, type TeamInput } from "@/state/DemoProvider";
+import { Button, Drawer, cx } from "@/components/ui/primitives";
+
+export const isActive = (t: CareTeam) => t.active !== false;
+
+export function initials(name: string) {
+  return name
+    .replace(/^(Dra?\.)\s/, "")
+    .split(" ")
+    .map((x) => x[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+/** Member initials (the demo has no staff photos). */
+export function Avatars({ team, max = 4, size = 28 }: { team: CareTeam; max?: number; size?: number }) {
+  const shown = team.members.slice(0, max);
+  const rest = team.members.length - shown.length;
+  return (
+    <span className="flex items-center">
+      {shown.map((m, i) => (
+        <span
+          key={m}
+          title={m}
+          className="grid place-items-center rounded-full border-2 border-panel-solid font-semibold text-[#03101c]"
+          style={{ width: size, height: size, marginLeft: i ? -size / 3.2 : 0, fontSize: size * 0.36, background: i % 2 ? `${team.color}cc` : team.color }}
+        >
+          {initials(m)}
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="grid place-items-center rounded-full border-2 border-panel-solid bg-panel-2 font-semibold text-muted" style={{ width: size, height: size, marginLeft: -size / 3.2, fontSize: size * 0.34 }}>
+          +{rest}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function ActiveBadge({ team }: { team: CareTeam }) {
+  const on = isActive(team);
+  return (
+    <span className={cx("inline-flex items-center gap-1.5 text-xs font-medium", on ? "text-ok" : "text-faint")}>
+      <span className={cx("h-2 w-2 rounded-full", on ? "bg-ok" : "bg-faint")} />
+      {on ? "Active" : "Inactive"}
+    </span>
+  );
+}
+
+export interface TeamStats {
+  team: CareTeam;
+  penguinIds: string[];
+  inWater: number;
+  zones: [string, number][];
+}
+
+/** Per-team indicators, computed from the current assignment (one team per penguin). */
+export function useTeamStats(): TeamStats[] {
+  const { dataset, teamOf, snapshots } = useDemo();
+  return useMemo(
+    () =>
+      dataset.teams.map((team) => {
+        const penguinIds = dataset.penguins.filter((p) => teamOf(p.id) === team.id).map((p) => p.id);
+        const zones = new Map<string, number>();
+        for (const id of penguinIds) {
+          const z = snapshots.get(id)?.reading?.zoneId;
+          if (z) zones.set(z, (zones.get(z) ?? 0) + 1);
+        }
+        return {
+          team,
+          penguinIds,
+          inWater: penguinIds.filter((id) => snapshots.get(id)!.status === "water").length,
+          zones: [...zones.entries()].sort((a, b) => b[1] - a[1]),
+        };
+      }),
+    [dataset, teamOf, snapshots],
+  );
+}
+
+/** Form to create or edit a team. Penguin assignment is done separately. */
+export function TeamFormDrawer({ open, onClose, team, onSaved }: { open: boolean; onClose: () => void; team?: CareTeam; onSaved?: (id: string) => void }) {
+  return (
+    <Drawer open={open} onClose={onClose} width={520} title={team ? `Edit ${team.name}` : "New team"}>
+      {open && <TeamForm key={team?.id ?? "new"} team={team} onClose={onClose} onSaved={onSaved} />}
+    </Drawer>
+  );
+}
+
+function TeamForm({ team, onClose, onSaved }: { team?: CareTeam; onClose: () => void; onSaved?: (id: string) => void }) {
+  const { addTeam, updateTeam, dataset, teamOf } = useDemo();
+  const [name, setName] = useState(team?.name ?? "");
+  const [focus, setFocus] = useState(team?.focus ?? "");
+  const [lead, setLead] = useState(team?.lead ?? "");
+  const [members, setMembers] = useState((team?.members ?? []).filter((m) => m !== team?.lead).join("\n"));
+  const [zones, setZones] = useState<string[]>(team?.zoneIds ?? []);
+  const [active, setActive] = useState(team ? isActive(team) : true);
+  const assigned = team ? dataset.penguins.filter((p) => teamOf(p.id) === team.id).length : 0;
+  const duplicate = dataset.teams.some((t) => t.id !== team?.id && t.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const valid = name.trim() && lead.trim() && !duplicate;
+
+  if (!PERMISSIONS.manageTeams) return <p className="p-5 text-sm text-muted">Your role cannot create or edit teams.</p>;
+
+  const save = () => {
+    const input: TeamInput = {
+      name: name.trim(),
+      focus: focus.trim(),
+      lead: lead.trim(),
+      members: [lead.trim(), ...members.split("\n").map((m) => m.trim()).filter((m) => m && m !== lead.trim())],
+      zoneIds: zones,
+      active,
+    };
+    if (team) {
+      updateTeam(team.id, input);
+      onSaved?.(team.id);
+    } else {
+      onSaved?.(addTeam(input));
+    }
+    onClose();
+  };
+
+  const field = "mt-1 w-full rounded-xl border border-line-strong bg-ink/[0.05] px-3 py-2 text-sm outline-none placeholder:text-faint focus:border-accent/60";
+  return (
+    <form
+      className="space-y-4 p-5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid) save();
+      }}
+    >
+      <label className="block text-xs text-muted">
+        Name
+        <input value={name} onChange={(e) => setName(e.target.value)} className={field} placeholder="Team Delta" />
+        {duplicate && <span className="mt-1 block text-[11px] text-danger">A team with that name already exists.</span>}
+      </label>
+      <label className="block text-xs text-muted">
+        Description
+        <input value={focus} onChange={(e) => setFocus(e.target.value)} className={field} placeholder="The team's zone or focus" />
+      </label>
+      <label className="block text-xs text-muted">
+        Team lead
+        <input value={lead} onChange={(e) => setLead(e.target.value)} className={field} placeholder="First and last name" />
+      </label>
+      <label className="block text-xs text-muted">
+        Members <span className="text-faint">(one per line; the lead is included automatically)</span>
+        <textarea value={members} onChange={(e) => setMembers(e.target.value)} rows={4} className={cx(field, "resize-none")} />
+      </label>
+      <div>
+        <p className="text-xs text-muted">Zones of responsibility</p>
+        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+          {HABITAT.zones
+            .filter((z) => z.kind !== "restricted")
+            .map((z) => (
+              <label key={z.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-2 py-1.5 text-xs hover:border-line-strong">
+                <input
+                  type="checkbox"
+                  className="accent-[var(--accent)]"
+                  checked={zones.includes(z.id)}
+                  onChange={() => setZones(zones.includes(z.id) ? zones.filter((x) => x !== z.id) : [...zones, z.id])}
+                />
+                {z.name}
+              </label>
+            ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-xs text-muted">Status</p>
+        <div className="mt-1.5 flex gap-2">
+          {[true, false].map((v) => (
+            <button
+              key={String(v)}
+              type="button"
+              onClick={() => setActive(v)}
+              className={cx("h-8 rounded-xl border px-3 text-xs", active === v ? "border-accent/50 bg-accent/10 text-ink" : "border-line-strong text-muted")}
+            >
+              {v ? "Active" : "Inactive"}
+            </button>
+          ))}
+        </div>
+        {team && !active && assigned > 0 && (
+          <p className="mt-2 rounded-lg border border-warn/30 bg-warn/10 px-2.5 py-2 text-[11px] text-warn">
+            Its {assigned} {assigned === 1 ? "penguin stays" : "penguins stay"} assigned to this team. Reassign them explicitly from the Penguins tab if needed.
+          </p>
+        )}
+      </div>
+      <p className="text-[11px] text-faint">
+        {team ? "Changes are kept in the team's history; nothing is deleted." : "Penguins are assigned afterwards, from the team detail, through an explicit reassignment."}
+      </p>
+      <div className="flex justify-end gap-2 border-t border-line pt-4">
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button type="submit" variant="primary" disabled={!valid}>{team ? "Save changes" : "Create team"}</Button>
+      </div>
+    </form>
+  );
+}

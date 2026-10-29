@@ -1,0 +1,225 @@
+"use client";
+
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { ArrowUp, MessageSquareText, RotateCcw, Square, X } from "lucide-react";
+import { useDemo } from "@/state/DemoProvider";
+import { cx } from "@/components/ui/primitives";
+import { colonyRoster, mentionedPenguins, penguinDossier } from "./penguinContext";
+import { ASK_EVENT } from "./ask";
+import { localAnswer } from "./localReports";
+
+/** What's shown on screen and what's sent to Claude (the question plus attached dossiers). */
+interface Turn {
+  role: "user" | "assistant";
+  text: string;
+  sent: string;
+  attached?: string[];
+  /** Penguins the question is about, so the conversation can continue without repeating the code. */
+  about?: string[];
+}
+
+const SUGGESTIONS = ["Give me the full report on KNG-005", "Which penguins spent the least time in water today?", "Compare GEN-001 with its species average"];
+
+/**
+ * Per-penguin reports chat. Answers from the system's data; if the server has a
+ * Claude key, the question goes to Claude with the dossiers attached (the first time
+ * each penguin is mentioned, or the one open on screen).
+ */
+export function PenguinChat() {
+  const demo = useDemo();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const [open, setOpen] = useState(false);
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  // null: not known yet; false: the server has no key, so answers come from the system's data.
+  const [claude, setClaude] = useState<boolean | null>(null);
+  const abort = useRef<AbortController | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
+  }, [turns]);
+
+  // Latest version of send, for "ask for analysis" requests from other screens.
+  const sendRef = useRef<(q: string) => void>(() => {});
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      setOpen(true);
+      sendRef.current((e as CustomEvent<string>).detail);
+    };
+    window.addEventListener(ASK_EVENT, onAsk);
+    return () => window.removeEventListener(ASK_EVENT, onAsk);
+  }, []);
+
+  // The penguin the user has open: its profile or the one selected on the map.
+  const onScreen = pathname.startsWith("/penguins/") ? decodeURIComponent(pathname.split("/")[2] ?? "") : params.get("penguin");
+
+  const send = async (question: string) => {
+    const q = question.trim();
+    if (!q || busy) return;
+    const already = new Set(turns.flatMap((t) => t.attached ?? []));
+    let found = mentionedPenguins(demo.dataset.penguins, q);
+    let note = "";
+    if (!found.length && onScreen && !turns.length) {
+      const p = demo.penguinById.get(onScreen);
+      if (p) {
+        found = [p];
+        note = `(The user has ${p.id}'s profile open.)\n`;
+      }
+    }
+    const fresh = found.filter((p) => !already.has(p.id)).slice(0, 4);
+    const sent = fresh.length ? `${q}\n\n${note}<data>\n${fresh.map((p) => penguinDossier(demo, p)).join("\n\n")}\n</data>` : q;
+
+    const history: Turn[] = [...turns, { role: "user", text: q, sent, attached: fresh.map((p) => p.id), about: found.map((p) => p.id) }];
+    setTurns([...history, { role: "assistant", text: "", sent: "" }]);
+    setInput("");
+
+    // Answer from the system's data: instant and with no external services.
+    const context = turns.flatMap((t) => t.about ?? []).map((id) => demo.penguinById.get(id)!).filter(Boolean);
+    const local = () => localAnswer(demo, q, mentionedPenguins(demo.dataset.penguins, q), context.length ? context : found);
+    if (claude === false) {
+      setTurns([...history, { role: "assistant", text: local(), sent: local() }]);
+      return;
+    }
+
+    setBusy(true);
+    const ctrl = new AbortController();
+    abort.current = ctrl;
+    let answer = "";
+    const show = (text: string) => setTurns((ts) => [...ts.slice(0, -1), { role: "assistant", text, sent: text }]);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          colony: colonyRoster(demo),
+          messages: history.filter((t) => t.sent).map((t) => ({ role: t.role, content: t.sent })),
+        }),
+      });
+      if (res.status === 503) {
+        setClaude(false);
+        show(local());
+        return;
+      }
+      if (!res.ok || !res.body) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null;
+        show(`_${err?.error ?? `Couldn't get a response (${res.status}).`}_`);
+        return;
+      }
+      setClaude(true);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        answer += decoder.decode(value, { stream: true });
+        show(answer);
+      }
+    } catch (e) {
+      show(answer + ((e as Error).name === "AbortError" ? "\n\n_Response stopped._" : "\n\n_Connection lost._"));
+    } finally {
+      setBusy(false);
+      abort.current = null;
+    }
+  };
+
+  useEffect(() => {
+    sendRef.current = (q) => void send(q);
+  });
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    void send(input);
+  };
+
+  return (
+    <>
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className={cx("fixed right-5 z-50 inline-flex h-12 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(11,36,64,0.25)] transition hover:bg-[#0b8178]",
+            // On the map, the bottom-right corner holds the panel's profile button.
+            pathname === "/map" ? "bottom-[84px]" : "bottom-5",
+          )}
+        >
+          <MessageSquareText size={18} /> Reports
+        </button>
+      )}
+      {open && (
+        <section className="fixed bottom-5 right-5 z-50 flex h-[min(680px,calc(100vh-40px))] w-[min(440px,calc(100vw-40px))] flex-col overflow-hidden rounded-2xl border border-line-strong bg-panel-solid shadow-[0_16px_48px_rgba(11,36,64,0.25)]">
+          <header className="flex items-center gap-2 border-b border-line px-4 py-3">
+            <MessageSquareText size={17} className="text-accent" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold">Penguin reports</h2>
+              <p className="text-[11px] text-muted">Ask by code or name · {claude ? "Claude answers using the system's data" : "using the system's data"}</p>
+            </div>
+            {turns.length > 0 && (
+              <button onClick={() => !busy && setTurns([])} title="New conversation" className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink">
+                <RotateCcw size={15} />
+              </button>
+            )}
+            <button onClick={() => setOpen(false)} aria-label="Close" className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink">
+              <X size={16} />
+            </button>
+          </header>
+
+          <div ref={scroller} className="scroll-thin flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {turns.length === 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted">Ask for a bird&rsquo;s report, compare it with its species, or ask about the colony.</p>
+                {SUGGESTIONS.map((s) => (
+                  <button key={s} onClick={() => void send(s)} className="block w-full rounded-xl border border-line-strong px-3 py-2 text-left text-xs text-ink hover:bg-ink/[0.04]">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            {turns.map((t, i) =>
+              t.role === "user" ? (
+                <div key={i} className="ml-8 rounded-2xl rounded-br-md bg-accent/12 px-3 py-2 text-sm text-ink">
+                  {t.text}
+                  {!!t.attached?.length && <p className="mt-1 text-[10px] text-muted">Dossier attached: {t.attached.join(", ")}</p>}
+                </div>
+              ) : (
+                <div key={i} className="chat-md text-sm text-ink">
+                  {t.text ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.text}</ReactMarkdown> : <span className="text-xs text-muted">Preparing the report…</span>}
+                </div>
+              ),
+            )}
+          </div>
+
+          <form onSubmit={submit} className="flex items-end gap-2 border-t border-line p-3">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
+              rows={1}
+              placeholder="e.g. How is Koda doing this week?"
+              className="max-h-32 min-h-10 flex-1 resize-none rounded-xl border border-line-strong bg-panel-solid px-3 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
+            {busy ? (
+              <button type="button" onClick={() => abort.current?.abort()} aria-label="Stop" className="grid h-10 w-10 place-items-center rounded-xl bg-ink/10 text-ink hover:bg-ink/15">
+                <Square size={14} />
+              </button>
+            ) : (
+              <button type="submit" disabled={!input.trim()} aria-label="Send" className={cx("grid h-10 w-10 place-items-center rounded-xl bg-accent text-white transition hover:bg-[#0b8178]", !input.trim() && "opacity-40")}>
+                <ArrowUp size={16} />
+              </button>
+            )}
+          </form>
+        </section>
+      )}
+    </>
+  );
+}
