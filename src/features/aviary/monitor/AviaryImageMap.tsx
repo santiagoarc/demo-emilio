@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ImageIcon, Minus, Plus, RotateCcw } from "lucide-react";
+import { ImageIcon, Minimize2, Minus, Plus, RotateCcw } from "lucide-react";
 import { FOOTPRINT, INNER_RATIO, MONITOR_ZONES, MONITOR_ZONE_BY_ID, type MonitorZone, type Vec3 } from "@/domain/aviaryTracking";
 import { GREAT_TREE } from "@/domain/aviaryLayout";
 import { REFERENCE_IMAGE, groundScale, toImage } from "@/domain/aviaryImageProjection";
@@ -124,11 +124,16 @@ export function AviaryImageMap(props: Props) {
   });
 
   const { points, selectedBirdId, cluster, aggregate, zoneStats } = props;
-  const showDots = !aggregate || !!props.highlightZoneId;
+  const zonePicked = !!props.highlightZoneId;
+  const showDots = !aggregate || zonePicked || !!selectedBirdId;
   // Picture positions of the birds, and groups of dots that overlap at this zoom.
+  // In the areas view only the chosen area is drawn as dots, plus the selected bird.
   const placed = useMemo(
-    () => (showDots ? points.filter((p) => !aggregate || !p.dim) : []).map((p) => ({ p, ...toImage(p.pos) })),
-    [points, showDots, aggregate],
+    () =>
+      points
+        .filter((p) => !aggregate || (zonePicked ? !p.dim || p.id === selectedBirdId : p.id === selectedBirdId))
+        .map((p) => ({ p, ...toImage(p.pos) })),
+    [points, aggregate, zonePicked, selectedBirdId],
   );
   const outlines = useMemo(() => MONITOR_ZONES.map((z) => ({ z, pts: zoneOutline(z) })), []);
   const [hoverZone, setHoverZone] = useState<string | null>(null);
@@ -155,6 +160,17 @@ export function AviaryImageMap(props: Props) {
   }, [placed, v.k, cluster, selectedBirdId]);
 
   const { trees, selectedTreeId, highlightZoneId, precision, trail } = props;
+
+  // Closing the last open selection (bird, tree or area) zooms back out to the starting view.
+  const anySelected = !!(selectedBirdId || selectedTreeId || highlightZoneId);
+  const [wasSelected, setWasSelected] = useState(anySelected);
+  useEffect(() => {
+    if (anySelected === wasSelected) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWasSelected(anySelected);
+    if (!anySelected && k0) setView(null);
+  }, [anySelected, wasSelected, k0]);
+  const zoomedIn = v.k > k0 * 1.05;
   const treeSpots = useMemo(
     () =>
       trees.map((t) => {
@@ -211,7 +227,7 @@ export function AviaryImageMap(props: Props) {
       role="application"
       aria-label="Aviary map on the reference picture. Drag to pan, Ctrl + scroll to zoom, click a bird or a tree."
     >
-      <div className="absolute left-0 top-0 origin-top-left" style={{ width: IW, height: IH, transform: `translate(${v.tx}px, ${v.ty}px) scale(${v.k})` }}>
+      <div className="absolute left-0 top-0 origin-top-left" style={{ width: IW, height: IH, transform: `translate(${v.tx}px, ${v.ty}px) scale(${v.k})`, transition: dragging ? undefined : "transform 450ms ease" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={REFERENCE_IMAGE.src} alt="Reference render of the aviary (illustrative)" width={IW} height={IH} draggable={false} className="pointer-events-none block" />
         <svg width={IW} height={IH} viewBox={`0 0 ${IW} ${IH}`} className="absolute inset-0 overflow-visible">
@@ -360,6 +376,15 @@ export function AviaryImageMap(props: Props) {
         <div className={cx("absolute inset-0 grid place-items-center bg-ink/25 text-sm font-medium text-white transition-opacity", hint ? "opacity-100" : "opacity-0")}>Use Ctrl + scroll to zoom the map</div>
       </div>
 
+      {zoomedIn && (
+        <button
+          onClick={() => setView(null)}
+          className="absolute left-3 top-3 inline-flex h-8 items-center gap-1.5 rounded-lg border border-line-strong bg-panel-solid/95 px-2.5 text-xs font-medium text-ink shadow-sm backdrop-blur hover:border-accent/50"
+          title="Zoom back out to the whole aviary"
+        >
+          <Minimize2 size={13} /> Full view
+        </button>
+      )}
       <div className="absolute bottom-3 right-3 flex flex-col overflow-hidden rounded-xl border border-line-strong bg-panel-solid/90 shadow-sm backdrop-blur">
         <button onClick={() => zoomAt(1.4)} className="grid h-9 w-9 place-items-center text-muted hover:bg-ink/5 hover:text-ink" aria-label="Zoom in">
           <Plus size={16} />

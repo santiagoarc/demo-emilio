@@ -1032,6 +1032,15 @@ export function AviaryScene(props: AviarySceneProps) {
     }
   };
 
+  // Closing the last open selection flies back to the starting view.
+  const anySelected = !!(selectedBirdId || selectedTreeId || highlightZoneId);
+  const selectedRef = useRef(anySelected);
+  useEffect(() => {
+    if (selectedRef.current && !anySelected) reset();
+    selectedRef.current = anySelected;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anySelected]);
+
   const selBird = points.find((p) => p.id === selectedBirdId);
   const selTree = trees.find((t) => t.id === selectedTreeId);
 
