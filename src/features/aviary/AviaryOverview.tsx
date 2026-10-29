@@ -74,16 +74,15 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
             <h1 className="text-[24px] font-semibold tracking-tight text-ink">Aviary activity</h1>
             <span className="inline-flex items-center gap-1.5 text-xs text-muted">
               <span className="h-2 w-2 rounded-full bg-ok" />
-              Simulated data · clock at {fmtTime(asOf)}
+              Clock at {fmtTime(asOf)}
             </span>
-            <span className="rounded-md bg-warn px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white">DEMO / SIMULATED DATA</span>
           </div>
         </div>
         <button
           onClick={() => setClock({ playing: !clock.playing })}
           className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong bg-panel-solid px-3 text-xs font-medium text-ink hover:border-accent/50"
         >
-          {clock.playing ? <Pause size={14} /> : <Play size={14} />} {clock.playing ? "Pause simulation" : "Play simulation"}
+          {clock.playing ? <Pause size={14} /> : <Play size={14} />} {clock.playing ? "Pause" : "Play"}
         </button>
       </div>
 
@@ -111,7 +110,7 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
               <MapIcon size={17} className="text-accent" />
               <div>
                 <h3 className="text-[15px] font-semibold tracking-tight">Habitat map</h3>
-                <p className="text-[11px] text-muted">Latest simulated location of each bird · {located} with a 3D position · click a bird or a tree</p>
+                <p className="text-[11px] text-muted">Latest location of each bird · {located} with a 3D position · click a bird or a tree</p>
               </div>
             </div>
             <Link href={fullMapHref} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-semibold text-white hover:bg-[#0b8178]">
@@ -170,7 +169,7 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
                 {FIX_STATUS[s].label}
               </span>
             ))}
-            <span className="ml-auto text-faint">Conceptual layout · simulated movement</span>
+            <span className="ml-auto text-faint">Conceptual layout</span>
           </div>
         </section>
 
@@ -199,7 +198,7 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-[11px] text-faint">{registry.species.length} species in the demo catalogue · counts are fictional.</p>
+            <p className="mt-3 text-[11px] text-faint">{registry.species.length} species in the catalogue.</p>
           </section>
           <MovementFeed moves={moves} asOf={asOf} onSelect={(id) => (setBirdId(id), setTreeId(null))} />
         </div>

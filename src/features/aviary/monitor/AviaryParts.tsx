@@ -68,7 +68,7 @@ export const STATUS_TONE: Record<FixStatus, "ok" | "info" | "warn" | "danger"> =
  * lists, bottom panels, the movement feed and the data checks.
  */
 
-export function TreeCard({ tree, colorBy, fixes, asOf, now, compact, selectedBirdId, onSelectBird, onClose, history, ds, src }: {
+export function TreeCard({ tree, colorBy, fixes, asOf, compact, selectedBirdId, onSelectBird, onClose, history, ds, src }: {
   tree: AviaryTree;
   colorBy: "status" | "species";
   fixes: Map<string, Fix>;
@@ -112,7 +112,7 @@ export function TreeCard({ tree, colorBy, fixes, asOf, now, compact, selectedBir
       </header>
       {!compact && (
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <Field k="Plant species" v={tree.plantSpecies ?? <span className="text-muted">Not set (demo tree)</span>} />
+          <Field k="Plant species" v={tree.plantSpecies ?? <span className="text-muted">Not set</span>} />
           <Field k="Form" v={`${tree.form[0].toUpperCase()}${tree.form.slice(1)} (schematic)`} />
           <Field k="Total height" v={`${tree.heightM.toFixed(1)} m`} />
           <Field k="Coordinates" v={<span className="num">X {tree.x.toFixed(1)} · Y {tree.z.toFixed(1)} m</span>} />
@@ -120,7 +120,6 @@ export function TreeCard({ tree, colorBy, fixes, asOf, now, compact, selectedBir
           <Field k="Levels" v={levels.join(", ")} />
           <Field k="Birds now" v={<span className="num font-semibold">{occ.length}</span>} />
           <Field k="Last activity" v={Number.isFinite(lastActivity) ? `${fmtTime(lastActivity)} · ${fmtAgo(lastActivity, asOf)}` : "None in 24 h"} />
-          <Field k="Data" v={<Badge>Simulated</Badge>} />
         </dl>
       )}
       <div className="mt-3">
@@ -155,7 +154,6 @@ export function TreeCard({ tree, colorBy, fixes, asOf, now, compact, selectedBir
               </li>
             ))}
           </ul>
-          <p className="mt-1 text-[10px] text-faint">Demo clock {fmtDateTime(now, now)}.</p>
         </>
       )}
     </section>
@@ -167,9 +165,9 @@ export function MovementFeed({ moves, asOf, onSelect }: { moves: ReturnType<type
   return (
     <section className="panel p-4">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <ArrowRight size={15} className="text-accent" /> Recent movements <Badge>Simulated</Badge>
+        <ArrowRight size={15} className="text-accent" /> Recent movements
       </h2>
-      <p className="mt-0.5 text-[11px] text-muted">Arrivals at a new tree in the last 30 simulated minutes. Each one updates the bird’s coordinates, height, tree and history.</p>
+      <p className="mt-0.5 text-[11px] text-muted">Arrivals at a new tree in the last 30 minutes. Each one updates the bird’s coordinates, height, tree and history.</p>
       {moves.length === 0 ? (
         <p className="py-6 text-center text-xs text-muted">No movements in this period (birds roost at night).</p>
       ) : (
@@ -197,7 +195,7 @@ export function ChecksCard({ checks }: { checks: ReturnType<typeof runDemoChecks
   return (
     <section className="panel p-4">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <ShieldCheck size={15} className="text-accent" /> Demo data checks
+        <ShieldCheck size={15} className="text-accent" /> Data checks
         <Badge tone={ok === checks.length ? "ok" : "danger"}>
           {ok}/{checks.length} passed
         </Badge>
@@ -217,7 +215,7 @@ export function ChecksCard({ checks }: { checks: ReturnType<typeof runDemoChecks
         onClick={() => window.confirm("Generate a new demo registry? The demo birds, trees and clock stored in this browser are replaced.") && resetDemoData()}
         className="mt-3 text-[11px] font-medium text-muted underline-offset-2 hover:text-ink hover:underline"
       >
-        Reset demo data
+        Reset data
       </button>
     </section>
   );
@@ -371,9 +369,6 @@ export function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, on
                 </>
               }
             />
-            <div className="col-span-2 rounded-lg bg-ink/[0.03] px-2.5 py-2 text-[11px] text-muted">
-              All values are fictional demo data. A real device would be chosen by species size, admissible weight, battery life, coverage and veterinary approval.
-            </div>
           </dl>
         )}
 
@@ -403,7 +398,7 @@ export function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, on
               <Field k="Location confidence" v={det ? `${Math.round(det.confidence * 100)}%` : "—"} />
               <Field k="Movement" v={det?.moving == null ? "Not determinable" : det.moving ? "In transit" : "Perched / stationary"} />
             </dl>
-            <p className="mt-2 text-[10px] text-faint">Precision values are simulated · pending validation. Coordinates are on the conceptual layout (Z = height). Simulated clock {fmtDateTime(now, now)}.</p>
+            <p className="mt-2 text-[10px] text-faint">Coordinates are on the conceptual layout (Z = height). Clock {fmtDateTime(now, now)}.</p>
             {!det?.pos && (
               <p className="mt-2 rounded-lg bg-warn/[0.08] px-2.5 py-2 text-[11px] text-ink">
                 {det?.kind === "zone"
@@ -559,7 +554,7 @@ export function BottomPanels({ fixes, all, ds, src, asOf, level, onLevel, zoneId
               { key: "moving", color: "#2563EB", label: "Birds that moved" },
             ]}
           />
-          <p className="text-[10px] text-faint">Last 24 h, whole aviary ({all.size} birds). Simulated.</p>
+          <p className="text-[10px] text-faint">Last 24 h, whole aviary ({all.size} birds).</p>
         </div>
       </section>
     </div>

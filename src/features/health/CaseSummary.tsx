@@ -83,7 +83,7 @@ export function CaseSummary({ hc, onOpen }: { hc: HealthCase; onOpen: () => void
           <dd className="truncate text-muted">{snap ? `${STATUS_LABEL[snap.status]}${r ? ` · ${fmtAgo(r.timestamp, now)}` : ""}` : "—"}</dd>
         </div>
         <div className="min-w-0">
-          <dt className="text-faint" title="Inferred from simulated location data — not a clinical assessment">Activity check</dt>
+          <dt className="text-faint" title="Inferred from location data — not a clinical assessment">Activity check</dt>
           <dd className="mt-0.5">{ins ? <InsightBadge level={ins.level} /> : "—"}</dd>
         </div>
         <div className="min-w-0">
@@ -186,7 +186,7 @@ function CaseDetail({ hc }: { hc: HealthCase }) {
       {ins && ins.points.length > 0 && (
         <div>
           <p className="eyebrow mb-1">What its activity data shows</p>
-          <p className="mb-2 text-[11px] text-faint">Inference from simulated location data — not a clinical assessment.</p>
+          <p className="mb-2 text-[11px] text-faint">Inference from location data — not a clinical assessment.</p>
           <ul className="space-y-1.5">
             {ins.points.map((pt, i) => (
               <li key={i} className="flex gap-2 text-xs text-muted">

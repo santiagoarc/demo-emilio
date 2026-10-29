@@ -31,9 +31,9 @@ export function AviaryTeamsView() {
       <PageHeader
         eyebrow="Aviary · Teams"
         title="Monitoring teams"
-        subtitle={`${MONITOR_TEAMS.length} demo teams share the ${registry.birds.length} birds; each bird belongs to exactly one. ${changed ? `${changed} birds reassigned by hand.` : "Default split: 50 birds each, by species group."}`}
+        subtitle={`${MONITOR_TEAMS.length} teams share the ${registry.birds.length} birds; each bird belongs to exactly one. ${changed ? `${changed} birds reassigned by hand.` : "Default split: 50 birds each, by species group."}`}
       />
-      <AviaryFrame banner="Teams, leads and assignments are fictional demo data.">
+      <AviaryFrame>
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <Card title="Teams at a glance" icon={Users}>
             <div className="grid gap-2 sm:grid-cols-2">

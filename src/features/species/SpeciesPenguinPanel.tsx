@@ -9,7 +9,7 @@ import { QUALITY_LABEL, SOURCE_SHORT } from "@/logic/labels";
 import { computeActivity } from "@/logic/metrics";
 import { fmtAgo, fmtDateTime, fmtHours } from "@/logic/time";
 import { useDemo } from "@/state/DemoProvider";
-import { SimulatedTag, cx } from "@/components/ui/primitives";
+import { cx } from "@/components/ui/primitives";
 import { SERIES, StackedColumns } from "@/components/charts/Charts";
 import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 import { StatusPill } from "@/components/penguin/StatusPill";
@@ -89,7 +89,6 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
             <div className="space-y-2.5 rounded-xl border border-line p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] text-muted">Time recorded · {rangeLabel.toLowerCase()}</p>
-                <SimulatedTag />
               </div>
               {b.readings === 0 ? (
                 <p className="text-xs text-faint">No data in this period.</p>
@@ -120,7 +119,7 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
               <Pair k="Readings in period" v={String(b.readings)} />
               <Pair k="No movement recorded (on land)" v={fmtHours(b.stationary)} />
             </dl>
-            <p className="mt-3 text-[10px] text-faint">Water or land per the immersion sensor (simulated). A difference in activity does not by itself indicate a health problem.</p>
+            <p className="mt-3 text-[10px] text-faint">Water or land per the immersion sensor. A difference in activity does not by itself indicate a health problem.</p>
           </div>
         )}
 
@@ -139,7 +138,7 @@ export function SpeciesPenguinPanel({ penguinId, from, to, rangeLabel, onClose, 
                       <p>{n.text}</p>
                       <p className="text-[11px] text-faint">
                         {n.by} · {fmtDateTime(n.at, now)}
-                        {n.simulated ? " · fictional" : ""}
+                        
                       </p>
                     </li>
                   ))}

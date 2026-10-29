@@ -6,7 +6,7 @@ import { HeartPulse, Plus } from "lucide-react";
 import { SPECIES_BY_ID } from "@/domain/species";
 import type { InsightLevel } from "@/logic/insights";
 import { useDemo } from "@/state/DemoProvider";
-import { Button, Card, Segmented, SimulatedTag } from "@/components/ui/primitives";
+import { Button, Card, Segmented } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/shell/AppShell";
 import { InsightBadge, NewCaseForm } from "./HealthCards";
 import { CaseDrawer, CaseSummary } from "./CaseSummary";
@@ -45,7 +45,7 @@ export function HealthView() {
       <PageHeader
         eyebrow="Health"
         title="Follow-ups & activity checks"
-        subtitle={<>Care follow-ups the team is tracking, and each penguin&rsquo;s last 24 h of activity compared with its species. Activity checks are inferences from simulated location data — not a clinical assessment. <SimulatedTag /></>}
+        subtitle={<>Care follow-ups the team is tracking, and each penguin&rsquo;s last 24 h of activity compared with its species. Activity checks are inferences from location data — not a clinical assessment.</>}
         actions={
           !adding && (
             <Button variant="primary" onClick={() => setAdding(true)}>
@@ -72,7 +72,7 @@ export function HealthView() {
           />
         )}
 
-        <Card title="Open follow-ups" icon={HeartPulse} subtitle="Simulated care logs, most recently updated first · click one to see its log">
+        <Card title="Open follow-ups" icon={HeartPulse} subtitle="Care logs, most recently updated first · click one to see its log">
           {!open.length && <p className="py-6 text-center text-sm text-muted">No open follow-ups.</p>}
           <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
             {open.map((c) => (
@@ -83,7 +83,7 @@ export function HealthView() {
 
         <Card
           title="Activity checks"
-          subtitle="Last 24 h vs. the species average and the penguin's own previous days · inferred from simulated location data, not a clinical assessment"
+          subtitle="Last 24 h vs. the species average and the penguin's own previous days · inferred from location data, not a clinical assessment"
           action={
             <Segmented
               size="sm"

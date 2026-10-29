@@ -25,7 +25,7 @@ import { computeActivity, perPenguinPerDay, type Breakdown } from "@/logic/metri
 import { STATUS_LABEL, type LiveStatus, type Snapshot } from "@/logic/status";
 import { fmtDateTime, fmtHours, fmtTime } from "@/logic/time";
 import { useDemo } from "@/state/DemoProvider";
-import { Card, EmptyState, SimulatedTag, cx } from "@/components/ui/primitives";
+import { Card, EmptyState, cx } from "@/components/ui/primitives";
 import { Donut, SERIES, StackedColumns } from "@/components/charts/Charts";
 import { FilterMenu } from "@/components/filters/FilterMenu";
 import { PeriodPicker } from "@/components/filters/PeriodPicker";
@@ -233,7 +233,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `penguins-${sp.code}-simulated.csv`;
+    a.download = `penguins-${sp.code}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -272,7 +272,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: sp.color }} />
               <i>{sp.scientific}</i>
             </span>
-            <SimulatedTag />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -354,7 +353,6 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                     data={panelAgg.hourly.map((h, i) => ({ label: `${i}h`, tooltip: `${String(i).padStart(2, "0")}:00`, values: { water: h.water, land: h.land } }))}
                   />
                 </div>
-                <p className="mt-3 text-[10px] text-faint">Averages computed from simulated readings.</p>
               </>
             )}
           </Card>
@@ -572,7 +570,7 @@ function Detail({ speciesId }: { speciesId: SpeciesId }) {
                         <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">No data</span> : <HBar value={r.b!.land} max={maxH} color="#f5b84b" />}</td>
                         <td
                           className="whitespace-nowrap px-2 py-2 text-xs text-muted"
-                          title={r.snap.reading ? `${SOURCE_SHORT[r.snap.reading.source]} · ${QUALITY_LABEL[r.snap.reading.quality]} quality (±${r.snap.reading.accuracyM} m) · simulated` : undefined}
+                          title={r.snap.reading ? `${SOURCE_SHORT[r.snap.reading.source]} · ${QUALITY_LABEL[r.snap.reading.quality]} quality (±${r.snap.reading.accuracyM} m)` : undefined}
                         >
                           {r.snap.reading ? (
                             <>

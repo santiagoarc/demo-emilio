@@ -150,7 +150,7 @@ export type DeviceStatus = "active" | "low-battery" | "intermittent" | "no-signa
 export interface TrackingDevice {
   id: string;
   /** No technology is selected; the demo only names the category. */
-  category: "Tracker · demo device";
+  category: "Tracker";
   status: DeviceStatus;
   batteryPct: number;
 }

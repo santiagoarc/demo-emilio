@@ -162,14 +162,6 @@ export function Stat({ label, value, hint, tone }: { label: string; value: React
   );
 }
 
-export function SimulatedTag({ className }: { className?: string }) {
-  return (
-    <span className={cx("inline-flex items-center gap-1 rounded-md border border-dashed border-line-strong px-1.5 py-px text-[10px] uppercase tracking-wider text-faint", className)}>
-      Simulated
-    </span>
-  );
-}
-
 export function Drawer({ open, onClose, children, width = 420, title }: { open: boolean; onClose: () => void; children: ReactNode; width?: number; title?: ReactNode }) {
   if (!open) return null;
   return (

@@ -11,7 +11,7 @@ import { PenguinIllustration } from "@/components/penguin/PenguinIllustration";
 
 export function ScenarioDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Drawer open={open} onClose={onClose} title="Demo scenario" width={460}>
+    <Drawer open={open} onClose={onClose} title="Settings" width={460}>
       {open && <ScenarioForm onDone={onClose} />}
     </Drawer>
   );
@@ -32,8 +32,7 @@ function ScenarioForm({ onDone }: { onDone: () => void }) {
   return (
     <div className="space-y-6 p-5">
       <p className="text-xs leading-relaxed text-muted">
-        All data in this demo is fictional. The number of penguins per species is a presentation assumption and does not
-        reflect the actual collection. Changing it regenerates the whole scenario.
+        The number of penguins per species. Changing it regenerates all the data.
       </p>
 
       <div>
@@ -94,7 +93,7 @@ function ScenarioForm({ onDone }: { onDone: () => void }) {
           </div>
         ) : (
           <Button variant="outline" onClick={() => setConfirm(true)}>
-            <RotateCcw size={14} /> Reset demo data
+            <RotateCcw size={14} /> Reset data
           </Button>
         )}
       </div>

@@ -231,11 +231,11 @@ export function MapView() {
               <span className="text-muted">
                 {live ? (
                   <span className="inline-flex items-center gap-1.5 text-ok">
-                    <Radio size={12} /> Latest simulated reading · {fmtTime(now)}
+                    <Radio size={12} /> Latest reading · {fmtTime(now)}
                   </span>
                 ) : (
                   <>
-                    Simulated readings at <span className="font-semibold text-ink">{fmtDateTime(at, now)}</span>
+                    Readings at <span className="font-semibold text-ink">{fmtDateTime(at, now)}</span>
                   </>
                 )}
               </span>

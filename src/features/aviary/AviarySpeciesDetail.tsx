@@ -94,7 +94,6 @@ function Detail({ speciesId }: { speciesId: string }) {
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: sp.color }} />
               <i>{sp.scientific}</i> · {sp.commonEs}
             </span>
-            <span className="rounded-md bg-warn px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white">DEMO / SIMULATED DATA</span>
           </div>
         </div>
         <Link
@@ -105,7 +104,7 @@ function Detail({ speciesId }: { speciesId: string }) {
         </Link>
       </div>
 
-      <AviaryFrame banner="The photo and description are about the species in general (Wikipedia / Wikimedia Commons). The birds, counts and positions below are fictional demo data.">
+      <AviaryFrame>
         {/* Summary */}
         <section className="panel grid overflow-hidden lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           <figure className="relative min-h-[260px] bg-ink/5">
@@ -126,15 +125,15 @@ function Detail({ speciesId }: { speciesId: string }) {
             </a>
 
             <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <Kpi icon={<span className="text-[11px] font-bold">{sp.code}</span>} color={sp.color} value={n} label="Demo birds" />
+              <Kpi icon={<span className="text-[11px] font-bold">{sp.code}</span>} color={sp.color} value={n} label="Birds" />
               <Kpi icon={<Radio size={17} />} color={FIX_STATUS.detected.color} value={detected} label="Detected now" />
               <Kpi icon={<Navigation size={17} />} color={FIX_STATUS.moving.color} value={moving} label="Moving now" />
               <Kpi icon={<Ruler size={17} />} color="#0891B2" value={avgHeight == null ? "—" : `${avgHeight.toFixed(1)} m`} label="Average height" />
             </div>
 
             <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 text-xs">
-              <Fact k="Usual heights (demo)" v={sp.prefLevels.map((l) => LEVEL_BY_ID[l].short).join(", ")} />
-              <Fact k="Usual zones (demo)" v={sp.prefZones.map((z) => MONITOR_ZONE_BY_ID[z].name).join(", ")} />
+              <Fact k="Usual heights" v={sp.prefLevels.map((l) => LEVEL_BY_ID[l].short).join(", ")} />
+              <Fact k="Usual zones" v={sp.prefZones.map((z) => MONITOR_ZONE_BY_ID[z].name).join(", ")} />
               <Fact k="Sex" v={sp.dimorphic ? `${males} male · ${females} female · ${n - males - females} not yet sexed` : "Not recorded (males and females look alike)"} />
               <Fact k="Age" v={ages.map((x) => `${x.n} ${AGE_LABEL[x.a].toLowerCase()}`).join(" · ")} />
               <Fact k="Where now" v={zones.map(([z, c]) => `${MONITOR_ZONE_BY_ID[z].code} ${c}`).join(" · ") || "—"} />
@@ -182,7 +181,7 @@ function Detail({ speciesId }: { speciesId: string }) {
               ))}
             </ul>
           )}
-          <p className="mt-3 text-[11px] text-faint">Positions as of the saved simulated clock. {registry.birds.length} birds in the whole demo registry.</p>
+          <p className="mt-3 text-[11px] text-faint">{registry.birds.length} birds in the whole registry.</p>
         </section>
       </AviaryFrame>
     </div>

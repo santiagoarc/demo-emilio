@@ -31,8 +31,8 @@ export function AviaryTreesView() {
 
   return (
     <div className="pb-12">
-      <PageHeader eyebrow="Aviary · Trees" title="Trees" subtitle={`${registry.trees.length} demo trees with their working IDs. Birds located in each one at the saved simulated time, ${fmtTime(asOf)}.`} />
-      <AviaryFrame banner="Tree IDs, positions, heights and plant names are illustrative until a tree inventory of The Rainforest exists.">
+      <PageHeader eyebrow="Aviary · Trees" title="Trees" subtitle={`${registry.trees.length} trees with their working IDs. Birds located in each one at ${fmtTime(asOf)}.`} />
+      <AviaryFrame>
         <Card title="Tree list" icon={TreePine} subtitle={`${rows.length} trees · ${located} birds located in them`}>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <label className="relative min-w-[200px] flex-1">
@@ -49,7 +49,7 @@ export function AviaryTreesView() {
           </div>
           <div className="scroll-thin overflow-x-auto">
             <table className="w-full min-w-[860px] text-xs">
-              <caption className="sr-only">Demo trees and the birds located in them</caption>
+              <caption className="sr-only">Trees and the birds located in them</caption>
               <thead>
                 <tr className="border-b border-line text-left text-[11px] text-muted">
                   {["Tree", "Zone", "Height", ...LEVELS.slice().reverse().map((l) => l.short), "Birds", "Species", "Last detection", ""].map((h, i) => (

@@ -7,7 +7,7 @@ import { Badge, Button, Card, cx } from "@/components/ui/primitives";
 
 /**
  * Proposed rules: configurable examples to discuss with SeaWorld.
- * They never notify anyone; the preview only counts matches in the demo data.
+ * They never notify anyone; the preview only counts matches in the data.
  */
 
 export interface RuleMatch {
@@ -124,7 +124,7 @@ export function ProposedRules({ storageKey, rules, ideas, intro, backHref, backL
         ))}
       </div>
 
-      <Card title="Rule ideas that need validated data or technology" subtitle="Listed for discussion. No matches are shown because the data does not exist in this demo." icon={FlaskConical}>
+      <Card title="Rule ideas that need validated data or technology" subtitle="Listed for discussion. No matches are shown because the data does not exist yet." icon={FlaskConical}>
         <ul className="grid gap-3 md:grid-cols-3">
           {ideas.map((i) => (
             <li key={i.name} className="rounded-xl border border-dashed border-line-strong p-3">
@@ -227,7 +227,7 @@ function RuleCard({ rule, setting, onChange }: {
           className="flex w-full items-center justify-between gap-2 text-left text-sm disabled:cursor-default"
         >
           <span>
-            Would match <b className="num">{matches.length}</b> {noun} in the demo data
+            Would match <b className="num">{matches.length}</b> {noun} in the data
             {!setting.enabled && <span className="ml-1 text-xs text-faint">(example switched off)</span>}
           </span>
           {matches.length > 0 && <ChevronDown size={14} className={cx("text-muted transition", open && "rotate-180")} aria-hidden />}
@@ -247,7 +247,7 @@ function RuleCard({ rule, setting, onChange }: {
             {matches.length > 8 && <li className="text-[11px] text-faint">+{matches.length - 8} more</li>}
           </ul>
         )}
-        <p className="mt-2 text-[11px] text-faint">Preview only. Computed on simulated data; nothing is sent to anyone.</p>
+        <p className="mt-2 text-[11px] text-faint">Preview only. Nothing is sent to anyone.</p>
       </div>
     </section>
   );

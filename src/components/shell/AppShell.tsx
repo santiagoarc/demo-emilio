@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { Activity, BellRing, Bird, FileText, PanelLeftClose, PanelLeftOpen, TreePine, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
-import { useDemo } from "@/state/DemoProvider";
-import { fmtDateTime } from "@/logic/time";
 import { cx } from "@/components/ui/primitives";
 import { PenguinSearch } from "./PenguinSearch";
 import { BirdSearch } from "./BirdSearch";
@@ -87,7 +85,6 @@ function isActive(pathname: string, href: string, exact?: boolean) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { now } = useDemo();
   const [searchOpen, setSearchOpen] = useState(false);
   const [scenarioOpen, setScenarioOpen] = useState(false);
   const session = useDemoSession();
@@ -138,7 +135,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           {!slim && (
             <span className="mt-2.5 block text-center leading-tight">
               <span className="block text-[13px] font-semibold tracking-tight">Animal Care Platform</span>
-              <span className="block text-[11px] text-faint">Concept demo</span>
             </span>
           )}
         </Link>
@@ -182,27 +178,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className={cx("mt-auto space-y-2", !slim && "px-1")}>
-          {!slim && (
-          <div className="rounded-xl border border-line bg-ink/[0.02] p-3">
-            <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent-2" />
-              <span className="text-[11px] font-medium text-ink">Demo · Simulated data</span>
-            </div>
-            <p className="mt-1 text-[11px] leading-snug text-muted">
-              Fictional scenario, no live systems connected. Data cut-off: {fmtDateTime(now, now)}.
-            </p>
-            <Link href="/roadmap" className="mt-1 inline-block text-[11px] font-medium text-accent hover:underline">
-              What needs validation →
-            </Link>
-          </div>
-          )}
           {mod === "penguins" && !slim && (
             <button
               onClick={() => setScenarioOpen(true)}
               className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-faint transition hover:text-muted"
             >
               <SlidersHorizontal size={13} />
-              Demo scenario & reset
+              Settings & reset
             </button>
           )}
           <button

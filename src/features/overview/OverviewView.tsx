@@ -98,7 +98,7 @@ export function OverviewView() {
             <h1 className="text-[24px] font-semibold tracking-tight text-ink">Penguin overview</h1>
             <span className="inline-flex items-center gap-1.5 text-xs text-muted">
               <span className="h-2 w-2 rounded-full bg-ok" />
-              Simulated data · latest readings at {fmtTime(now)}
+              Latest readings at {fmtTime(now)}
             </span>
           </div>
         </div>
@@ -375,7 +375,7 @@ function PenguinCard({ s, team, now, onClose }: { s: Snapshot; team: string; now
         <dt className="text-faint">Last reading</dt>
         <dd className="text-right">{s.reading ? `${fmtTime(s.reading.timestamp)} · ${fmtAgo(s.reading.timestamp, now)}` : "—"}</dd>
         <dt className="text-faint">Source</dt>
-        <dd className="truncate text-right" title={s.reading ? `${QUALITY_LABEL[s.reading.quality]} quality · simulated` : undefined}>
+        <dd className="truncate text-right" title={s.reading ? `${QUALITY_LABEL[s.reading.quality]} quality` : undefined}>
           {s.reading ? `${SOURCE_SHORT[s.reading.source]} · ±${s.reading.accuracyM} m` : "—"}
         </dd>
         <dt className="text-faint">Team</dt>

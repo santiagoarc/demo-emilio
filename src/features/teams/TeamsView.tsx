@@ -8,7 +8,7 @@ import { ZONE_BY_ID } from "@/domain/habitat";
 import { computeActivity } from "@/logic/metrics";
 import { fmtHours, fmtWeekday } from "@/logic/time";
 import { PERMISSIONS, useDemo } from "@/state/DemoProvider";
-import { Card, Segmented, SimulatedTag, cx } from "@/components/ui/primitives";
+import { Card, Segmented, cx } from "@/components/ui/primitives";
 import { Donut, SERIES, StackedColumns } from "@/components/charts/Charts";
 import { DayPicker, PeriodPicker } from "@/components/filters/PeriodPicker";
 import { ActiveBadge, Avatars, TeamFormDrawer, isActive, useTeamStats, type TeamStats } from "./shared";
@@ -181,7 +181,7 @@ export function TeamsView() {
             {zoneRows.length > 7 && <p className="mt-1 px-1.5 text-[11px] text-faint">+{zoneRows.length - 7} more {zoneRows.length - 7 === 1 ? "zone" : "zones"} in Habitat Map</p>}
           </Card>
 
-          <Card title="Overall team activity" subtitle={`${range.label} · recorded hours, summed across assigned penguins`} action={<SimulatedTag />}>
+          <Card title="Overall team activity" subtitle={`${range.label} · recorded hours, summed across assigned penguins`}>
             <StackedColumns
               height={142}
               labelEvery={byHour ? 6 : agg.daily.length > 8 ? 2 : 1}

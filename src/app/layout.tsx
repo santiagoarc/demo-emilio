@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Animal Care Platform · SeaWorld concept demo",
-  description: "Concept demo for penguin and aviary care teams, built on simulated data.",
+  title: "Animal Care Platform · SeaWorld",
+  description: "Care platform for the penguin and aviary teams.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

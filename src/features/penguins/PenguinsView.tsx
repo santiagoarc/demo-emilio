@@ -121,7 +121,7 @@ export function PenguinsView() {
                         <td className="px-4 py-2 text-muted">{snap.reading ? ZONE_BY_ID[snap.reading.zoneId].name : "—"}</td>
                         <td
                           className="num px-4 py-2 text-xs text-muted"
-                          title={snap.reading ? `${fmtDateTime(snap.reading.timestamp, now)} · ${SOURCE_SHORT[snap.reading.source]} · ${QUALITY_LABEL[snap.reading.quality]} quality (±${snap.reading.accuracyM} m) · simulated` : undefined}
+                          title={snap.reading ? `${fmtDateTime(snap.reading.timestamp, now)} · ${SOURCE_SHORT[snap.reading.source]} · ${QUALITY_LABEL[snap.reading.quality]} quality (±${snap.reading.accuracyM} m)` : undefined}
                         >
                           {snap.reading ? (
                             <>

@@ -73,7 +73,7 @@ export function InsightCard({ penguinId, compact }: { penguinId: string; compact
           <p className="text-[11px] text-faint">The tick marks the species&rsquo; daily average.</p>
         </div>
       )}
-      <p className="text-[11px] leading-snug text-faint">Inference from simulated activity data — not a clinical assessment.</p>
+      <p className="text-[11px] leading-snug text-faint">Inference from activity data — not a clinical assessment.</p>
       <Button size="sm" variant="outline" onClick={() => askChat(`Give me the full report on ${p.id}: how its activity looks, what changed and what's worth watching.`)}>
         <MessageSquareText size={13} /> Ask for a full report
       </Button>

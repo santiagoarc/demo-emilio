@@ -230,7 +230,6 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-[24px] font-semibold tracking-tight text-ink">The Rainforest</h1>
             <span className="text-sm text-muted">Tropical Ocean</span>
-            <span className="rounded-md bg-warn px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white">DEMO / SIMULATED DATA</span>
           </div>
         </div>
         <ClockBar clock={clock} onClock={setClock} onRestart={restart} start={ds.windowStart} end={ds.horizon} anchor={registry.anchor} smooth={smooth} onSmooth={setSmooth} />
@@ -247,7 +246,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
             <FilterSelect label="Species" value={speciesId} onChange={setSpeciesId} options={[["", "All"], ...MONITOR_SPECIES.map((s) => [s.id, s.common] as [string, string])]} />
             <div className="ml-auto flex items-center gap-2">
               {maxed && (
-                <button onClick={() => setClock({ playing: !clock.playing })} className="grid h-8 w-8 place-items-center rounded-lg border border-line-strong text-muted hover:text-ink" aria-label={clock.playing ? "Pause the simulation" : "Play the simulation"}>
+                <button onClick={() => setClock({ playing: !clock.playing })} className="grid h-8 w-8 place-items-center rounded-lg border border-line-strong text-muted hover:text-ink" aria-label={clock.playing ? "Pause" : "Play"}>
                   {clock.playing ? <Pause size={13} /> : <Play size={13} />}
                 </button>
               )}
@@ -426,7 +425,7 @@ function TreePanel({ tree, fixes, asOf, ds, src, highlightId, onHighlight, onOpe
             {tree.plantSpecies && <span> — {tree.plantSpecies}</span>}
           </h2>
           <p className="text-[11px] text-muted">
-            {tree.form[0].toUpperCase() + tree.form.slice(1)} · {tree.heightM.toFixed(1)} m · {zone.code} {zone.name} · <span className="text-warn">demo tree</span>
+            {tree.form[0].toUpperCase() + tree.form.slice(1)} · {tree.heightM.toFixed(1)} m · {zone.code} {zone.name}
           </p>
         </div>
         <button onClick={onPrev} className="rounded-lg p-1.5 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Previous tree"><ChevronLeft size={16} /></button>
@@ -533,7 +532,7 @@ function TreePanel({ tree, fixes, asOf, ds, src, highlightId, onHighlight, onOpe
         {tab === "info" && (
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 px-4 py-3 text-xs">
             <Info k="Tree" v={`${tree.id}${tree.plantSpecies ? ` · ${tree.plantSpecies}` : ""}`} />
-            <Info k="Plant name" v={<span className="text-warn">Illustrative demo name</span>} />
+            <Info k="Plant name" v={tree.plantSpecies ?? <span className="text-muted">Not set</span>} />
             <Info k="Form" v={tree.form[0].toUpperCase() + tree.form.slice(1)} />
             <Info k="Total height" v={`${tree.heightM.toFixed(1)} m`} />
             <Info k="Crown radius" v={`${tree.crownRadiusM.toFixed(1)} m`} />
@@ -547,7 +546,7 @@ function TreePanel({ tree, fixes, asOf, ds, src, highlightId, onHighlight, onOpe
 
         {tab === "history" && (
           <div className="px-3 py-2">
-            <p className="px-1 pb-1.5 text-[11px] text-muted">Stays in this tree, last 24 simulated hours ({hist.length})</p>
+            <p className="px-1 pb-1.5 text-[11px] text-muted">Stays in this tree, last 24 hours ({hist.length})</p>
             <ul className="space-y-0.5">
               {hist.slice(0, 80).map((r) => (
                 <li key={r.id}>
@@ -649,13 +648,13 @@ function ClockBar({ clock, onClock, onRestart, start, end, anchor, smooth, onSmo
       <button
         onClick={() => onClock({ playing: !clock.playing })}
         className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-white"
-        aria-label={clock.playing ? "Pause the simulation" : "Play the simulation"}
+        aria-label={clock.playing ? "Pause" : "Play"}
       >
         {clock.playing ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
       </button>
       <div className="min-w-[200px]">
         <p className="flex items-center justify-between gap-2 text-[10px]">
-          <span className="font-semibold uppercase tracking-wider text-warn">Simulated clock</span>
+          <span className="font-semibold uppercase tracking-wider text-warn">Clock</span>
           <span className="num text-xs font-semibold text-ink">{fmtDateTime(clock.simTime, clock.simTime)}</span>
         </p>
         <input
@@ -667,12 +666,12 @@ function ClockBar({ clock, onClock, onRestart, start, end, anchor, smooth, onSmo
           value={clock.simTime}
           style={{ ["--fill" as string]: `${((clock.simTime - start) / (end - start)) * 100}%` }}
           onChange={(e) => onClock({ simTime: Number(e.target.value) })}
-          aria-label="Simulated time"
-          title={`Demo start ${fmtTime(anchor)}`}
+          aria-label="Time"
+          title={`Start ${fmtTime(anchor)}`}
         />
       </div>
       <Segmented size="sm" value={String(clock.speed)} onChange={(v) => onClock({ speed: Number(v) })} options={SPEEDS.map((o) => ({ value: o.value as string, label: o.label }))} />
-      <button onClick={onRestart} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:bg-ink/5 hover:text-ink" title="Back to the demo start time" aria-label="Back to the demo start time">
+      <button onClick={onRestart} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:bg-ink/5 hover:text-ink" title="Back to the start time" aria-label="Back to the start time">
         <RotateCcw size={13} />
       </button>
       <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted">
@@ -792,7 +791,7 @@ function BottomRow({ fixes, ds, src, asOf, level, onLevel, counts }: {
               { key: "moving", color: FIX_STATUS.moving.color, label: "Birds that moved" },
             ]}
           />
-          <p className="text-[10px] text-faint">Last 24 simulated hours, whole aviary.</p>
+          <p className="text-[10px] text-faint">Last 24 hours, whole aviary.</p>
         </div>
       </section>
     </div>
@@ -814,7 +813,7 @@ function TreeFloat({ tree, fixes, onOpen, onClose, onBird }: { tree: AviaryTree;
         {tree.plantSpecies && <span>— {tree.plantSpecies}</span>}
       </p>
       <p className="mt-0.5 text-[11px] text-muted">
-        {tree.heightM.toFixed(1)} m · {MONITOR_ZONE_BY_ID[tree.zoneId].name} · {occ.length} birds{last ? ` · last ${fmtTime(last)}` : ""} · <span className="text-warn">demo</span>
+        {tree.heightM.toFixed(1)} m · {MONITOR_ZONE_BY_ID[tree.zoneId].name} · {occ.length} birds{last ? ` · last ${fmtTime(last)}` : ""}
       </p>
       <div className="mt-2 flex gap-1">
         {byLevel.reverse().map(({ l, n }) => (

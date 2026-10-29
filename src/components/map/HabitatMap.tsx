@@ -605,7 +605,7 @@ export function HabitatMap({
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#e5484d] opacity-70" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-[#e5484d]" />
           </span>
-          Live · simulated
+          Live
         </div>
       )}
       {overlay}

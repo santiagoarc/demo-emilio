@@ -18,7 +18,7 @@ export interface PenguinDataSource {
 export function createSimulatedSource(config: DemoConfig): PenguinDataSource {
   return {
     kind: "simulated",
-    label: "Demo · Simulated data",
+    label: "Tracking data",
     load: (now) => generateDataset(config, now),
   };
 }

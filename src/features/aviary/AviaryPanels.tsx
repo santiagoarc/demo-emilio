@@ -168,13 +168,13 @@ export function TeamsSection({ fixes, teamOf, onAssign, teamFilter, onTeamFilter
             <Users size={15} className="text-accent" /> Monitoring teams
           </h2>
           <p className="text-[11px] text-muted" title="Each bird belongs to exactly one team">
-            {MONITOR_TEAMS.length} teams · {assigned}/{total} birds assigned · demo
+            {MONITOR_TEAMS.length} teams · {assigned}/{total} birds assigned
           </p>
         </div>
         <button
           onClick={() => setEditing((v) => !v)}
           className={cx("inline-flex h-7 items-center gap-1 rounded-lg border px-2 text-[11px] font-medium", editing ? "border-accent bg-accent/12 text-ink" : "border-line-strong text-muted hover:text-ink")}
-          title="Demo permission: the signed-in user can reassign birds"
+          title="The signed-in user can reassign birds"
           aria-pressed={editing}
         >
           {editing ? <Unlock size={12} /> : <Lock size={12} />} {editing ? "Editing" : "Edit"}

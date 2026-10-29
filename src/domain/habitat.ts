@@ -116,7 +116,7 @@ const ZONES: HabitatZone[] = [
 
 export const HABITAT: Habitat = {
   id: "penguin-habitat-demo",
-  name: "Penguin Habitat · demo layout",
+  name: "Penguin Habitat",
   width: 1600,
   height: 1000,
   unitsPerMeter: 40,

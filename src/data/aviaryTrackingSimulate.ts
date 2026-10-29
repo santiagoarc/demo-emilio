@@ -173,7 +173,7 @@ export function generateRegistry(seed = 20261028, anchor = defaultAnchor()): Dem
         homeZoneId: pick(rng, sp.prefZones),
         device: {
           id: `DEV-${hashSeed(id, seed).toString(16).slice(0, 5).toUpperCase()}`,
-          category: "Tracker · demo device",
+          category: "Tracker",
           status,
           batteryPct: status === "low-battery" ? Math.round(between(rng, 6, 18)) : status === "no-signal" ? 0 : Math.round(between(rng, 35, 98)),
         },

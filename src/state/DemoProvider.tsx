@@ -436,7 +436,7 @@ function BootScreen() {
           <span className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/20" />
           <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[var(--accent)]" />
         </div>
-        <p className="text-sm text-[var(--muted)]">Generating demo scenario…</p>
+        <p className="text-sm text-[var(--muted)]">Loading…</p>
       </div>
     </div>
   );

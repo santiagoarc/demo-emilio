@@ -10,7 +10,7 @@ import { computeActivity } from "@/logic/metrics";
 import { snapshotAt } from "@/logic/status";
 import { fmtAgo, fmtDateTime, fmtHours, HOUR, startOfDay } from "@/logic/time";
 import { useDemo } from "@/state/DemoProvider";
-import { Badge, SimulatedTag, cx } from "@/components/ui/primitives";
+import { Badge, cx } from "@/components/ui/primitives";
 import { SERIES, SplitBar } from "@/components/charts/Charts";
 import { PenguinIllustration } from "./PenguinIllustration";
 import { StatusPill } from "./StatusPill";
@@ -102,7 +102,6 @@ export function PenguinPanel({ penguinId, at, onClose, className }: { penguinId:
         <div>
           <div className="mb-2 flex items-center justify-between">
             <p className="eyebrow">Time recorded today</p>
-            <SimulatedTag />
           </div>
           <SplitBar
             parts={[

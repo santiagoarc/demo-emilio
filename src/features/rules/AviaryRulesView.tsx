@@ -10,9 +10,9 @@ import { AviaryFrame, useAviarySnapshot } from "@/features/aviary/common";
 import { ProposedRules, type RuleDef, type RuleIdea } from "./ProposedRules";
 
 const IDEAS: RuleIdea[] = [
-  { name: "Feeding intake below usual", needs: "Needs per-bird or per-group feeding records that the keepers validate. Not part of the demo data." },
+  { name: "Feeding intake below usual", needs: "Needs per-bird or per-group feeding records that the keepers validate. Not in the current data." },
   { name: "Weight trend", needs: "Needs a regular, validated weighing routine with the bird's identity confirmed at each weigh-in." },
-  { name: "Breeding / nesting events", needs: "Needs nest-box checks or breeding records agreed with the avian team. Nothing like that is simulated here." },
+  { name: "Breeding / nesting events", needs: "Needs nest-box checks or breeding records agreed with the avian team. Not recorded yet." },
 ];
 
 export function AviaryRulesView() {
@@ -25,8 +25,8 @@ export function AviaryRulesView() {
         id: "no-signal",
         name: "No recent detection",
         description: (n) => `Flags a bird with no detection in the last ${n} hours, so a keeper can look for it and check its device.`,
-        scope: "All demo birds",
-        basis: "Simulated detections · time of the last one",
+        scope: "All birds",
+        basis: "Detections · time of the last one",
         threshold: { label: "No detection for at least", unit: "hours", default: 6, min: 1, max: 48, step: 1 },
         defaultEnabled: true,
         noun: ["bird", "birds"],
@@ -39,8 +39,8 @@ export function AviaryRulesView() {
         id: "low-battery",
         name: "Device battery low",
         description: (n) => `Flags a device whose battery is at or below ${n}%, to plan its replacement.`,
-        scope: "All demo devices",
-        basis: "Simulated device status",
+        scope: "All devices",
+        basis: "Device status",
         threshold: { label: "Battery at or below", unit: "%", default: 20, min: 5, max: 50, step: 5 },
         defaultEnabled: true,
         noun: ["device", "devices"],
@@ -55,7 +55,7 @@ export function AviaryRulesView() {
         name: "Bird away from its usual zone",
         description: (n) => `Flags a bird that has spent the last ${n} hours outside its usual zone.`,
         scope: "Birds with a detection in the period",
-        basis: "Simulated location history",
+        basis: "Location history",
         threshold: { label: "Outside its zone for at least", unit: "hours", default: 4, min: 1, max: 24, step: 1 },
         defaultEnabled: false,
         noun: ["bird", "birds"],
@@ -71,8 +71,8 @@ export function AviaryRulesView() {
         id: "crowded-tree",
         name: "Many birds in one tree",
         description: (n) => `Flags a tree with ${n} or more birds located in it at the same time.`,
-        scope: "All demo trees",
-        basis: "Latest simulated detections",
+        scope: "All trees",
+        basis: "Latest detections",
         threshold: { label: "At least", unit: "birds", default: 12, min: 3, max: 40, step: 1 },
         defaultEnabled: false,
         noun: ["tree", "trees"],
@@ -93,9 +93,9 @@ export function AviaryRulesView() {
       <PageHeader
         eyebrow="Aviary · Proposed rules"
         title="Proposed rules"
-        subtitle="Examples of checks the aviary team could switch on once real data exists. Adjust a threshold to see how many demo birds it would touch."
+        subtitle="Examples of checks the aviary team could switch on once real data exists. Adjust a threshold to see how many birds it would touch."
       />
-      <AviaryFrame banner="Match counts below are computed on the demo registry at the saved simulated clock time.">
+      <AviaryFrame>
         <ProposedRules
           storageKey="penguin-demo/rules/aviary-v2"
           rules={rules}

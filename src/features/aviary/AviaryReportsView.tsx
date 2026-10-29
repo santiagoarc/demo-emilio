@@ -43,7 +43,7 @@ export function AviaryReportsView() {
       detail: `${registry.birds.length} rows · ID, species, team, age, sex, device, zone, tree, height, level, status, confidence`,
       run: () =>
         download(
-          `aviary-birds-DEMO-${stamp}.csv`,
+          `aviary-birds-${stamp}.csv`,
           ["ID", "Species", "Scientific name", "Team", "Age class", "Age (y)", "Sex", "Device", "Device status", "Zone", "Tree", "Height (m)", "Level", "Status", "Last detection", "Location confidence"],
           all.map((f) => {
             const sp = MONITOR_SPECIES_BY_ID[f.bird.speciesId];
@@ -62,7 +62,7 @@ export function AviaryReportsView() {
       detail: `${MONITOR_TEAMS.length} rows · birds, species, detected and without signal per team`,
       run: () =>
         download(
-          `aviary-teams-DEMO-${stamp}.csv`,
+          `aviary-teams-${stamp}.csv`,
           ["Team", "Lead", "Birds", "Species", "Detected", "No signal", "Status"],
           MONITOR_TEAMS.map((t) => {
             const birds = all.filter((f) => teamOf(f.bird) === t.id);
@@ -77,8 +77,8 @@ export function AviaryReportsView() {
       detail: `${registry.trees.length} rows · tree, plant name, zone, height, birds and species now`,
       run: () =>
         download(
-          `aviary-trees-DEMO-${stamp}.csv`,
-          ["Tree", "Plant name (demo)", "Zone", "Height (m)", "Birds now", "Species now", "Bird IDs"],
+          `aviary-trees-${stamp}.csv`,
+          ["Tree", "Plant name", "Zone", "Height (m)", "Birds now", "Species now", "Bird IDs"],
           registry.trees.map((t) => {
             const occ = treeOccupants(fixes, t.id);
             return [t.id, t.plantSpecies ?? "", MONITOR_ZONE_BY_ID[t.zoneId].name, t.heightM, occ.length, new Set(occ.map((f) => f.bird.speciesId)).size, occ.map((f) => f.bird.id).join(" ")];
@@ -89,8 +89,8 @@ export function AviaryReportsView() {
 
   return (
     <div className="pb-12">
-      <PageHeader eyebrow="Aviary · Reports" title="Reports" subtitle={`Tables of the demo data at the saved simulated time, ${fmtDateTime(asOf, asOf)}. Files are built in this browser and marked DEMO.`} />
-      <AviaryFrame banner="Every figure in these files is fictional demo data.">
+      <PageHeader eyebrow="Aviary · Reports" title="Reports" subtitle={`Tables of the data at ${fmtDateTime(asOf, asOf)}. Files are built in this browser.`} />
+      <AviaryFrame>
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           <Card title="Downloads" icon={FileSpreadsheet}>
             <ul className="space-y-2">

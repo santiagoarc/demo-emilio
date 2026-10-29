@@ -31,7 +31,7 @@ import { computeActivity } from "@/logic/metrics";
 import { firstIndexAtOrAfter, lastIndexAtOrBefore } from "@/logic/status";
 import { DAY, HOUR, MIN, fmtAgo, fmtDate, fmtDateTime, fmtHours, fmtWeekday, fromDateInput, startOfDay, toDateInput } from "@/logic/time";
 import { PERMISSIONS, useDemo } from "@/state/DemoProvider";
-import { Badge, Button, Card, EmptyState, SimulatedTag, cx } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, cx } from "@/components/ui/primitives";
 import { SERIES, SplitBar, StackedColumns } from "@/components/charts/Charts";
 import { HabitatMap, type TrailPoint } from "@/components/map/HabitatMap";
 import { PeriodPicker } from "@/components/filters/PeriodPicker";
@@ -126,7 +126,6 @@ function Profile({ penguinId }: { penguinId: string }) {
                   <MapPin size={11} />
                   {r ? `${ZONE_BY_ID[r.zoneId].name} · ${fmtDateTime(r.timestamp, now)} · ${QUALITY_LABEL[r.quality]} quality` : "No location recorded"}
                 </span>
-                <SimulatedTag />
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -301,10 +300,10 @@ function ActivitySection({ penguinId }: { penguinId: string }) {
       title={<span id="activity" className="scroll-mt-20">Activity</span>}
       icon={Activity}
       subtitle={`${range.label} · hours recorded by the readings.`}
-      action={<SimulatedTag />}
+      
     >
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricBlock label="In water · observed" value={t.readings ? fmtHours(t.water) : "No data"} sub="Device immersion sensor (simulated)" color={SERIES.water} />
+        <MetricBlock label="In water · observed" value={t.readings ? fmtHours(t.water) : "No data"} sub="Device immersion sensor" color={SERIES.water} />
         <MetricBlock label="On land · observed" value={t.readings ? fmtHours(t.land) : "No data"} sub="Land readings, moving or not" color={SERIES.land} />
         <MetricBlock label="No movement · inferred" value={t.readings ? fmtHours(t.stationary) : "No data"} sub="Share of land time with repeated positions" color={SERIES.stationary} />
         <MetricBlock label="Water ↔ land changes" value={String(changes)} sub="Between consecutive stretches" color="#a78bfa" />
@@ -486,7 +485,6 @@ function ReadingsSection({ penguinId }: { penguinId: string }) {
           <ChevronDown size={13} /> Show more ({rows.length - limit} remaining)
         </button>
       )}
-      <p className="mt-2 text-[10px] text-faint">Simulated readings.</p>
     </Card>
   );
 }
@@ -615,7 +613,7 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
                 <li key={n.id} className={cx("border-l-2 pl-3", n.simulated ? "border-line-strong" : "border-accent")}>
                   <p className="text-sm">{n.text}</p>
                   <p className="mt-0.5 text-[11px] text-faint">
-                    {n.by} · {fmtDateTime(n.at, now)} · {n.simulated ? "fictional record" : "logged in this demo"}
+                    {n.by} · {fmtDateTime(n.at, now)}
                   </p>
                 </li>
               ))}
@@ -665,7 +663,7 @@ function CareSection({ penguinId, className }: { penguinId: string; className?: 
         <Stethoscope size={16} className="mt-0.5 shrink-0 text-faint" />
         <div className="text-xs">
           <p className="font-medium">Veterinary records</p>
-          <p className="mt-0.5 text-muted">No data in the demo. They are kept separate from operational observations and will come from the veterinary system once integrated.</p>
+          <p className="mt-0.5 text-muted">No data yet. They are kept separate from operational observations and will come from the veterinary system once integrated.</p>
           <p className="mt-1 text-[11px] text-faint">The platform does not generate diagnoses or clinical recommendations.</p>
         </div>
       </div>

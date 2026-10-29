@@ -103,7 +103,7 @@ export function LoginScreen({ onEnter }: { onEnter: (user: string) => void }) {
           </form>
 
           <p className="mt-6 rounded-xl bg-[#f1f6fa] px-3.5 py-2.5 text-[11px] leading-snug text-[#5a7189]">
-            Demo access: the password is not checked or sent to any server. All data is simulated.
+            The password is not checked or sent to any server.
           </p>
         </div>
       </div>

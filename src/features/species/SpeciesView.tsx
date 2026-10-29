@@ -58,7 +58,7 @@ export function SpeciesView() {
       <PageHeader
         eyebrow="Catalog · SeaWorld Penguin Tracking & Care"
         title="Species"
-        subtitle="Explore the six species and review their population, activity and responsible teams. Simulated data."
+        subtitle="Explore the six species and review their population, activity and responsible teams."
         actions={
           <Segmented<RangePreset>
             size="sm"

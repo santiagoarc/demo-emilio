@@ -160,7 +160,7 @@ export function BirdActivity({ bird, asOf, windowMs, windowLabel, control }: {
       )}
 
       <p className="text-[11px] leading-snug text-faint">
-        Inference from simulated tracking data — not a clinical assessment. Distances follow the recorded path between positions; species average over the last {Math.round(Math.min(7, (asOf - ds.windowStart) / DAY))} days.
+        Inference from tracking data — not a clinical assessment. Distances follow the recorded path between positions; species average over the last {Math.round(Math.min(7, (asOf - ds.windowStart) / DAY))} days.
       </p>
     </div>
   );

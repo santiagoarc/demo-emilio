@@ -32,7 +32,7 @@ import { computeActivity, type Breakdown } from "@/logic/metrics";
 import { STATUS_LABEL, type LiveStatus, type Snapshot } from "@/logic/status";
 import { HOUR, fmtDateTime, fmtHours, fmtWeekday } from "@/logic/time";
 import { PERMISSIONS, useDemo } from "@/state/DemoProvider";
-import { Badge, Button, Card, EmptyState, Select, SimulatedTag, cx } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Select, cx } from "@/components/ui/primitives";
 import { SERIES, StackedColumns } from "@/components/charts/Charts";
 import { FilterMenu } from "@/components/filters/FilterMenu";
 import { DayPicker, PeriodPicker } from "@/components/filters/PeriodPicker";
@@ -144,7 +144,6 @@ function Detail({ teamId }: { teamId: string }) {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h1 className="text-[28px] font-semibold leading-tight tracking-tight">{team.name}</h1>
               <ActiveBadge team={team} />
-              <SimulatedTag />
             </div>
             <p className="text-sm text-muted">
               {team.focus || "No description"} · {penguins.length} assigned {penguins.length === 1 ? "penguin" : "penguins"} ({Math.round((penguins.length / Math.max(1, total)) * 100)}% of total)
@@ -314,7 +313,7 @@ function ZonePanel({ teamId, ids }: { teamId: string; ids: string[] }) {
 function ActivityPanel({ agg, label, span }: { agg: ReturnType<typeof computeActivity>; label: string; span: number }) {
   const byHour = span <= 26 * HOUR;
   return (
-    <Card title="Team activity" subtitle={`${label} · recorded hours of its penguins`} action={<SimulatedTag />}>
+    <Card title="Team activity" subtitle={`${label} · recorded hours of its penguins`}>
       {agg.penguinCount === 0 ? (
         <p className="py-4 text-center text-xs text-muted">No penguins assigned.</p>
       ) : (
@@ -515,7 +514,7 @@ function PenguinTable({
                   <td className="px-2 py-2">{noData ? <span className="text-xs text-faint">No data</span> : <HBar value={r.b!.land} max={maxH} color="#f5b84b" />}</td>
                   <td
                     className="whitespace-nowrap px-2 py-2 text-xs text-muted"
-                    title={r.snap.reading ? `${SOURCE_SHORT[r.snap.reading.source]} · ${QUALITY_LABEL[r.snap.reading.quality]} quality (±${r.snap.reading.accuracyM} m) · simulated` : undefined}
+                    title={r.snap.reading ? `${SOURCE_SHORT[r.snap.reading.source]} · ${QUALITY_LABEL[r.snap.reading.quality]} quality (±${r.snap.reading.accuracyM} m)` : undefined}
                   >
                     {r.snap.reading ? (
                       <>
@@ -686,7 +685,7 @@ function ScheduleTab({ teamId }: { teamId: string }) {
         </div>
         {mine.length === 0 ? (
           <EmptyState icon={CalendarClock} title="No shifts set up" action={PERMISSIONS.manageTeams ? <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>Set up shifts</Button> : undefined}>
-            The demo includes no staff schedules and none are made up. Once they are recorded, they will appear here by day.
+            No staff schedules recorded yet. Once they are recorded, they will appear here by day.
           </EmptyState>
         ) : day.length === 0 ? (
           <p className="py-8 text-center text-xs text-muted">No shifts set up for {WEEKDAYS[weekday]}.</p>
@@ -907,7 +906,7 @@ function StaffTab({ teamId }: { teamId: string }) {
       </section>
       <Card title="Team history" icon={History} subtitle="Changes to members, roles, status and shifts">
         {history.length === 0 ? (
-          <p className="py-3 text-xs text-muted">No changes recorded in the demo.</p>
+          <p className="py-3 text-xs text-muted">No changes recorded.</p>
         ) : (
           <ol className="scroll-thin max-h-[420px] space-y-2.5 overflow-y-auto pr-1">
             {history.map((h) => (

@@ -40,8 +40,8 @@ export function BirdRegistry() {
 
   return (
     <div className="pb-12">
-      <PageHeader eyebrow="Aviary · Demo registry" title="Birds" subtitle={`${registry.birds.length} individual birds across ${registry.species.length} species. Positions as of the simulated clock, ${fmtDateTime(asOf, asOf)}.`} />
-      <AviaryFrame banner="Open a bird to see it on the Habitat map with its card and detection history.">
+      <PageHeader eyebrow="Aviary · Registry" title="Birds" subtitle={`${registry.birds.length} individual birds across ${registry.species.length} species. Positions as of ${fmtDateTime(asOf, asOf)}.`} />
+      <AviaryFrame>
         <section className="panel p-4">
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative min-w-[220px] flex-1">
@@ -90,7 +90,7 @@ export function BirdRegistry() {
 
           <div className="scroll-thin mt-2 overflow-x-auto">
             <table className="w-full min-w-[980px] text-xs">
-              <caption className="sr-only">Demo bird registry</caption>
+              <caption className="sr-only">Bird registry</caption>
               <thead>
                 <tr className="border-b border-line text-left text-[11px] text-muted">
                   {["ID", "Species", "Age", "Sex", "Zone", "Tree", "Height", "Level", "Status", "Device", "Last detection"].map((h) => (

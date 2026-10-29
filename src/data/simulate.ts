@@ -292,7 +292,7 @@ export function generateDataset(config: DemoConfig, now: number): Dataset {
         if (at < registeredAt) continue;
         notes.push({ id: `NOTE-${id}-${k}`, penguinId: id, at, by: pick(rng, TEAMS.find((t) => t.id === teamId)!.members), text: pick(rng, NOTE_TEXTS), simulated: true });
       }
-      incidents.push({ id: `INC-${id}-reg`, penguinId: id, at: registeredAt, kind: "registry", text: "Added to the demo registry." });
+      incidents.push({ id: `INC-${id}-reg`, penguinId: id, at: registeredAt, kind: "registry", text: "Added to the registry." });
       incidents.push({ id: `INC-${id}-rev`, penguinId: id, at: lastReviewAt, kind: "care", text: "Routine check completed." });
       if (!recent && chance(rng, 0.12)) between(rng, 20, 200);
     }

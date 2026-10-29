@@ -90,7 +90,7 @@ export function runDemoChecks(ds: TrackingDataset, src: TrackingSource, fixes: M
     { id: "trees", label: "Every location points to an existing tree in its zone", pass: badTree === 0 && detBadTree === 0, detail: `${stayCount.toLocaleString("en-US")} locations checked · ${badTree + detBadTree} problems` },
     { id: "heights", label: "Vertical coordinate matches the recorded height and tree", pass: badHeight === 0 && detBadLevel === 0, detail: `y within 0 m and the tree height; level matches height · ${badHeight + detBadLevel} problems` },
     { id: "no-invent", label: "Approximate or unknown locations carry no coordinates", pass: detNoInvent === 0, detail: `${detNoInvent} detections with invented coordinates` },
-    { id: "dupes", label: "The simulation creates no duplicate records", pass: dupStay === 0 && overlap === 0 && h1 === h2, detail: `${dupStay} duplicate IDs · ${overlap} overlapping stays · history repeatable` },
+    { id: "dupes", label: "No duplicate records", pass: dupStay === 0 && overlap === 0 && h1 === h2, detail: `${dupStay} duplicate IDs · ${overlap} overlapping stays · history repeatable` },
     { id: "teams", label: "Ten teams of 50, each bird in exactly one", pass: teamsOk, detail: `${split.size} birds assigned · per team ${[...new Set(perTeam)].join("/")} (default split, before manual changes)` },
     {
       id: "persist",

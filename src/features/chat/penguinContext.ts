@@ -77,7 +77,7 @@ export function penguinDossier(d: ChatData, p: Penguin): string {
 
   const ins = d.insights.get(p.id);
   if (ins) {
-    out.push(`\n### How is it doing? (the demo's automatic indicator): ${INSIGHT_LABEL[ins.level]}`);
+    out.push(`\n### How is it doing? (automatic indicator): ${INSIGHT_LABEL[ins.level]}`);
     for (const pt of ins.points) out.push(`- ${pt.text}`);
   }
 

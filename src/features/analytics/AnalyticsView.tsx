@@ -68,7 +68,7 @@ export function AnalyticsView() {
       <PageHeader
         eyebrow="Analytics"
         title="Activity Analytics"
-        subtitle="Every chart is computed from the simulated readings and responds to the filters."
+        subtitle="Every chart is computed from the readings and responds to the filters."
       />
       <div className="space-y-5 px-6 lg:px-8">
         <div className="panel-flat p-4">

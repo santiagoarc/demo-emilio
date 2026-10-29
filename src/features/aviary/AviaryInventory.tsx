@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { ClipboardList, TreePine } from "lucide-react";
 import { GROUP_LABEL, MONITOR_ZONE_BY_ID, type AgeClass } from "@/domain/aviaryTracking";
-import { DEMO_TOTAL_BIRDS, REQUESTED_TOTAL } from "@/data/aviaryCatalog";
+import { REQUESTED_TOTAL } from "@/data/aviaryCatalog";
 import { SPECIES_INFO } from "@/data/aviarySpeciesInfo";
 import { runDemoChecks } from "@/logic/aviaryDemoChecks";
 import { treeOccupants } from "@/logic/aviaryTracking";
@@ -38,25 +38,25 @@ export function AviaryInventory() {
 
   return (
     <div className="pb-12">
-      <PageHeader eyebrow="Aviary · Demo catalogue" title="Species" subtitle={`${registry.species.length} species · ${total} birds · ${registry.trees.length} trees. Generated once and stored in this browser.`} />
-      <AviaryFrame banner="This distribution exists only for the demo and does not represent the population of any zoological facility.">
+      <PageHeader eyebrow="Aviary · Catalogue" title="Species" subtitle={`${registry.species.length} species · ${total} birds · ${registry.trees.length} trees.`} />
+      <AviaryFrame>
         {registry.distributionNote && (
           <p className="rounded-xl border border-accent-2/30 bg-accent-2/[0.05] px-4 py-2.5 text-xs text-ink">
             <span className="font-semibold">Total checked before loading.</span> {registry.distributionNote}
           </p>
         )}
 
-        <Card title="Species catalogue" icon={ClipboardList} subtitle={`Requested ${REQUESTED_TOTAL} · generated ${total} (target ${DEMO_TOTAL_BIRDS})`}>
+        <Card title="Species catalogue" icon={ClipboardList} subtitle={`${registry.species.length} species · ${total} birds`}>
           <div className="scroll-thin overflow-x-auto">
             <table className="w-full min-w-[920px] text-xs">
-              <caption className="sr-only">Demo species catalogue with counts</caption>
+              <caption className="sr-only">Species catalogue with counts</caption>
               <thead>
                 <tr className="border-b border-line text-left text-[11px] text-muted">
                   <th scope="col" className="px-2 py-2 font-medium">Code</th>
                   <th scope="col" className="px-2 py-2 font-medium">Species</th>
                   <th scope="col" className="px-2 py-2 font-medium">Group</th>
                   <th scope="col" className="px-2 py-2 text-right font-medium">Requested</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Demo birds</th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">Birds</th>
                   <th scope="col" className="px-2 py-2 text-right font-medium">M / F</th>
                   <th scope="col" className="px-2 py-2 text-right font-medium">Juv · Sub · Adult · Senior</th>
                 </tr>
@@ -99,10 +99,10 @@ export function AviaryInventory() {
         </Card>
 
         <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
-          <Card title="Trees" icon={TreePine} subtitle="Demo trees on the conceptual layout. Reference points are simulated, not surveyed.">
+          <Card title="Trees" icon={TreePine} subtitle="Trees with their working IDs and positions.">
             <div className="scroll-thin max-h-[520px] overflow-auto">
               <table className="w-full min-w-[620px] text-xs">
-                <caption className="sr-only">Demo tree inventory</caption>
+                <caption className="sr-only">Tree inventory</caption>
                 <thead className="sticky top-0 bg-panel-solid">
                   <tr className="border-b border-line text-left text-[11px] text-muted">
                     {["Tree", "Zone", "Form", "Height", "X · Y", "Reference points", "Birds now"].map((h) => (

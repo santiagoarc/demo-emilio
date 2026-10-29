@@ -10,9 +10,9 @@ import { PageHeader } from "@/components/shell/AppShell";
 import { ProposedRules, type RuleDef, type RuleIdea } from "./ProposedRules";
 
 const IDEAS: RuleIdea[] = [
-  { name: "Feeding intake below usual", needs: "Needs per-penguin feeding records validated by the keepers. The demo has no feeding data." },
-  { name: "Weight trend", needs: "Needs a validated weighing routine linked to each penguin's identity. Not simulated here." },
-  { name: "Breeding / nesting events", needs: "Needs nest checks or breeding records agreed with the animal-care team. Not simulated here." },
+  { name: "Feeding intake below usual", needs: "Needs per-penguin feeding records validated by the keepers. No feeding data yet." },
+  { name: "Weight trend", needs: "Needs a validated weighing routine linked to each penguin's identity. Not recorded yet." },
+  { name: "Breeding / nesting events", needs: "Needs nest checks or breeding records agreed with the animal-care team. Not recorded yet." },
 ];
 
 /** Hours a penguin's latest readings have stayed at exactly the same position. */
@@ -104,7 +104,7 @@ export function PenguinRulesView() {
       <PageHeader
         eyebrow="Penguins · Proposed rules"
         title="Proposed rules"
-        subtitle="Examples of checks the penguin team could switch on later. Adjust a threshold to see how many demo penguins it would touch."
+        subtitle="Examples of checks the penguin team could switch on later. Adjust a threshold to see how many penguins it would touch."
       />
       <div className="px-6 lg:px-8">
         <ProposedRules
@@ -113,7 +113,7 @@ export function PenguinRulesView() {
           ideas={IDEAS}
           backHref="/penguins"
           backLabel="Back to penguins"
-          intro="None of these rules is running. They send no notifications and do not replace keeper judgement. Matches are computed on the simulated penguin data."
+          intro="None of these rules is running. They send no notifications and do not replace keeper judgement. Matches are computed on the penguin data."
         />
       </div>
     </div>
