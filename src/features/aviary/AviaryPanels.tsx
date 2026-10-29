@@ -212,9 +212,14 @@ export function TeamsSection({ fixes, teamOf, onAssign, teamFilter, onTeamFilter
           const t = q.trim().toLowerCase();
           const shown = expanded && t ? birds.filter((f) => `${f.bird.id} ${MONITOR_SPECIES_BY_ID[f.bird.speciesId].common} ${MONITOR_SPECIES_BY_ID[f.bird.speciesId].scientific}`.toLowerCase().includes(t)) : birds;
           return (
-            <li key={team.id} className={cx("rounded-xl border", expanded ? "border-accent/40 bg-panel-2/40" : "border-line")}>
-              <button onClick={() => (setOpen(expanded ? null : team.id), setQ(""))} aria-expanded={expanded} className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink/[0.06] text-[13px] font-bold text-ink">{team.name.split(" ")[1][0]}</span>
+            <li
+              key={team.id}
+              className={cx("relative overflow-hidden rounded-xl border", expanded ? "bg-panel-2/40" : "border-line", teamFilter === team.id && !expanded && "bg-ink/[0.02]")}
+              style={expanded || teamFilter === team.id ? { borderColor: `${team.color}88` } : undefined}
+            >
+              <span className="absolute inset-y-0 left-0 w-1" style={{ background: team.color }} aria-hidden />
+              <button onClick={() => (setOpen(expanded ? null : team.id), setQ(""))} aria-expanded={expanded} className="flex w-full items-center gap-2.5 py-2 pl-3.5 pr-2.5 text-left">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[13px] font-bold" style={{ background: `${team.color}22`, color: team.color }}>{team.name.split(" ")[1][0]}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="text-[13px] font-semibold text-ink">{team.name}</span>
@@ -246,12 +251,14 @@ export function TeamsSection({ fixes, teamOf, onAssign, teamFilter, onTeamFilter
                     </label>
                     <button
                       onClick={() => onTeamFilter(teamFilter === team.id ? "" : team.id)}
-                      className={cx("h-7 shrink-0 rounded-lg border px-2 text-[10px] font-medium", teamFilter === team.id ? "border-accent bg-accent text-white" : "border-line-strong text-ink hover:border-accent/50")}
+                      className={cx("h-7 shrink-0 rounded-lg border px-2 text-[10px] font-medium", teamFilter === team.id ? "text-white" : "border-line-strong text-ink hover:border-accent/50")}
+                      style={teamFilter === team.id ? { background: team.color, borderColor: team.color } : undefined}
                     >
                       {teamFilter === team.id ? "On map ✓" : "Show on map"}
                     </button>
                   </div>
-                  <p className="mt-1 px-1 text-[10px] text-faint">
+                  <p className="mt-1 flex items-center gap-1.5 px-1 text-[10px] text-faint">
+                    <span className="h-2 w-2 rounded-full" style={{ background: team.color }} />
                     Lead {team.lead} · {shown.length} of {birds.length}
                   </p>
                   <ul className="scroll-thin mt-1 max-h-72 overflow-y-auto">
