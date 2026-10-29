@@ -39,7 +39,8 @@ export function loadRegistry(): { registry: DemoRegistry; origin: RegistryOrigin
     if (looksValid(parsed)) {
       // Registries saved before trees had demo plant names get them filled in; birds are untouched.
       const trees = parsed.trees.map((t) => (t.plantSpecies ? t : { ...t, plantSpecies: demoPlant(t) }));
-      return { registry: { ...parsed, trees }, origin: "storage" };
+      // Species always come from the catalogue, so colours stay consistent everywhere.
+      return { registry: { ...parsed, species: MONITOR_SPECIES, trees }, origin: "storage" };
     }
   } catch {
     // Unreadable storage: fall through and generate.

@@ -19,7 +19,7 @@ export interface Vec3 {
 }
 
 /** Conceptual footprint. Not the real dimensions of The Rainforest. */
-export const FOOTPRINT = { rx: 58, rz: 38, domeHeight: 26, label: "Conceptual layout · not to scale" };
+export const FOOTPRINT = { rx: 58, rz: 38, domeHeight: 36, label: "Conceptual layout · not to scale" };
 
 export type LevelId = "ground" | "l1" | "l2" | "l3" | "upper";
 
@@ -58,19 +58,20 @@ export interface MonitorZone {
 
 /** Conceptual zoning. Codes and names are working labels, not SeaWorld's. */
 export const MONITOR_ZONES: MonitorZone[] = [
-  { id: "entrance", code: "Z1", name: "Entrance", color: "#3B82F6", sector: [170, 210] },
-  { id: "mangrove", code: "Z2", name: "Mangrove", color: "#16A34A", sector: [210, 270] },
-  { id: "canopy", code: "Z3", name: "Tree Canopy", color: "#CA8A04", sector: [270, 330] },
-  { id: "waterfall", code: "Z4", name: "Waterfall", color: "#8B5CF6", sector: [-30, 30] },
-  { id: "lagoon", code: "Z5", name: "Central Lagoon", color: "#0891B2", sector: null },
-  { id: "nesting", code: "Z6", name: "Nesting Area", color: "#DC2626", sector: [30, 90] },
-  { id: "feeding", code: "Z7", name: "Feeding Area", color: "#EA580C", sector: [90, 170] },
+  { id: "entrance", code: "Z1", name: "Entrance", color: "#3B82F6", sector: [140, 180] },
+  { id: "mangrove", code: "Z2", name: "West Pool", color: "#16A34A", sector: [180, 245] },
+  { id: "canopy", code: "Z3", name: "Tree Canopy", color: "#CA8A04", sector: [245, 300] },
+  { id: "waterfall", code: "Z4", name: "Waterfalls", color: "#8B5CF6", sector: [-60, 0] },
+  { id: "lagoon", code: "Z5", name: "South Lagoon", color: "#0891B2", sector: [95, 140] },
+  { id: "nesting", code: "Z6", name: "East Pool", color: "#DC2626", sector: [0, 50] },
+  { id: "feeding", code: "Z7", name: "Feeding Area", color: "#EA580C", sector: [50, 95] },
+  { id: "greattree", code: "Z8", name: "Great Tree", color: "#0E9F95", sector: null },
 ];
 
 export const MONITOR_ZONE_BY_ID = Object.fromEntries(MONITOR_ZONES.map((z) => [z.id, z])) as Record<string, MonitorZone>;
 
 /** Inner ellipse (central zone) as a share of the footprint radii. */
-export const INNER_RATIO = 0.4;
+export const INNER_RATIO = 0.3;
 
 /** Zone that contains a plan point, or null when it falls outside the footprint. */
 export function zoneAt(x: number, z: number): MonitorZone | null {
@@ -78,9 +79,9 @@ export function zoneAt(x: number, z: number): MonitorZone | null {
   const nz = z / FOOTPRINT.rz;
   const r = Math.hypot(nx, nz);
   if (r > 1) return null;
-  if (r < INNER_RATIO) return MONITOR_ZONE_BY_ID.lagoon;
+  if (r < INNER_RATIO) return MONITOR_ZONE_BY_ID.greattree;
   let deg = (Math.atan2(nz, nx) * 180) / Math.PI;
-  if (deg < -30) deg += 360;
+  if (deg < -60) deg += 360;
   return MONITOR_ZONES.find((zn) => zn.sector && deg >= zn.sector[0] && deg < zn.sector[1]) ?? null;
 }
 

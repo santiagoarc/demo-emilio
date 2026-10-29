@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { ArrowRight, ArrowUpRight, Bird, Feather, Map as MapIcon, MapPinned, Navigation, Pause, Play, Radio, X, type LucideIcon } from "lucide-react";
 import { FIX_STATUS, MONITOR_ZONE_BY_ID } from "@/domain/aviaryTracking";
 import { MONITOR_SPECIES_BY_ID } from "@/data/aviaryCatalog";
-import { STRUCTURES } from "@/data/aviaryTrackingSimulate";
 import { fmtHeight, recentMoves, snapshot } from "@/logic/aviaryTracking";
 import { MIN, fmtAgo, fmtTime } from "@/logic/time";
 import { useSimClock, useTracking, type TrackingState } from "@/state/useTracking";
@@ -40,9 +39,7 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
         .map((f) => ({
           id: f.bird.id,
           pos: f.det!.pos!,
-          species: MONITOR_SPECIES_BY_ID[f.bird.speciesId].code,
           color: MONITOR_SPECIES_BY_ID[f.bird.speciesId].color,
-          ring: FIX_STATUS[f.status].color,
           dim: false,
           label: `${f.bird.id} · ${MONITOR_SPECIES_BY_ID[f.bird.speciesId].common}`,
         })),
@@ -124,7 +121,6 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
           <div className="relative h-[clamp(340px,calc(100vh-290px),700px)] w-full border-y border-line">
             <AviaryScene
               trees={registry.trees}
-              structures={STRUCTURES}
               points={points}
               selectedBirdId={birdId}
               selectedTreeId={treeId}

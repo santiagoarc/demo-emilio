@@ -16,8 +16,8 @@ import { SpeciesAvatar } from "./SpeciesAvatar";
 
 /* ---------- left panel: species ---------- */
 
-/** One row height; about eight species fit at a time. */
-const SPECIES_ROW = 50;
+/** One legend row height. */
+const SPECIES_ROW = 32;
 
 /** Discreet monitoring status for a group of birds: worst state wins. */
 export function monitorState(fixes: Fix[]) {
@@ -60,7 +60,7 @@ export function SpeciesSection({ fixes, speciesFilter, onSpeciesFilter, onBird, 
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Species">
       <div className="border-b border-line px-3 pb-2.5 pt-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-[15px] font-semibold text-ink">Species</h2>
+          <h2 className="text-[15px] font-semibold text-ink">Species legend</h2>
           {speciesFilter ? (
             <button onClick={() => onSpeciesFilter("")} className="text-[11px] font-medium text-accent hover:underline">
               Show all
@@ -99,21 +99,20 @@ export function SpeciesSection({ fixes, speciesFilter, onSpeciesFilter, onBird, 
                 onClick={() => onSpeciesFilter(on ? "" : s.id)}
                 aria-pressed={on}
                 title={on ? "Click again to show all species" : `Show only ${s.common} on the map`}
-                className={cx("flex w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors", on ? "bg-accent/12 ring-1 ring-accent/40" : "hover:bg-ink/[0.04]")}
+                className={cx("flex w-full items-center gap-2 rounded-md px-2 text-left transition-colors", on ? "bg-accent/12 ring-1 ring-accent/40" : "hover:bg-ink/[0.04]")}
                 style={{ height: SPECIES_ROW }}
               >
-                <SpeciesAvatar code={s.code} size={34} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-ink">{s.common}</span>
-                  <span className="block truncate text-[10px] italic text-muted">{s.scientific}</span>
+                <span className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white" style={{ background: s.color, boxShadow: "0 0 0 3px rgba(3,16,28,0.15)" }} aria-hidden />
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink" title={s.scientific}>
+                  {s.common}
                 </span>
-                <span className="num text-[13px] font-semibold text-ink">{birds.length}</span>
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: st.color }} title={st.label} aria-label={st.label} />
+                <span className="num text-[12px] font-semibold text-ink">{birds.length}</span>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: st.color }} title={st.label} aria-label={st.label} />
               </button>
               {on && (
                 <div className="mx-1 mb-2 mt-1 rounded-lg border border-line bg-panel-2/60 p-2">
                   <p className="text-[11px] text-muted">
-                    {st.detected}/{birds.length} detected · <Link href={`/aviary/species/${s.id}`} className="text-accent hover:underline">species page →</Link>
+                    <i>{s.scientific}</i> · {st.detected}/{birds.length} detected · <Link href={`/aviary/species/${s.id}`} className="text-accent hover:underline">species page →</Link>
                   </p>
                   <ul className="scroll-thin mt-1.5 max-h-56 overflow-y-auto">
                     {birds.map((f) => (

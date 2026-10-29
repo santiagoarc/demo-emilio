@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { LEVELS, type AviaryTree, type FixStatus } from "@/domain/aviaryTracking";
-import { SPECIES_ICON } from "@/data/aviarySpeciesIcons";
 import { hashSeed, mulberry32 } from "@/logic/rng";
 
 export interface TreeBird {
@@ -14,6 +13,7 @@ export interface TreeBird {
   /** East–west offset from the trunk, metres (side elevation). */
   dx: number;
   status: FixStatus;
+  /** Species colour of the dot. */
   ring: string;
 }
 
@@ -23,7 +23,7 @@ const PAD_L = 62;
 const PAD_R = 40;
 const PAD_T = 14;
 const ROOTS = 30;
-const MARK = 13;
+const MARK = 6;
 
 /**
  * Side elevation of one tree, roots to crown, with a metre scale and the
@@ -68,11 +68,6 @@ export function TreeIllustration({ tree, birds, highlightId, onHover, onOpen }: 
           <stop offset="0.5" stopColor="#8a6440" />
           <stop offset="1" stopColor="#4c3420" />
         </linearGradient>
-        {birds.map((b) => (
-          <clipPath key={b.id} id={`clip-${b.id}`}>
-            <circle r={MARK} />
-          </clipPath>
-        ))}
       </defs>
 
       {/* Habitat levels and metre scale */}
@@ -129,7 +124,6 @@ export function TreeIllustration({ tree, birds, highlightId, onHover, onOpen }: 
         const by = y(b.heightM);
         const on = b.id === highlightId || b.id === hover;
         const s = on ? 1.3 : 1;
-        const icon = SPECIES_ICON[b.species];
         const label = on || showAllLabels;
         return (
           <g
@@ -142,12 +136,9 @@ export function TreeIllustration({ tree, birds, highlightId, onHover, onOpen }: 
             <title>{`${b.id} · ${b.heightM.toFixed(1)} m ± ${b.precisionM} m`}</title>
             <line x1={bx} x2={bx} y1={y(b.heightM + b.precisionM)} y2={y(Math.max(0, b.heightM - b.precisionM))} stroke={b.ring} strokeWidth={2} opacity={on ? 0.7 : 0.3} />
             <g transform={`translate(${bx} ${by}) scale(${s})`} style={{ transition: "transform 200ms ease" }}>
-              {on && <circle r={MARK + 6} fill={b.ring} opacity={0.25} />}
-              <circle r={MARK + 2.5} fill={b.ring} />
-              <g clipPath={`url(#clip-${b.id})`}>
-                <image href={icon.src} x={-MARK / icon.zoom} y={-MARK / icon.zoom} width={(2 * MARK) / icon.zoom} height={(2 * MARK) / icon.zoom} preserveAspectRatio={`x${align(icon.fx)}Y${align(icon.fy)} slice`} />
-              </g>
-              <circle r={MARK} fill="none" stroke="#fff" strokeWidth={1.5} />
+              {on && <circle r={MARK + 5} fill={b.ring} opacity={0.25} />}
+              <circle r={MARK} fill={b.ring} stroke="#fff" strokeWidth={2} />
+              <circle r={MARK + 1} fill="none" stroke="rgba(3,16,28,0.55)" strokeWidth={1} />
             </g>
             {label && (
               <g transform={`translate(${bx + MARK * s + 5} ${by - 12})`}>
@@ -161,11 +152,6 @@ export function TreeIllustration({ tree, birds, highlightId, onHover, onOpen }: 
       })}
     </svg>
   );
-}
-
-/** SVG preserveAspectRatio alignment closest to a focus share. */
-function align(f: number) {
-  return f < 0.4 ? "Min" : f > 0.6 ? "Max" : "Mid";
 }
 
 interface Blob {

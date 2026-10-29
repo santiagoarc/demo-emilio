@@ -15,148 +15,24 @@ import {
   type MonitorZone,
   type Vec3,
 } from "@/domain/aviaryTracking";
-import { LAGOON, WATERFALL_POOL, type STRUCTURES } from "@/data/aviaryTrackingSimulate";
+import { GREAT_TREE, PAVILIONS, PLATFORMS, ROCKS, WALKWAYS, WATER, WATERFALLS, distToWalkways, nearPavilion, nearRocks, nearWater, type XZ } from "@/domain/aviaryLayout";
 import { hashSeed, mulberry32 } from "@/logic/rng";
 import { cx } from "@/components/ui/primitives";
-import { SPECIES_ICON } from "@/data/aviarySpeciesIcons";
 
 /**
- * Markers keep the same size on screen at any zoom, like the penguin map dots.
- * MARK is the share of the view height (perspective); LIFT floats them just above the point.
+ * The demo aviary in three.js, built from the layout in aviaryLayout.ts. The
+ * 3D view (perspective, oblique) and the top view (orthographic, from above)
+ * render the same scene, so every tree and feature matches between them.
+ *
+ * Birds are small dots in their species colour. Dots that overlap on screen
+ * fold into a counter, which splits as the camera gets closer.
  */
-const MARK = 0.026;
-const LIFT = 0.4;
-
-/** Round dot in one colour with a thin white edge, drawn once per colour. */
-function dotTexture(color: string, cache: Map<string, THREE.CanvasTexture>) {
-  const hit = cache.get(color);
-  if (hit) return hit;
-  const S = 64;
-  const c = document.createElement("canvas");
-  c.width = c.height = S;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "rgba(3,16,28,0.55)";
-  g.beginPath();
-  g.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = "#ffffff";
-  g.beginPath();
-  g.arc(S / 2, S / 2, S / 2 - 4, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = color;
-  g.beginPath();
-  g.arc(S / 2, S / 2, S / 2 - 9, 0, Math.PI * 2);
-  g.fill();
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  cache.set(color, tex);
-  return tex;
-}
-
-/** Round species image with a white edge, drawn once per species. */
-function speciesTexture(code: string, cache: Map<string, THREE.CanvasTexture>) {
-  const hit = cache.get(code);
-  if (hit) return hit;
-  const S = 128;
-  const c = document.createElement("canvas");
-  c.width = c.height = S;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "#9fb3c2";
-  g.beginPath();
-  g.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2);
-  g.fill();
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const icon = SPECIES_ICON[code];
-  if (icon) {
-    const img = new Image();
-    img.onload = () => {
-      const side = Math.min(img.width, img.height) * icon.zoom;
-      const sx = Math.min(img.width - side, Math.max(0, icon.fx * img.width - side / 2));
-      const sy = Math.min(img.height - side, Math.max(0, icon.fy * img.height - side / 2));
-      g.clearRect(0, 0, S, S);
-      g.save();
-      g.beginPath();
-      g.arc(S / 2, S / 2, S / 2 - 7, 0, Math.PI * 2);
-      g.clip();
-      g.drawImage(img, sx, sy, side, side, 0, 0, S, S);
-      g.restore();
-      g.strokeStyle = "#ffffff";
-      g.lineWidth = 6;
-      g.beginPath();
-      g.arc(S / 2, S / 2, S / 2 - 7, 0, Math.PI * 2);
-      g.stroke();
-      tex.needsUpdate = true;
-    };
-    img.src = icon.src;
-  }
-  cache.set(code, tex);
-  return tex;
-}
-
-/** Status ring drawn behind the species image. */
-function statusRingTexture(color: string, cache: Map<string, THREE.CanvasTexture>) {
-  const hit = cache.get(color);
-  if (hit) return hit;
-  const S = 128;
-  const c = document.createElement("canvas");
-  c.width = c.height = S;
-  const g = c.getContext("2d")!;
-  g.fillStyle = color;
-  g.beginPath();
-  g.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
-  g.fill();
-  const tex = new THREE.CanvasTexture(c);
-  cache.set(color, tex);
-  return tex;
-}
-
-/** Group marker: how many birds overlap on screen there. */
-function clusterTexture(label: string, cache: Map<string, THREE.CanvasTexture>) {
-  const hit = cache.get(label);
-  if (hit) return hit;
-  const S = 128;
-  const c = document.createElement("canvas");
-  c.width = c.height = S;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "rgba(14,159,149,0.28)";
-  g.beginPath();
-  g.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = "#ffffff";
-  g.strokeStyle = "#0e9f95";
-  g.lineWidth = 7;
-  g.beginPath();
-  g.arc(S / 2, S / 2, S / 2 - 14, 0, Math.PI * 2);
-  g.fill();
-  g.stroke();
-  g.fillStyle = "#0b2440";
-  g.font = `700 ${label.length > 2 ? 34 : 42}px system-ui, sans-serif`;
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  g.fillText(label, S / 2, S / 2 + 2);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  cache.set(label, tex);
-  return tex;
-}
-
-/** Screen cell (px) inside which nearby birds are grouped. */
-const CLUSTER_CELL = 34;
-/** Trees show their ID once the camera is this close (perspective) or zoomed this far (2D). */
-const TREE_LABEL_DIST = 85;
-const TREE_LABEL_ZOOM = 1.7;
-
 
 export interface ScenePoint {
   id: string;
   pos: Vec3;
-  /** Species code: the photo marker shows that species. */
-  species: string;
-  /** Colour of the species, used by the dot marker style. */
+  /** Species colour. */
   color: string;
-  /** Status ring around the photo marker (detected, moving, no signal). */
-  ring: string;
   dim: boolean;
   label: string;
 }
@@ -171,11 +47,10 @@ export const DEFAULT_SCENE_LAYERS: SceneLayers = { zones: true, labels: true, do
 
 export interface AviarySceneProps {
   trees: AviaryTree[];
-  structures: typeof STRUCTURES;
   points: ScenePoint[];
   selectedBirdId: string | null;
   selectedTreeId: string | null;
-  /** Zones to emphasise (filter, or the zone of a zone-only bird). */
+  /** Zone to emphasise (filter, or the zone of a zone-only bird). */
   highlightZoneId: string | null;
   /** Uncertainty sphere around the selected bird. */
   precision: { pos: Vec3; r: number } | null;
@@ -188,13 +63,99 @@ export interface AviarySceneProps {
   /** Glide markers to their new position instead of jumping. */
   smooth?: boolean;
   layers?: SceneLayers;
-  /** Species photo with a status ring (default) or a dot in the species colour. */
-  markerStyle?: "photo" | "dot";
-  /** Group birds that overlap on screen into a counter; they split when zooming in. */
+  /** Fold dots that overlap on screen into a counter; they split when zooming in. */
   cluster?: boolean;
   onSelectBird: (id: string) => void;
   onSelectTree: (id: string) => void;
   onSelectZone: (id: string) => void;
+  /** Birds that still overlap at the closest zoom (same estimated spot). */
+  onSelectGroup?: (ids: string[]) => void;
+}
+
+/** Dot size as a share of the view height, and how far above the point it floats. */
+const MARK = 0.017;
+const LIFT = 0.3;
+/** Screen cell (px) inside which nearby dots are grouped. */
+const CLUSTER_CELL = 22;
+/** Trees show their ID once the camera is this close (3D) or zoomed this far (2D). */
+const TREE_LABEL_DIST = 85;
+const TREE_LABEL_ZOOM = 1.7;
+/** Closest the camera gets; at this distance a group can no longer be split by zooming. */
+const MIN_DIST = 12;
+
+const HOME_TARGET = new THREE.Vector3(0, 2, 4);
+const HOME_CAM = new THREE.Vector3(0, 104, 118);
+
+/* ---------- textures ---------- */
+
+/** Round dot in one colour with a thin white edge and a dark outline. */
+function dotTexture(color: string, cache: Map<string, THREE.CanvasTexture>) {
+  const hit = cache.get(color);
+  if (hit) return hit;
+  const S = 64;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "rgba(3,16,28,0.6)";
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "#ffffff";
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 5, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = color;
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 10, 0, Math.PI * 2);
+  g.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  cache.set(color, tex);
+  return tex;
+}
+
+/** Counter for dots that overlap on screen. */
+function clusterTexture(label: string, cache: Map<string, THREE.CanvasTexture>) {
+  const key = `c:${label}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const S = 96;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#ffffff";
+  g.strokeStyle = "#0b2440";
+  g.lineWidth = 5;
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 5, 0, Math.PI * 2);
+  g.fill();
+  g.stroke();
+  g.fillStyle = "#0b2440";
+  g.font = `700 ${label.length > 2 ? 30 : 38}px system-ui, sans-serif`;
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(label, S / 2, S / 2 + 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, tex);
+  return tex;
+}
+
+function ringTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d")!;
+  g.strokeStyle = "#ffffff";
+  g.lineWidth = 12;
+  g.beginPath();
+  g.arc(64, 64, 50, 0, Math.PI * 2);
+  g.stroke();
+  g.strokeStyle = "#0b2440";
+  g.lineWidth = 5;
+  g.beginPath();
+  g.arc(64, 64, 50, 0, Math.PI * 2);
+  g.stroke();
+  return new THREE.CanvasTexture(c);
 }
 
 /* ---------- geometry helpers (shape space: x → x, y → −z) ---------- */
@@ -203,6 +164,16 @@ function ellipseShape(rx: number, rz: number, cx = 0, cz = 0) {
   const s = new THREE.Shape();
   s.absellipse(cx, -cz, rx, rz, 0, Math.PI * 2, false, 0);
   return s;
+}
+
+/** Smooth closed outline through plan points (optionally grown around its centre). */
+function smoothShape(outline: XZ[], scale = 1) {
+  const cx = outline.reduce((a, p) => a + p[0], 0) / outline.length;
+  const cz = outline.reduce((a, p) => a + p[1], 0) / outline.length;
+  const pts = outline.map(([x, z]) => new THREE.Vector2(cx + (x - cx) * scale, -(cz + (z - cz) * scale)));
+  const curve = new THREE.SplineCurve([...pts, pts[0], pts[1]]);
+  const all = curve.getPoints((outline.length + 2) * 10);
+  return new THREE.Shape(all.slice(0, all.length - 20));
 }
 
 function zoneShape(zone: MonitorZone) {
@@ -222,21 +193,28 @@ function zoneShape(zone: MonitorZone) {
 }
 
 function zoneAnchor(zone: MonitorZone): THREE.Vector3 {
-  if (!zone.sector) return new THREE.Vector3(0, 0.5, -LAGOON.rz - 2);
+  if (!zone.sector) return new THREE.Vector3(GREAT_TREE.x - 9, 0.5, GREAT_TREE.z + 9);
   const mid = (((zone.sector[0] + zone.sector[1]) / 2) * Math.PI) / 180;
-  return new THREE.Vector3(Math.cos(mid) * FOOTPRINT.rx * 0.74, 0.5, Math.sin(mid) * FOOTPRINT.rz * 0.74);
+  return new THREE.Vector3(Math.cos(mid) * FOOTPRINT.rx * 0.8, 0.5, Math.sin(mid) * FOOTPRINT.rz * 0.8);
 }
 
-/** Flat ribbon along an elliptical arc, in world space. */
-function ribbon(r: number, width: number, a0: number, a1: number, y: number) {
-  const { rx, rz } = FOOTPRINT;
+/** Smooth 3D path through plan points at a height. */
+function pathCurve(path: XZ[], y: number) {
+  return new THREE.CatmullRomCurve3(path.map(([x, z]) => new THREE.Vector3(x, y, z)), false, "centripetal");
+}
+
+/** Flat strip along a curve (boardwalk deck). */
+function deckGeometry(curve: THREE.CatmullRomCurve3, width: number) {
+  const n = Math.max(16, Math.round(curve.getLength() * 1.5));
   const pos: number[] = [];
   const idx: number[] = [];
-  const steps = Math.max(8, Math.round((a1 - a0) / 2));
-  for (let i = 0; i <= steps; i++) {
-    const a = ((a0 + ((a1 - a0) * i) / steps) * Math.PI) / 180;
-    const c = Math.cos(a), sn = Math.sin(a);
-    pos.push(c * (rx * r - width / 2), y, sn * (rz * r - width / 2), c * (rx * r + width / 2), y, sn * (rz * r + width / 2));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t);
+    const nx = -tan.z, nz = tan.x;
+    const l = Math.hypot(nx, nz) || 1;
+    pos.push(p.x + (nx / l) * (width / 2), p.y, p.z + (nz / l) * (width / 2), p.x - (nx / l) * (width / 2), p.y, p.z - (nz / l) * (width / 2));
     if (i) {
       const k = i * 2;
       idx.push(k - 2, k - 1, k, k - 1, k + 1, k);
@@ -249,21 +227,18 @@ function ribbon(r: number, width: number, a0: number, a1: number, y: number) {
   return g;
 }
 
-function ringTexture() {
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const g = c.getContext("2d")!;
-  g.strokeStyle = "#ffffff";
-  g.lineWidth = 10;
-  g.beginPath();
-  g.arc(64, 64, 52, 0, Math.PI * 2);
-  g.stroke();
-  g.strokeStyle = "#0b2440";
-  g.lineWidth = 4;
-  g.beginPath();
-  g.arc(64, 64, 52, 0, Math.PI * 2);
-  g.stroke();
-  return new THREE.CanvasTexture(c);
+/** Geodesic hemisphere: icosphere triangles above the ground. */
+function geodesicDome() {
+  const ico = new THREE.IcosahedronGeometry(1, 4).toNonIndexed();
+  const p = ico.getAttribute("position");
+  const keep: number[] = [];
+  for (let i = 0; i < p.count; i += 3) {
+    if (p.getY(i) >= -0.02 && p.getY(i + 1) >= -0.02 && p.getY(i + 2) >= -0.02) for (let k = 0; k < 3; k++) keep.push(p.getX(i + k), p.getY(i + k), p.getZ(i + k));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(keep, 3));
+  ico.dispose();
+  return g;
 }
 
 interface Rig {
@@ -274,16 +249,17 @@ interface Rig {
   ctl3: OrbitControls;
   ctl2: OrbitControls;
   markers: THREE.Group;
-  pool: { icon: THREE.Sprite; ring: THREE.Sprite }[];
+  pool: THREE.Sprite[];
   clusterPool: THREE.Sprite[];
   /** Groups shown in the last frame, in screen pixels, for picking. */
-  clusters: { sx: number; sy: number; pos: Vec3; n: number }[];
+  clusters: { sx: number; sy: number; pos: Vec3; ids: string[] }[];
   /** Birds folded into a group in the last frame (not pickable on their own). */
   hidden: Set<string>;
   spriteMat: (key: string, make: () => THREE.SpriteMaterial) => THREE.SpriteMaterial;
   tex: Map<string, THREE.CanvasTexture>;
   treeParts: Map<string, THREE.Mesh[]>;
   zoneFills: Map<string, THREE.Mesh>;
+  zoneEdges: THREE.Object3D[];
   dome: THREE.Group;
   levelBand: THREE.Group;
   selRing: THREE.Sprite;
@@ -291,14 +267,10 @@ interface Rig {
   precision: THREE.Mesh;
   treeRing: THREE.Mesh;
   trail: THREE.Line;
-  zoneEdges: THREE.Object3D[];
   /** Bird markers: shown position glides toward the target position. */
   marks: { ids: string[]; cur: Float32Array; tgt: Float32Array; scale: Float32Array; dim: Uint8Array };
   fly: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t0: number } | null;
 }
-
-const HOME_TARGET = new THREE.Vector3(0, 4, 4);
-const HOME_CAM = new THREE.Vector3(0, 92, 118);
 
 export function AviaryScene(props: AviarySceneProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -316,7 +288,7 @@ export function AviaryScene(props: AviarySceneProps) {
   /* ---------- build the scene once ---------- */
   useEffect(() => {
     const wrap = wrapRef.current!;
-    const { trees, structures } = propsRef.current;
+    const { trees } = propsRef.current;
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -324,14 +296,14 @@ export function AviaryScene(props: AviarySceneProps) {
     renderer.domElement.className = "block h-full w-full outline-none";
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#e6efec");
-    scene.fog = new THREE.Fog("#e6efec", 170, 320);
-    scene.add(new THREE.HemisphereLight("#ffffff", "#8c7d5c", 1.25));
-    const sun = new THREE.DirectionalLight("#fff6e6", 1.7);
-    sun.position.set(40, 90, 30);
+    scene.background = new THREE.Color("#e8f0f2");
+    scene.fog = new THREE.Fog("#e8f0f2", 200, 380);
+    scene.add(new THREE.HemisphereLight("#ffffff", "#7d8a5c", 1.35));
+    const sun = new THREE.DirectionalLight("#fff4df", 1.8);
+    sun.position.set(-40, 90, 50);
     scene.add(sun);
 
-    const persp = new THREE.PerspectiveCamera(38, 1, 0.5, 600);
+    const persp = new THREE.PerspectiveCamera(38, 1, 0.5, 700);
     persp.position.copy(HOME_CAM);
     const ortho = new THREE.OrthographicCamera(-60, 60, 40, -40, 0.1, 400);
     ortho.position.set(0, 160, 0);
@@ -342,142 +314,213 @@ export function AviaryScene(props: AviarySceneProps) {
     ctl3.target.copy(HOME_TARGET);
     ctl3.enableDamping = true;
     ctl3.maxPolarAngle = 1.48;
-    ctl3.minDistance = 12;
-    ctl3.maxDistance = 240;
+    ctl3.minDistance = MIN_DIST;
+    ctl3.maxDistance = 260;
     const ctl2 = new OrbitControls(ortho, renderer.domElement);
     ctl2.enableRotate = false;
     ctl2.screenSpacePanning = true;
     ctl2.enableDamping = true;
     ctl2.minZoom = 0.6;
-    ctl2.maxZoom = 8;
+    ctl2.maxZoom = 10;
     ctl2.enabled = false;
 
-    const rng = mulberry32(hashSeed("scene-decor", 7));
+    const rng = mulberry32(hashSeed("scene-decor", 11));
     const std = (color: string, extra: THREE.MeshStandardMaterialParameters = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, flatShading: true, ...extra });
     const flat = (g: THREE.BufferGeometry, y: number) => {
       g.rotateX(-Math.PI / 2);
       g.translate(0, y, 0);
       return g;
     };
+    const { rx, rz, domeHeight } = FOOTPRINT;
 
-    // Terrain slab
-    const slab = new THREE.ExtrudeGeometry(ellipseShape(FOOTPRINT.rx + 3, FOOTPRINT.rz + 3), { depth: 3, bevelEnabled: false, curveSegments: 72 });
+    // Ground: a slab under a lush floor.
+    const slab = new THREE.ExtrudeGeometry(ellipseShape(rx + 4, rz + 4), { depth: 3, bevelEnabled: false, curveSegments: 72 });
     slab.rotateX(-Math.PI / 2);
     slab.translate(0, -3.02, 0);
-    scene.add(new THREE.Mesh(slab, std("#8f7f62")));
-    scene.add(new THREE.Mesh(flat(new THREE.ShapeGeometry(ellipseShape(FOOTPRINT.rx + 3, FOOTPRINT.rz + 3), 72), 0), std("#c9dcb6")));
+    scene.add(new THREE.Mesh(slab, std("#8a7a5c")));
+    scene.add(new THREE.Mesh(flat(new THREE.ShapeGeometry(ellipseShape(rx + 4, rz + 4), 72), 0), std("#9cc47a")));
 
-    // Zones: tint + outline
+    // Zones: light tint + outline (layer).
     const zoneFills = new Map<string, THREE.Mesh>();
     const zoneEdges: THREE.Object3D[] = [];
     for (const z of MONITOR_ZONES) {
-      const g = flat(new THREE.ShapeGeometry(zoneShape(z), 24), 0.03);
-      const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: z.color, transparent: true, opacity: 0.1, depthWrite: false }));
-      m.userData.zoneId = z.id;
+      const m = new THREE.Mesh(flat(new THREE.ShapeGeometry(zoneShape(z), 24), 0.03), new THREE.MeshBasicMaterial({ color: z.color, transparent: true, opacity: 0.07, depthWrite: false }));
       zoneFills.set(z.id, m);
       scene.add(m);
       const edge = new THREE.LineLoop(
         new THREE.BufferGeometry().setFromPoints(zoneShape(z).getPoints(24).map((p) => new THREE.Vector3(p.x, 0.06, -p.y))),
-        new THREE.LineBasicMaterial({ color: z.color, transparent: true, opacity: 0.45 }),
+        new THREE.LineBasicMaterial({ color: z.color, transparent: true, opacity: 0.35 }),
       );
       zoneEdges.push(edge);
       scene.add(edge);
     }
 
-    // Water
-    const water = std("#4aaecb", { roughness: 0.25, metalness: 0.1, flatShading: false });
-    scene.add(new THREE.Mesh(flat(new THREE.ShapeGeometry(ellipseShape(LAGOON.rx, LAGOON.rz), 64), 0.08), water));
-    scene.add(new THREE.Mesh(flat(new THREE.ShapeGeometry(ellipseShape(WATERFALL_POOL.r, WATERFALL_POOL.r * 0.85, WATERFALL_POOL.x, WATERFALL_POOL.z), 32), 0.08), water));
-    scene.add(new THREE.Mesh(flat(new THREE.ShapeGeometry(ellipseShape(6, 4, -30, -22), 32), 0.08), water));
-    scene.add(new THREE.Mesh(flat(new THREE.ShapeGeometry(ellipseShape(4.5, 3, -18, -30), 32), 0.08), water));
-
-    // Waterfall cliff
-    const rock = std("#8a8f94");
-    for (let i = 0; i < 7; i++) {
-      const r = 2.5 + rng() * 2.5;
-      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), rock);
-      m.position.set(WATERFALL_POOL.x + 6 + rng() * 3, r * 0.6 + (i % 3) * 2.6, WATERFALL_POOL.z - 6 + i * 2);
-      m.rotation.set(rng() * 3, rng() * 3, rng() * 3);
-      scene.add(m);
+    // Water: turquoise lagoons with a stony shore.
+    const shore = std("#cbb98e");
+    const water = new THREE.MeshStandardMaterial({ color: "#3dbccb", roughness: 0.15, metalness: 0.05 });
+    for (const w of WATER) {
+      scene.add(new THREE.Mesh(flat(new THREE.ShapeGeometry(smoothShape(w.outline, 1.1), 8), 0.05), shore));
+      scene.add(new THREE.Mesh(flat(new THREE.ShapeGeometry(smoothShape(w.outline), 8), 0.09), water));
     }
-    const fall = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 8), new THREE.MeshBasicMaterial({ color: "#d8f3fb", transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
-    fall.position.set(WATERFALL_POOL.x + 4.2, 4, WATERFALL_POOL.z);
-    fall.rotation.y = Math.PI / 2;
-    scene.add(fall);
 
-    // Paths, walkway and platform
-    const path = std("#dcc9a2");
-    scene.add(new THREE.Mesh(ribbon(0.445, 2.6, 0, 360, 0.1), path));
-    const entry = new THREE.Mesh(new THREE.BoxGeometry(FOOTPRINT.rx * (1 - 0.445) + 3, 0.08, 2.6), path);
-    entry.position.set(-(FOOTPRINT.rx * 0.445 + (FOOTPRINT.rx * (1 - 0.445) + 3) / 2), 0.1, 0);
-    scene.add(entry);
-    const wood = std("#a5835a");
-    for (const st of structures) {
-      if (st.kind === "walkway") {
-        scene.add(new THREE.Mesh(ribbon(0.7, 2.2, 238, 302, st.heightM), wood));
-        for (let a = 240; a <= 300; a += 6) {
-          const r = (a * Math.PI) / 180;
-          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, st.heightM, 6), wood);
-          post.position.set(Math.cos(r) * FOOTPRINT.rx * 0.7, st.heightM / 2, Math.sin(r) * FOOTPRINT.rz * 0.7);
-          scene.add(post);
-        }
-      } else {
-        const deck = new THREE.Mesh(new THREE.BoxGeometry(9, 0.4, 4), wood);
-        deck.position.set(st.x, st.heightM, st.z);
-        scene.add(deck);
-        for (const [dx, dz] of [[-4, -1.6], [4, -1.6], [-4, 1.6], [4, 1.6]]) {
-          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, st.heightM, 6), wood);
-          post.position.set(st.x + dx, st.heightM / 2, st.z + dz);
-          scene.add(post);
-        }
+    // Rock formations and waterfalls.
+    const rockMats = [std("#8d8f8a"), std("#a39b8a"), std("#7b7a73")];
+    for (const r of ROCKS) {
+      const n = Math.round(4 + r.r * 1.6);
+      for (let i = 0; i < n; i++) {
+        const s = 1.2 + rng() * (r.r * 0.55);
+        const a = rng() * Math.PI * 2;
+        const d = rng() * r.r * 0.8;
+        const m = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockMats[i % 3]);
+        m.position.set(r.x + Math.cos(a) * d, s * 0.5 + rng() * Math.max(0, r.h - s) * (1 - d / (r.r + 0.1)), r.z + Math.sin(a) * d);
+        m.rotation.set(rng() * 3, rng() * 3, rng() * 3);
+        m.scale.y = 0.8 + rng() * 0.6;
+        scene.add(m);
+      }
+    }
+    const fallMat = new THREE.MeshBasicMaterial({ color: "#e6f8fc", transparent: true, opacity: 0.88, side: THREE.DoubleSide });
+    const foamMat = new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.75 });
+    for (const f of WATERFALLS) {
+      const fall = new THREE.Mesh(new THREE.PlaneGeometry(f.width, f.h), fallMat);
+      fall.position.set(f.x, f.h / 2, f.z);
+      fall.rotation.y = -f.facing + Math.PI / 2;
+      scene.add(fall);
+      const foam = new THREE.Mesh(flat(new THREE.CircleGeometry(f.width * 0.9, 20), 0.12), foamMat);
+      foam.position.set(f.x + Math.cos(f.facing) * 1.2, 0, f.z + Math.sin(f.facing) * 1.2);
+      scene.add(foam);
+    }
+
+    // Boardwalks: decks, posts and rails.
+    // Decks are flat strips seen from above and below: draw both faces.
+    const wood = std("#cf9d61", { side: THREE.DoubleSide });
+    const woodDark = std("#8a6440");
+    const groundPath = std("#d9c49b", { side: THREE.DoubleSide });
+    const railMat = new THREE.LineBasicMaterial({ color: "#7a5a3c" });
+    for (const w of WALKWAYS) {
+      const curve = pathCurve(w.path, w.y);
+      scene.add(new THREE.Mesh(deckGeometry(curve, w.width), w.y > 0.5 ? wood : groundPath));
+      if (w.y <= 0.5) continue;
+      const len = curve.getLength();
+      const posts = Math.round(len / 5);
+      const steps = Math.round(len * 1.2);
+      const rails: THREE.Vector3[][] = [[], []];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const p = curve.getPointAt(t);
+        const tan = curve.getTangentAt(t);
+        const nx = -tan.z, nz = tan.x;
+        const l = Math.hypot(nx, nz) || 1;
+        rails[0].push(new THREE.Vector3(p.x + (nx / l) * (w.width / 2), p.y + 1, p.z + (nz / l) * (w.width / 2)));
+        rails[1].push(new THREE.Vector3(p.x - (nx / l) * (w.width / 2), p.y + 1, p.z - (nz / l) * (w.width / 2)));
+      }
+      for (const r of rails) scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(r), railMat));
+      for (let i = 0; i <= posts; i++) {
+        const p = curve.getPointAt(i / posts);
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, w.y, 6), woodDark);
+        post.position.set(p.x, w.y / 2, p.z);
+        scene.add(post);
       }
     }
 
-    // Undergrowth (decor only)
-    const shrubGeo = new THREE.IcosahedronGeometry(1, 0);
-    const shrubs = new THREE.InstancedMesh(shrubGeo, std("#5f9e58"), 170);
-    const m4 = new THREE.Matrix4();
-    let n = 0;
-    for (let tries = 0; n < 170 && tries < 3000; tries++) {
-      const a = rng() * Math.PI * 2;
-      const r = Math.sqrt(0.12 + rng() * 0.85);
-      const x = Math.cos(a) * r * FOOTPRINT.rx, z = Math.sin(a) * r * FOOTPRINT.rz;
-      if ((x / LAGOON.rx) ** 2 + (z / LAGOON.rz) ** 2 < 1.2) continue;
-      if (Math.abs(Math.hypot(x / FOOTPRINT.rx, z / FOOTPRINT.rz) - 0.445) < 0.04) continue;
-      if (x < -30 && Math.abs(z) < 3) continue;
-      const s = 0.9 + rng() * 1.3;
-      m4.compose(new THREE.Vector3(x, s * 0.45, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rng() * 6, 0)), new THREE.Vector3(s, s * 0.7, s));
-      shrubs.setMatrixAt(n++, m4);
+    // Glass pavilions.
+    const glass = new THREE.MeshStandardMaterial({ color: "#cfe9f1", transparent: true, opacity: 0.45, roughness: 0.1 });
+    const frame = new THREE.LineBasicMaterial({ color: "#6f8793" });
+    for (const p of PAVILIONS) {
+      const g = new THREE.BoxGeometry(p.w, p.h, p.d);
+      const box = new THREE.Mesh(g, glass);
+      box.position.set(p.x, p.h / 2, p.z);
+      box.rotation.y = p.rot;
+      scene.add(box);
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), frame);
+      e.position.copy(box.position);
+      e.rotation.copy(box.rotation);
+      scene.add(e);
     }
-    shrubs.count = n;
+
+    // Undergrowth (decor only), kept off water, rocks and paths.
+    const shrubs = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), std("#5a9a4f"), 320);
+    const m4 = new THREE.Matrix4();
+    let ns = 0;
+    for (let tries = 0; ns < 320 && tries < 6000; tries++) {
+      const a = rng() * Math.PI * 2;
+      const r = Math.sqrt(rng()) * 0.97;
+      const x = Math.cos(a) * r * rx, z = Math.sin(a) * r * rz;
+      if (nearWater(x, z, 0.8) || nearRocks(x, z, 0.5) || distToWalkways(x, z) < 1 || nearPavilion(x, z, 1)) continue;
+      const s = 0.8 + rng() * 1.4;
+      m4.compose(new THREE.Vector3(x, s * 0.4, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rng() * 6, 0)), new THREE.Vector3(s, s * 0.7, s));
+      shrubs.setMatrixAt(ns++, m4);
+    }
+    shrubs.count = ns;
     scene.add(shrubs);
 
-    // Trees
+    // Trees.
     const treeParts = new Map<string, THREE.Mesh[]>();
-    const trunkGeo = new THREE.CylinderGeometry(0.32, 0.55, 1, 7);
+    const trunkGeo = new THREE.CylinderGeometry(0.32, 0.55, 1, 8);
     const crownGeo = new THREE.IcosahedronGeometry(1, 1);
     const frondGeo = new THREE.ConeGeometry(0.6, 1, 4);
     for (const t of trees) {
-      const tr = mulberry32(hashSeed(t.id, 3));
-      const green = new THREE.Color().setHSL(0.3 + tr() * 0.06, 0.42, 0.34 + tr() * 0.1);
+      const tr = mulberry32(hashSeed(t.id, 5));
+      const great = Math.hypot(t.x - GREAT_TREE.x, t.z - GREAT_TREE.z) < 0.5 && t.heightM >= GREAT_TREE.heightM - 0.5;
+      const green = new THREE.Color().setHSL(0.27 + tr() * 0.08, 0.45, 0.3 + tr() * 0.12);
       const crownMat = std(`#${green.getHexString()}`, { transparent: true });
-      const trunkMat = std("#7a5b3d", { transparent: true });
+      const trunkMat = std(great ? "#8b6b4a" : "#7a5b3d", { transparent: true });
       const parts: THREE.Mesh[] = [];
       const add = (m: THREE.Mesh) => {
         m.userData.treeId = t.id;
         parts.push(m);
         scene.add(m);
       };
+      if (great) {
+        // Massive trunk with buttress roots and a broad, layered crown.
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 2.6, t.heightM * 0.72, 12), trunkMat);
+        trunk.position.set(t.x, (t.heightM * 0.72) / 2, t.z);
+        add(trunk);
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2 + tr() * 0.3;
+          const root = new THREE.Mesh(new THREE.BoxGeometry(0.9, 4.5, 4.5), trunkMat);
+          root.position.set(t.x + Math.cos(a) * 2.6, 1.6, t.z + Math.sin(a) * 2.6);
+          root.rotation.y = -a;
+          add(root);
+        }
+        const r = t.crownRadiusM;
+        const blobs = 16;
+        for (let k = 0; k < blobs; k++) {
+          const a = (k / blobs) * Math.PI * 2 + tr();
+          const ring = k % 2 ? 0.6 : 0.95;
+          const y = t.heightM * (k % 3 === 0 ? 0.62 : k % 3 === 1 ? 0.78 : 0.9);
+          const b = new THREE.Mesh(crownGeo, crownMat);
+          const s = r * (0.32 + tr() * 0.12);
+          b.position.set(t.x + Math.cos(a) * r * ring * 0.75, y, t.z + Math.sin(a) * r * ring * 0.75);
+          b.scale.set(s, s * 0.6, s);
+          add(b);
+        }
+        const top = new THREE.Mesh(crownGeo, crownMat);
+        top.position.set(t.x, t.heightM - r * 0.25, t.z);
+        top.scale.set(r * 0.55, r * 0.35, r * 0.55);
+        add(top);
+        // Ring platforms around the trunk.
+        for (const pl of PLATFORMS) {
+          const deck = new THREE.Mesh(flat(new THREE.RingGeometry(pl.r - 1.3, pl.r, 40), 0), wood);
+          deck.position.set(t.x, pl.y, t.z);
+          scene.add(deck);
+          const rail = new THREE.Mesh(new THREE.TorusGeometry(pl.r, 0.07, 6, 48), woodDark);
+          rail.rotation.x = Math.PI / 2;
+          rail.position.set(t.x, pl.y + 1, t.z);
+          scene.add(rail);
+        }
+        treeParts.set(t.id, parts);
+        continue;
+      }
       const trunkH = t.form === "palm" ? t.heightM - 0.6 : t.heightM * 0.7;
       const trunk = new THREE.Mesh(trunkGeo, trunkMat);
       trunk.scale.set(t.form === "palm" ? 0.7 : 1 + t.heightM / 30, trunkH, t.form === "palm" ? 0.7 : 1 + t.heightM / 30);
       trunk.position.set(t.x, trunkH / 2, t.z);
       add(trunk);
       if (t.form === "palm") {
-        for (let k = 0; k < 7; k++) {
+        for (let k = 0; k < 8; k++) {
           const f = new THREE.Mesh(frondGeo, crownMat);
-          const a = (k / 7) * Math.PI * 2;
-          f.scale.set(1, t.crownRadiusM * 1.1, 0.25);
+          const a = (k / 8) * Math.PI * 2;
+          f.scale.set(1, t.crownRadiusM * 1.15, 0.25);
           f.position.set(t.x + Math.cos(a) * t.crownRadiusM * 0.45, t.heightM - 0.5, t.z + Math.sin(a) * t.crownRadiusM * 0.45);
           f.rotation.set(0, -a, 0);
           f.rotateZ(-Math.PI / 2 + 0.35);
@@ -499,34 +542,38 @@ export function AviaryScene(props: AviarySceneProps) {
       treeParts.set(t.id, parts);
     }
 
-    // Dome (conceptual enclosure)
+    // Glass geodesic dome with its main arches.
     const dome = new THREE.Group();
-    const domeGeo = new THREE.SphereGeometry(1, 40, 10, 0, Math.PI * 2, 0, Math.PI / 2);
-    const lattice = new THREE.Mesh(domeGeo, new THREE.MeshBasicMaterial({ color: "#45667a", wireframe: true, transparent: true, opacity: 0.14, depthWrite: false }));
-    const glass = new THREE.Mesh(domeGeo, new THREE.MeshBasicMaterial({ color: "#bfe3f0", transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false }));
-    for (const m of [lattice, glass]) {
-      m.scale.set(FOOTPRINT.rx + 3, FOOTPRINT.domeHeight, FOOTPRINT.rz + 3);
+    const lattice = new THREE.LineSegments(new THREE.WireframeGeometry(geodesicDome()), new THREE.LineBasicMaterial({ color: "#7d97a6", transparent: true, opacity: 0.3 }));
+    const glassDome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: "#d6eef6", transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false }));
+    for (const m of [lattice, glassDome]) {
+      m.scale.set(rx + 4, domeHeight, rz + 4);
       dome.add(m);
+    }
+    const archMat = new THREE.MeshStandardMaterial({ color: "#e4ecef", roughness: 0.5 });
+    for (const z0 of [-24, -10, 4]) {
+      const k = Math.sqrt(Math.max(0, 1 - (z0 / (rz + 4)) ** 2));
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 40; i++) {
+        const a = (i / 40) * Math.PI;
+        pts.push(new THREE.Vector3(Math.cos(a) * (rx + 4) * k, Math.sin(a) * domeHeight * k, z0));
+      }
+      dome.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, 0.45, 6), archMat));
     }
     scene.add(dome);
 
-    // Level band (shown when a level is chosen)
+    // Level band (shown when a level is chosen).
     const levelBand = new THREE.Group();
-    const bandGeo = flat(new THREE.ShapeGeometry(ellipseShape(FOOTPRINT.rx, FOOTPRINT.rz), 64), 0);
+    const bandGeo = flat(new THREE.ShapeGeometry(ellipseShape(rx, rz), 64), 0);
     for (let k = 0; k < 2; k++) {
       const m = new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({ color: "#0891b2", transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false }));
       levelBand.add(m);
-      const edge = new THREE.LineLoop(
-        new THREE.BufferGeometry().setFromPoints(ellipseShape(FOOTPRINT.rx, FOOTPRINT.rz).getPoints(64).map((p) => new THREE.Vector3(p.x, 0, -p.y))),
-        new THREE.LineBasicMaterial({ color: "#0891b2", transparent: true, opacity: 0.55 }),
-      );
-      m.add(edge);
+      m.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(ellipseShape(rx, rz).getPoints(64).map((p) => new THREE.Vector3(p.x, 0, -p.y))), new THREE.LineBasicMaterial({ color: "#0891b2", transparent: true, opacity: 0.55 })));
     }
     levelBand.visible = false;
     scene.add(levelBand);
 
-    // Birds: always drawn on top of foliage so they stay visible.
-    // Birds: species-image sprites, always drawn over the foliage so they stay visible.
+    // Bird dots: always drawn over the foliage so they stay visible.
     const markers = new THREE.Group();
     scene.add(markers);
     const mats = new Map<string, THREE.SpriteMaterial>();
@@ -537,18 +584,18 @@ export function AviaryScene(props: AviarySceneProps) {
     };
 
     const selRing = new THREE.Sprite(new THREE.SpriteMaterial({ map: ringTexture(), depthTest: false, transparent: true, sizeAttenuation: false }));
-    selRing.renderOrder = 12;
+    selRing.renderOrder = 14;
     selRing.visible = false;
     scene.add(selRing);
     const selDrop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineDashedMaterial({ color: "#0b2440", dashSize: 0.6, gapSize: 0.4, depthTest: false }));
     selDrop.renderOrder = 11;
     selDrop.visible = false;
     scene.add(selDrop);
-    const precision = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: "#2563eb", transparent: true, opacity: 0.16, depthWrite: false, depthTest: false }));
+    const precision = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: "#2563eb", transparent: true, opacity: 0.14, depthWrite: false, depthTest: false }));
     precision.renderOrder = 9;
     precision.visible = false;
     scene.add(precision);
-    const treeRing = new THREE.Mesh(flat(new THREE.RingGeometry(0.92, 1, 48), 0), new THREE.MeshBasicMaterial({ color: "#0e9f95", transparent: true, opacity: 0.9, depthWrite: false }));
+    const treeRing = new THREE.Mesh(flat(new THREE.RingGeometry(0.9, 1, 48), 0), new THREE.MeshBasicMaterial({ color: "#0e9f95", transparent: true, opacity: 0.9, depthWrite: false }));
     treeRing.position.y = 0.15;
     treeRing.visible = false;
     scene.add(treeRing);
@@ -557,7 +604,12 @@ export function AviaryScene(props: AviarySceneProps) {
     trail.visible = false;
     scene.add(trail);
 
-    const rig: Rig = { renderer, scene, persp, ortho, ctl3, ctl2, markers, pool: [], clusterPool: [], clusters: [], hidden: new Set(), spriteMat, tex: new Map(), treeParts, zoneFills, dome, levelBand, selRing, selDrop, precision, treeRing, trail, zoneEdges, marks: { ids: [], cur: new Float32Array(0), tgt: new Float32Array(0), scale: new Float32Array(0), dim: new Uint8Array(0) }, fly: null };
+    const rig: Rig = {
+      renderer, scene, persp, ortho, ctl3, ctl2, markers, pool: [], clusterPool: [], clusters: [], hidden: new Set(), spriteMat, tex: new Map(),
+      treeParts, zoneFills, zoneEdges, dome, levelBand, selRing, selDrop, precision, treeRing, trail,
+      marks: { ids: [], cur: new Float32Array(0), tgt: new Float32Array(0), scale: new Float32Array(0), dim: new Uint8Array(0) },
+      fly: null,
+    };
     rigRef.current = rig;
 
     // Size
@@ -568,7 +620,7 @@ export function AviaryScene(props: AviarySceneProps) {
       renderer.setSize(w, h, false);
       persp.aspect = w / Math.max(1, h);
       persp.updateProjectionMatrix();
-      const half = Math.max(FOOTPRINT.rz + 6, (FOOTPRINT.rx + 6) / (w / Math.max(1, h)));
+      const half = Math.max(rz + 6, (rx + 6) / (w / Math.max(1, h)));
       ortho.top = half;
       ortho.bottom = -half;
       ortho.left = -half * (w / Math.max(1, h));
@@ -579,23 +631,21 @@ export function AviaryScene(props: AviarySceneProps) {
     ro.observe(wrap);
     resize();
 
-    // Loop: controls, fly-to, HTML labels
+    // Loop: glide dots, fold overlaps into groups, camera, labels.
     const v = new THREE.Vector3();
     const dropPos = selDrop.geometry.getAttribute("position") as THREE.BufferAttribute;
     let lastT = 0;
     renderer.setAnimationLoop((time) => {
       const p = propsRef.current;
-      // Markers glide toward their latest position (time constant ~0.35 s).
       const dt = lastT ? Math.min(100, time - lastT) : 16;
       lastT = time;
       const k = p.smooth === false ? 1 : 1 - Math.exp(-dt / 350);
       const { ids, cur, tgt, scale, dim } = rig.marks;
-      const photo = p.markerStyle !== "dot";
+      const cam = p.mode === "2d" ? ortho : persp;
+      const ctl = p.mode === "2d" ? ctl2 : ctl3;
       // Perspective: size as a share of the view. Orthographic has no distance, so convert to metres.
-      const base = p.mode === "2d" ? MARK * ((ortho.top - ortho.bottom) / ortho.zoom) : MARK * 2 * Math.tan(((persp.fov / 2) * Math.PI) / 180);
-      const unit = base * (photo ? 1.7 : 1);
-      selRing.scale.setScalar(unit * 2.2);
-      const camNow = p.mode === "2d" ? ortho : persp;
+      const unit = p.mode === "2d" ? MARK * ((ortho.top - ortho.bottom) / ortho.zoom) : MARK * 2 * Math.tan(((persp.fov / 2) * Math.PI) / 180);
+      selRing.scale.setScalar(unit * 2.8);
       const W0 = wrap.clientWidth, H0 = wrap.clientHeight;
       const grouping = p.cluster !== false;
       const cells = new Map<number, number[]>();
@@ -606,38 +656,34 @@ export function AviaryScene(props: AviarySceneProps) {
         cur[o + 1] += (tgt[o + 1] - cur[o + 1]) * k;
         cur[o + 2] += (tgt[o + 2] - cur[o + 2]) * k;
         const mk = rig.pool[i];
-        mk.icon.position.set(cur[o], cur[o + 1] + LIFT, cur[o + 2]);
-        mk.ring.position.copy(mk.icon.position);
+        mk.position.set(cur[o], cur[o + 1] + LIFT, cur[o + 2]);
         const sz = unit * scale[i];
-        mk.icon.scale.set(sz, sz, 1);
-        mk.ring.scale.set(sz * 1.24, sz * 1.24, 1);
-        mk.icon.visible = true;
-        mk.ring.visible = photo;
+        mk.scale.set(sz, sz, 1);
+        mk.visible = true;
         if (ids[i] === p.selectedBirdId) {
           selIdx = i;
           continue;
         }
         if (!grouping || dim[i]) continue;
-        v.copy(mk.icon.position).project(camNow);
+        v.copy(mk.position).project(cam);
         if (v.z > 1) continue;
         const key = Math.floor((((v.x + 1) / 2) * W0) / CLUSTER_CELL) * 4096 + Math.floor((((1 - v.y) / 2) * H0) / CLUSTER_CELL);
         const cell = cells.get(key);
         if (cell) cell.push(i);
         else cells.set(key, [i]);
       }
-      // Three or more birds in one screen cell become a counter; zooming in splits them.
+      // Four or more dots in one screen cell become a counter; zooming in splits them.
       rig.hidden.clear();
       let ci = 0;
       for (const list of cells.values()) {
-        if (list.length < 3) continue;
+        if (list.length < 4) continue;
         let x = 0, y = 0, z = 0;
         for (const i of list) {
-          const pos = rig.pool[i].icon.position;
+          const pos = rig.pool[i].position;
           x += pos.x;
           y += pos.y;
           z += pos.z;
-          rig.pool[i].icon.visible = false;
-          rig.pool[i].ring.visible = false;
+          rig.pool[i].visible = false;
           rig.hidden.add(ids[i]);
         }
         x /= list.length;
@@ -653,14 +699,15 @@ export function AviaryScene(props: AviarySceneProps) {
         const label = list.length > 99 ? "99+" : String(list.length);
         cs.material = spriteMat(`c:${label}`, () => new THREE.SpriteMaterial({ map: clusterTexture(label, rig.tex), depthTest: false, transparent: true, sizeAttenuation: false }));
         cs.position.set(x, y, z);
-        cs.scale.setScalar(unit * (1.25 + Math.min(0.7, list.length / 30)));
+        cs.scale.setScalar(unit * (1.9 + Math.min(1, list.length / 25)));
         cs.visible = true;
-        v.set(x, y, z).project(camNow);
-        rig.clusters[ci] = { sx: ((v.x + 1) / 2) * W0, sy: ((1 - v.y) / 2) * H0, pos: { x, y, z }, n: list.length };
+        v.set(x, y, z).project(cam);
+        rig.clusters[ci] = { sx: ((v.x + 1) / 2) * W0, sy: ((1 - v.y) / 2) * H0, pos: { x, y, z }, ids: list.map((i) => ids[i]) };
         ci++;
       }
       for (let j = ci; j < rig.clusterPool.length; j++) rig.clusterPool[j].visible = false;
       rig.clusters.length = ci;
+
       if (selIdx >= 0) {
         const o = selIdx * 3;
         selRing.position.set(cur[o], cur[o + 1] + LIFT, cur[o + 2]);
@@ -668,7 +715,7 @@ export function AviaryScene(props: AviarySceneProps) {
         dropPos.setXYZ(1, cur[o], 0.1, cur[o + 2]);
         dropPos.needsUpdate = true;
         selDrop.computeLineDistances();
-        if (precision.visible) precision.position.set(cur[o], cur[o + 1] + 0.4, cur[o + 2]);
+        if (precision.visible) precision.position.set(cur[o], cur[o + 1] + LIFT, cur[o + 2]);
         const lbl = wrap.querySelector<HTMLElement>("[data-follow]");
         if (lbl) {
           lbl.dataset.x = String(cur[o]);
@@ -676,17 +723,18 @@ export function AviaryScene(props: AviarySceneProps) {
           lbl.dataset.z = String(cur[o + 2]);
         }
       }
-      const cam = p.mode === "2d" ? ortho : persp;
-      const ctl = p.mode === "2d" ? ctl2 : ctl3;
+
       if (rig.fly) {
-        const k = Math.min(1, (time - rig.fly.t0) / 700);
-        const e = 1 - (1 - k) ** 3;
+        const f = Math.min(1, (time - rig.fly.t0) / 700);
+        const e = 1 - (1 - f) ** 3;
         ctl.target.lerpVectors(rig.fly.from, rig.fly.to, e);
         cam.position.lerpVectors(rig.fly.camFrom, rig.fly.camTo, e);
-        if (k >= 1) rig.fly = null;
+        if (f >= 1) rig.fly = null;
       }
       ctl.update();
       renderer.render(scene, cam);
+
+      // HTML labels: zone codes always; tree IDs only when close and not overlapping.
       const w = wrap.clientWidth, h = wrap.clientHeight;
       const near = p.mode === "2d" ? ortho.zoom > TREE_LABEL_ZOOM : persp.position.distanceTo(ctl3.target) < TREE_LABEL_DIST;
       const placed: number[] = [];
@@ -705,19 +753,34 @@ export function AviaryScene(props: AviarySceneProps) {
       });
     });
 
-    // Picking: birds in screen space (they are small), trees by raycast.
+    /** Clicking a group flies closer to it, so its birds split apart. */
+    const zoomInto = (pos: Vec3) => {
+      const to = new THREE.Vector3(pos.x, pos.y, pos.z);
+      if (propsRef.current.mode === "2d") {
+        ortho.zoom = Math.min(10, ortho.zoom * 2);
+        ortho.updateProjectionMatrix();
+        rig.fly = { from: ctl2.target.clone(), to: new THREE.Vector3(to.x, 0, to.z), camFrom: ortho.position.clone(), camTo: new THREE.Vector3(to.x, 160, to.z), t0: performance.now() };
+      } else {
+        const off = persp.position.clone().sub(ctl3.target);
+        const len = Math.max(MIN_DIST, off.length() * 0.45);
+        rig.fly = { from: ctl3.target.clone(), to, camFrom: persp.position.clone(), camTo: to.clone().add(off.setLength(len)), t0: performance.now() };
+      }
+    };
+    const atClosest = () => (propsRef.current.mode === "2d" ? ortho.zoom >= 9.5 : persp.position.distanceTo(ctl3.target) <= MIN_DIST + 1);
+
+    // Picking: groups first, then visible dots (screen space), then trees (raycast).
     const ray = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
-    const pick = (cx: number, cy: number): { type: "bird" | "tree" | "cluster"; id: string; label: string; pos?: Vec3 } | null => {
+    const pick = (cx: number, cy: number): { type: "bird" | "tree" | "cluster"; id: string; label: string; pos?: Vec3; ids?: string[] } | null => {
       const p = propsRef.current;
       const cam = p.mode === "2d" ? ortho : persp;
       const rect = renderer.domElement.getBoundingClientRect();
       const x = cx - rect.left, y = cy - rect.top;
       for (const c of rig.clusters) {
-        if (Math.hypot(c.sx - x, c.sy - y) < 20) return { type: "cluster", id: "", label: `${c.n} birds here · click to zoom in`, pos: c.pos };
+        if (Math.hypot(c.sx - x, c.sy - y) < 14) return { type: "cluster", id: "", label: atClosest() ? `${c.ids.length} birds at about the same spot · click to list them` : `${c.ids.length} birds here · click to zoom in`, pos: c.pos, ids: c.ids };
       }
       let best: ScenePoint | null = null;
-      let bestD = 16;
+      let bestD = 10;
       for (const pt of p.points) {
         if (rig.hidden.has(pt.id)) continue;
         v.set(pt.pos.x, pt.pos.y + LIFT, pt.pos.z).project(cam);
@@ -734,23 +797,9 @@ export function AviaryScene(props: AviarySceneProps) {
       const hit = ray.intersectObjects([...treeParts.values()].flat(), false)[0];
       if (hit) {
         const t = p.trees.find((tt) => tt.id === hit.object.userData.treeId);
-        if (t) return { type: "tree", id: t.id, label: `${t.id} · ${t.heightM.toFixed(1)} m` };
+        if (t) return { type: "tree", id: t.id, label: `${t.id}${t.plantSpecies ? ` · ${t.plantSpecies}` : ""} · ${t.heightM.toFixed(1)} m` };
       }
       return null;
-    };
-
-    /** Clicking a group flies closer to it, so its birds split apart. */
-    const zoomInto = (pos: Vec3) => {
-      const to = new THREE.Vector3(pos.x, pos.y, pos.z);
-      if (propsRef.current.mode === "2d") {
-        ortho.zoom = Math.min(8, ortho.zoom * 2);
-        ortho.updateProjectionMatrix();
-        rig.fly = { from: ctl2.target.clone(), to: new THREE.Vector3(to.x, 0, to.z), camFrom: ortho.position.clone(), camTo: new THREE.Vector3(to.x, 160, to.z), t0: performance.now() };
-      } else {
-        const off = persp.position.clone().sub(ctl3.target);
-        const len = Math.max(14, off.length() * 0.45);
-        rig.fly = { from: ctl3.target.clone(), to, camFrom: persp.position.clone(), camTo: to.clone().add(off.setLength(len)), t0: performance.now() };
-      }
     };
 
     const el = renderer.domElement;
@@ -763,7 +812,11 @@ export function AviaryScene(props: AviarySceneProps) {
       const hit = pick(e.clientX, e.clientY);
       if (hit?.type === "bird") propsRef.current.onSelectBird(hit.id);
       else if (hit?.type === "tree") propsRef.current.onSelectTree(hit.id);
-      else if (hit?.type === "cluster" && hit.pos) zoomInto(hit.pos);
+      else if (hit?.type === "cluster" && hit.pos) {
+        // At the closest zoom the birds share an estimated spot: list them instead of inventing a spread.
+        if (atClosest() && hit.ids && propsRef.current.onSelectGroup) propsRef.current.onSelectGroup(hit.ids);
+        else zoomInto(hit.pos);
+      }
     };
     const onMove = (e: PointerEvent) => {
       if (hoverQueued || e.buttons) return;
@@ -818,8 +871,8 @@ export function AviaryScene(props: AviarySceneProps) {
       scene.traverse((o) => {
         const m = o as THREE.Mesh;
         m.geometry?.dispose();
-        const mats = Array.isArray(m.material) ? m.material : m.material ? [m.material] : [];
-        mats.forEach((mm) => {
+        const ms = Array.isArray(m.material) ? m.material : m.material ? [m.material] : [];
+        ms.forEach((mm) => {
           (mm as THREE.MeshBasicMaterial).map?.dispose();
           mm.dispose();
         });
@@ -831,7 +884,7 @@ export function AviaryScene(props: AviarySceneProps) {
   }, []);
 
   /* ---------- birds ---------- */
-  const { points, selectedBirdId, markerStyle } = props;
+  const { points, selectedBirdId } = props;
   useEffect(() => {
     const rig = rigRef.current;
     if (!rig) return;
@@ -843,37 +896,27 @@ export function AviaryScene(props: AviarySceneProps) {
     const tgt = new Float32Array(n * 3);
     const scale = new Float32Array(n);
     const dim = new Uint8Array(n);
-    const photo = markerStyle !== "dot";
     points.forEach((p, i) => {
       dim[i] = p.dim ? 1 : 0;
       tgt.set([p.pos.x, p.pos.y, p.pos.z], i * 3);
       const j = prevIdx.get(p.id);
       cur.set(j === undefined ? [p.pos.x, p.pos.y, p.pos.z] : prev.cur.subarray(j * 3, j * 3 + 3), i * 3);
-      scale[i] = p.id === selectedBirdId ? 1.6 : p.dim ? 0.6 : 1;
+      scale[i] = p.id === selectedBirdId ? 1.7 : p.dim ? 0.75 : 1;
       while (rig.pool.length <= i) {
-        const icon = new THREE.Sprite();
-        const ring = new THREE.Sprite();
-        rig.markers.add(ring, icon);
-        rig.pool.push({ icon, ring });
+        const dot = new THREE.Sprite();
+        rig.markers.add(dot);
+        rig.pool.push(dot);
       }
       const mk = rig.pool[i];
-      const d = p.dim ? "d" : "";
-      if (photo) {
-        mk.icon.material = rig.spriteMat(`p:${p.species}:${d}`, () => new THREE.SpriteMaterial({ map: speciesTexture(p.species, rig.tex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.25 : 1 }));
-        mk.ring.material = rig.spriteMat(`r:${p.ring}:${d}`, () => new THREE.SpriteMaterial({ map: statusRingTexture(p.ring, rig.tex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.2 : 1 }));
-      } else {
-        mk.icon.material = rig.spriteMat(`d:${p.color}:${d}`, () => new THREE.SpriteMaterial({ map: dotTexture(p.color, rig.tex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.22 : 1 }));
-      }
-      const top = p.id === selectedBirdId;
-      mk.icon.renderOrder = top ? 15 : p.dim ? 9 : 11;
-      mk.ring.renderOrder = top ? 14 : p.dim ? 8 : 10;
-      if (j === undefined) mk.icon.position.set(p.pos.x, p.pos.y + LIFT, p.pos.z);
+      mk.material = rig.spriteMat(`d:${p.color}:${p.dim ? "d" : ""}`, () => new THREE.SpriteMaterial({ map: dotTexture(p.color, rig.tex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.2 : 1 }));
+      mk.renderOrder = p.id === selectedBirdId ? 15 : p.dim ? 9 : 11;
+      if (j === undefined) mk.position.set(p.pos.x, p.pos.y + LIFT, p.pos.z);
     });
-    for (let i = n; i < rig.pool.length; i++) rig.pool[i].icon.visible = rig.pool[i].ring.visible = false;
+    for (let i = n; i < rig.pool.length; i++) rig.pool[i].visible = false;
     rig.marks = { ids: points.map((p) => p.id), cur, tgt, scale, dim };
     const sel = points.some((p) => p.id === selectedBirdId);
     rig.selRing.visible = rig.selDrop.visible = sel;
-  }, [points, selectedBirdId, markerStyle, ready]);
+  }, [points, selectedBirdId, ready]);
 
   /* ---------- selection overlays ---------- */
   const { precision, trail, selectedTreeId, highlightZoneId, trees, dimTrees, level, mode } = props;
@@ -883,11 +926,11 @@ export function AviaryScene(props: AviarySceneProps) {
     if (!rig) return;
     rig.precision.visible = !!precision;
     if (precision) {
-      rig.precision.position.set(precision.pos.x, precision.pos.y + 0.4, precision.pos.z);
+      rig.precision.position.set(precision.pos.x, precision.pos.y + LIFT, precision.pos.z);
       rig.precision.scale.setScalar(Math.max(0.6, precision.r));
     }
     rig.trail.visible = !!trail && trail.length > 1;
-    if (trail && trail.length > 1) rig.trail.geometry.setFromPoints(trail.map((p) => new THREE.Vector3(p.x, p.y + 0.4, p.z)));
+    if (trail && trail.length > 1) rig.trail.geometry.setFromPoints(trail.map((p) => new THREE.Vector3(p.x, p.y + LIFT, p.z)));
   }, [precision, trail, ready]);
 
   useEffect(() => {
@@ -914,7 +957,7 @@ export function AviaryScene(props: AviarySceneProps) {
   useEffect(() => {
     const rig = rigRef.current;
     if (!rig) return;
-    rig.zoneFills.forEach((m, id) => ((m.material as THREE.MeshBasicMaterial).opacity = id === highlightZoneId ? 0.42 : highlightZoneId ? 0.05 : 0.1));
+    rig.zoneFills.forEach((m, id) => ((m.material as THREE.MeshBasicMaterial).opacity = id === highlightZoneId ? 0.36 : highlightZoneId ? 0.03 : 0.07));
   }, [highlightZoneId, ready]);
 
   useEffect(() => {
@@ -923,10 +966,11 @@ export function AviaryScene(props: AviarySceneProps) {
     rig.levelBand.visible = level !== "all";
     if (level !== "all") {
       const L = LEVEL_BY_ID[level];
-      const [lo, hi] = [Math.max(0.05, L.min === -Infinity ? 0.05 : L.min), Math.min(FOOTPRINT.domeHeight, L.max === Infinity ? FOOTPRINT.domeHeight : L.max)];
+      const lo = Math.max(0.05, L.min === -Infinity ? 0.05 : L.min);
+      const hi = Math.min(FOOTPRINT.domeHeight, L.max === Infinity ? FOOTPRINT.domeHeight : L.max);
       rig.levelBand.children[0].position.y = lo;
       rig.levelBand.children[1].position.y = level === "ground" ? 0.5 : hi;
-      rig.levelBand.children.forEach((c) => (((c as THREE.Mesh).material as THREE.MeshBasicMaterial).color.set(L.color)));
+      rig.levelBand.children.forEach((c) => ((c as THREE.Mesh).material as THREE.MeshBasicMaterial).color.set(L.color));
     }
   }, [level, ready]);
 
@@ -955,12 +999,12 @@ export function AviaryScene(props: AviarySceneProps) {
     if (!rig || !focus) return;
     const to = new THREE.Vector3(focus.pos.x, focus.pos.y, focus.pos.z);
     if (propsRef.current.mode === "2d") {
-      rig.ortho.zoom = Math.max(rig.ortho.zoom, 2.2);
+      rig.ortho.zoom = Math.max(rig.ortho.zoom, 2.4);
       rig.ortho.updateProjectionMatrix();
       rig.fly = { from: rig.ctl2.target.clone(), to: new THREE.Vector3(to.x, 0, to.z), camFrom: rig.ortho.position.clone(), camTo: new THREE.Vector3(to.x, 160, to.z), t0: performance.now() };
     } else {
       const dir = rig.persp.position.clone().sub(rig.ctl3.target).normalize();
-      rig.fly = { from: rig.ctl3.target.clone(), to, camFrom: rig.persp.position.clone(), camTo: to.clone().add(dir.multiplyScalar(68)), t0: performance.now() };
+      rig.fly = { from: rig.ctl3.target.clone(), to, camFrom: rig.persp.position.clone(), camTo: to.clone().add(dir.multiplyScalar(60)), t0: performance.now() };
     }
   }, [focus]);
 
@@ -968,11 +1012,11 @@ export function AviaryScene(props: AviarySceneProps) {
     const rig = rigRef.current;
     if (!rig) return;
     if (mode === "2d") {
-      rig.ortho.zoom = THREE.MathUtils.clamp(rig.ortho.zoom * f, 0.6, 8);
+      rig.ortho.zoom = THREE.MathUtils.clamp(rig.ortho.zoom * f, 0.6, 10);
       rig.ortho.updateProjectionMatrix();
     } else {
       const off = rig.persp.position.clone().sub(rig.ctl3.target);
-      const len = THREE.MathUtils.clamp(off.length() / f, 12, 240);
+      const len = THREE.MathUtils.clamp(off.length() / f, MIN_DIST, 260);
       rig.persp.position.copy(rig.ctl3.target).add(off.setLength(len));
     }
   };
@@ -992,31 +1036,30 @@ export function AviaryScene(props: AviarySceneProps) {
   const selTree = trees.find((t) => t.id === selectedTreeId);
 
   return (
-    <div ref={wrapRef} className="relative h-full w-full touch-none overflow-hidden" role="application" aria-label="Interactive aviary map. Drag to rotate, scroll to zoom, click a bird or a tree to open its details.">
-      {/* Labels are kept to zone codes; details open on selection. */}
+    <div ref={wrapRef} className="relative h-full w-full touch-none overflow-hidden" role="application" aria-label="Interactive aviary map. Drag to rotate, Ctrl + scroll to zoom, click a bird or a tree to open its details.">
       <div className="pointer-events-none absolute inset-0">
-        {layers.labels && MONITOR_ZONES.map((z) => {
-          const a = zoneAnchor(z);
-          return (
-            <button
-              key={z.id}
-             
-              data-x={a.x}
-              data-y={a.y}
-              data-z={a.z}
-              onClick={() => props.onSelectZone(z.id)}
-              title={`${z.code} · ${z.name}`}
-              className={cx(
-                "pointer-events-auto absolute left-0 top-0 rounded-md border bg-panel-solid/90 px-1.5 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur transition-opacity hover:bg-panel-solid",
-                highlightZoneId === z.id ? "border-ink/40 text-ink" : "border-line-strong text-muted",
-              )}
-              style={{ borderLeft: `3px solid ${z.color}` }}
-            >
-              {z.code}
-              <span className={cx("ml-1 font-medium", highlightZoneId === z.id ? "inline" : "hidden xl:inline")}>{z.name}</span>
-            </button>
-          );
-        })}
+        {layers.labels &&
+          MONITOR_ZONES.map((z) => {
+            const a = zoneAnchor(z);
+            return (
+              <button
+                key={z.id}
+                data-x={a.x}
+                data-y={a.y}
+                data-z={a.z}
+                onClick={() => props.onSelectZone(z.id)}
+                title={`${z.code} · ${z.name}`}
+                className={cx(
+                  "pointer-events-auto absolute left-0 top-0 rounded-md border bg-panel-solid/90 px-1.5 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur transition-opacity hover:bg-panel-solid",
+                  highlightZoneId === z.id ? "border-ink/40 text-ink" : "border-line-strong text-muted",
+                )}
+                style={{ borderLeft: `3px solid ${z.color}` }}
+              >
+                {z.code}
+                <span className={cx("ml-1 font-medium", highlightZoneId === z.id ? "inline" : "hidden xl:inline")}>{z.name}</span>
+              </button>
+            );
+          })}
         {layers.labels &&
           trees
             .filter((t) => t.id !== selectedTreeId)
@@ -1031,7 +1074,7 @@ export function AviaryScene(props: AviarySceneProps) {
           </span>
         )}
         {selBird && (
-          <span key={`bird-${selBird.id}`} data-follow data-dy={-30} data-x={selBird.pos.x} data-y={selBird.pos.y} data-z={selBird.pos.z} className="absolute left-0 top-0 rounded-md bg-panel-solid px-1.5 py-0.5 text-[10px] font-semibold text-ink shadow ring-1 ring-line-strong">
+          <span key={`bird-${selBird.id}`} data-follow data-dy={-22} data-x={selBird.pos.x} data-y={selBird.pos.y} data-z={selBird.pos.z} className="absolute left-0 top-0 rounded-md bg-panel-solid px-1.5 py-0.5 text-[10px] font-semibold text-ink shadow ring-1 ring-line-strong">
             {selBird.id}
           </span>
         )}
@@ -1040,12 +1083,18 @@ export function AviaryScene(props: AviarySceneProps) {
       </div>
 
       <div className="absolute bottom-3 right-3 flex flex-col overflow-hidden rounded-xl border border-line-strong bg-panel-solid/90 shadow-sm backdrop-blur">
-        <button onClick={() => zoom(1.25)} className="grid h-9 w-9 place-items-center text-muted hover:bg-ink/5 hover:text-ink" aria-label="Zoom in"><Plus size={16} /></button>
-        <button onClick={() => zoom(0.8)} className="grid h-9 w-9 place-items-center border-t border-line text-muted hover:bg-ink/5 hover:text-ink" aria-label="Zoom out"><Minus size={16} /></button>
-        <button onClick={reset} className="grid h-9 w-9 place-items-center border-t border-line text-muted hover:bg-ink/5 hover:text-ink" aria-label="Reset view"><RotateCcw size={15} /></button>
+        <button onClick={() => zoom(1.25)} className="grid h-9 w-9 place-items-center text-muted hover:bg-ink/5 hover:text-ink" aria-label="Zoom in">
+          <Plus size={16} />
+        </button>
+        <button onClick={() => zoom(0.8)} className="grid h-9 w-9 place-items-center border-t border-line text-muted hover:bg-ink/5 hover:text-ink" aria-label="Zoom out">
+          <Minus size={16} />
+        </button>
+        <button onClick={reset} className="grid h-9 w-9 place-items-center border-t border-line text-muted hover:bg-ink/5 hover:text-ink" aria-label="Reset view">
+          <RotateCcw size={15} />
+        </button>
       </div>
       <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg bg-panel-solid/85 px-2 py-1 text-[10px] text-muted shadow-sm backdrop-blur">
-        <Box size={12} /> {FOOTPRINT.label} · {mode === "3d" ? "drag to rotate · Ctrl + scroll to zoom · right-drag to pan" : "drag to pan · Ctrl + scroll to zoom"}
+        <Box size={12} /> Illustrative reconstruction · not to scale · {mode === "3d" ? "drag to rotate · Ctrl + scroll to zoom · right-drag to pan" : "top view · drag to pan · Ctrl + scroll to zoom"}
       </div>
       {highlightZoneId && <span className="sr-only">Zone {MONITOR_ZONE_BY_ID[highlightZoneId]?.name} highlighted</span>}
     </div>

@@ -20,6 +20,7 @@ import {
   type Vec3,
 } from "@/domain/aviaryTracking";
 import { DISTRIBUTION_NOTE, MONITOR_SPECIES } from "@/data/aviaryCatalog";
+import { FEATURE_TREES, GREAT_TREE, distToWalkways, nearPavilion, nearRocks, nearWater } from "@/domain/aviaryLayout";
 import { between, chance, hashSeed, mulberry32, pick, type Rng } from "@/logic/rng";
 import { DAY, HOUR, MIN, startOfDay } from "@/logic/time";
 
@@ -32,7 +33,8 @@ import { DAY, HOUR, MIN, startOfDay } from "@/logic/time";
  * registry and its seed, so the same registry always yields the same history.
  */
 
-export const REGISTRY_VERSION = 1;
+// v2: trees laid out after the reference render (great tree, lagoons, boardwalks).
+export const REGISTRY_VERSION = 2;
 /** Simulated history before the anchor, and simulated future the clock can play into. */
 export const HISTORY_DAYS = 7;
 export const HORIZON_DAYS = 3;
@@ -49,7 +51,7 @@ function weighted<T>(rng: Rng, items: readonly (readonly [T, number])[]): T {
 
 /** Unit-ellipse radius range of each zone (share of the footprint). */
 function radialRange(zone: MonitorZone): [number, number] {
-  return zone.sector ? [INNER_RATIO + 0.04, 0.95] : [0, INNER_RATIO - 0.03];
+  return zone.sector ? [INNER_RATIO + 0.04, 0.93] : [0.12, INNER_RATIO - 0.02];
 }
 
 function pointInZone(rng: Rng, zone: MonitorZone, rRange = radialRange(zone)): { x: number; z: number } {
@@ -60,32 +62,27 @@ function pointInZone(rng: Rng, zone: MonitorZone, rRange = radialRange(zone)): {
   return { x: Math.cos(rad) * r * FOOTPRINT.rx, z: Math.sin(rad) * r * FOOTPRINT.rz };
 }
 
-/** Lagoon water, waterfall pool and the entrance path are kept free of trees. */
-export const LAGOON = { rx: FOOTPRINT.rx * 0.29, rz: FOOTPRINT.rz * 0.29 };
-export const WATERFALL_POOL = { x: 46, z: 2, r: 7 };
-
-/** Decorative structures drawn by the scene. */
-export const STRUCTURES = [
-  { id: "S1", name: "Feeding platform", kind: "platform" as const, x: -6, z: 27, heightM: 3 },
-  { id: "S2", name: "Canopy walkway", kind: "walkway" as const, x: 4, z: -25, heightM: 6 },
-];
-
+/** Trunks stay out of the water, rocks, boardwalks, pavilions and the great tree's crown. */
 function blocked(x: number, z: number) {
-  if ((x / LAGOON.rx) ** 2 + (z / LAGOON.rz) ** 2 < 1.15) return true;
-  if (Math.hypot(x - WATERFALL_POOL.x, z - WATERFALL_POOL.z) < WATERFALL_POOL.r + 3) return true;
-  if (x < -36 && Math.abs(z) < 5) return true;
-  if (Math.hypot(x - STRUCTURES[0].x, z - STRUCTURES[0].z) < 6) return true;
-  return false;
+  return (
+    nearWater(x, z, 1.5) ||
+    nearRocks(x, z, 1.5) ||
+    distToWalkways(x, z) < 2 ||
+    nearPavilion(x, z, 2) ||
+    Math.hypot(x - GREAT_TREE.x, z - GREAT_TREE.z) < GREAT_TREE.crownRadiusM - 1
+  );
 }
 
+/** Extra trees per zone, filled in around the great tree and the feature trees. */
 const TREES_PER_ZONE: Record<string, { n: number; forms: [TreeForm, number][] }> = {
-  canopy: { n: 10, forms: [["emergent", 0.55], ["broadleaf", 0.45]] },
-  nesting: { n: 7, forms: [["emergent", 0.4], ["broadleaf", 0.6]] },
-  mangrove: { n: 8, forms: [["broadleaf", 0.8], ["palm", 0.2]] },
+  canopy: { n: 8, forms: [["emergent", 0.4], ["broadleaf", 0.4], ["palm", 0.2]] },
+  nesting: { n: 5, forms: [["broadleaf", 0.6], ["palm", 0.4]] },
+  mangrove: { n: 6, forms: [["broadleaf", 0.7], ["palm", 0.3]] },
   waterfall: { n: 5, forms: [["broadleaf", 0.5], ["palm", 0.5]] },
-  feeding: { n: 7, forms: [["palm", 0.4], ["broadleaf", 0.6]] },
-  entrance: { n: 4, forms: [["palm", 0.6], ["broadleaf", 0.4]] },
-  lagoon: { n: 5, forms: [["palm", 1]] },
+  feeding: { n: 6, forms: [["palm", 0.5], ["broadleaf", 0.5]] },
+  entrance: { n: 4, forms: [["palm", 0.7], ["broadleaf", 0.3]] },
+  lagoon: { n: 6, forms: [["palm", 0.7], ["broadleaf", 0.3]] },
+  greattree: { n: 0, forms: [["palm", 1]] },
 };
 
 /** Illustrative plant names for demo trees, by form. Not a survey of the aviary. */
@@ -95,38 +92,44 @@ const DEMO_PLANTS: Record<TreeForm, string[]> = {
   palm: ["Royal palm", "Foxtail palm", "Areca palm", "Coconut palm"],
 };
 
-/** Demo plant name for a tree, stable for its ID. */
+/** Demo plant name for a tree, stable for its ID. The great tree is the Ceiba of the render. */
 export function demoPlant(t: Pick<AviaryTree, "id" | "form">) {
+  if (t.id === "T1") return "Ceiba (great tree)";
   const list = DEMO_PLANTS[t.form];
   return list[hashSeed("plant", t.id) % list.length];
 }
 
 function generateTrees(rng: Rng): AviaryTree[] {
-  const placed: { x: number; z: number; zoneId: string; form: TreeForm }[] = [];
+  type P = { x: number; z: number; form: TreeForm; h?: number; crown?: number };
+  // T1 is the great central tree; then the prominent trees of the render; then the fill.
+  const placed: P[] = [
+    { x: GREAT_TREE.x, z: GREAT_TREE.z, form: "emergent", h: GREAT_TREE.heightM, crown: GREAT_TREE.crownRadiusM },
+    ...FEATURE_TREES.map((t) => ({ x: t.x, z: t.z, form: t.form, h: t.h, crown: t.crown })),
+  ];
   for (const zone of MONITOR_ZONES) {
     const spec = TREES_PER_ZONE[zone.id];
-    const rRange: [number, number] = zone.sector ? [INNER_RATIO + 0.08, 0.88] : [0.31, INNER_RATIO - 0.02];
     let count = 0;
-    for (let tries = 0; count < spec.n && tries < 800; tries++) {
-      const p = pointInZone(rng, zone, rRange);
+    for (let tries = 0; count < spec.n && tries < 1500; tries++) {
+      const p = pointInZone(rng, zone);
       if (blocked(p.x, p.z) || zoneAt(p.x, p.z)?.id !== zone.id) continue;
-      if (placed.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 8.5)) continue;
-      placed.push({ ...p, zoneId: zone.id, form: weighted(rng, spec.forms) });
+      if (placed.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 7.5)) continue;
+      placed.push({ ...p, form: weighted(rng, spec.forms) });
       count++;
     }
   }
   return placed.map((p, i) => {
-    const h = p.form === "emergent" ? between(rng, 18.5, 24) : p.form === "broadleaf" ? between(rng, 9, 16.5) : between(rng, 7, 13);
+    const h = p.h ?? (p.form === "emergent" ? between(rng, 18.5, 24) : p.form === "broadleaf" ? between(rng, 9, 16.5) : between(rng, 7, 13));
     const heightM = Math.round(h * 10) / 10;
     const tiers = p.form === "emergent" ? [0.42, 0.58, 0.72, 0.86] : p.form === "broadleaf" ? [0.4, 0.6, 0.8] : [0.9];
-    const crown = p.form === "emergent" ? between(rng, 6, 8) : p.form === "broadleaf" ? between(rng, 4, 6) : between(rng, 2.8, 3.8);
+    const crown = p.crown ?? (p.form === "emergent" ? between(rng, 6, 8) : p.form === "broadleaf" ? between(rng, 4, 6) : between(rng, 2.8, 3.8));
+    const id = `T${i + 1}`;
     return {
-      id: `T${i + 1}`,
-      plantSpecies: demoPlant({ id: `T${i + 1}`, form: p.form }),
+      id,
+      plantSpecies: demoPlant({ id, form: p.form }),
       form: p.form,
       x: Math.round(p.x * 10) / 10,
       z: Math.round(p.z * 10) / 10,
-      zoneId: p.zoneId,
+      zoneId: zoneAt(p.x, p.z)?.id ?? "greattree",
       heightM,
       crownRadiusM: Math.round(crown * 10) / 10,
       branchTiersM: tiers.map((t) => Math.round(heightM * t * 10) / 10),

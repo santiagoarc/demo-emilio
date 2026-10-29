@@ -18,7 +18,6 @@ import { MONITOR_SPECIES, MONITOR_SPECIES_BY_ID } from "@/data/aviaryCatalog";
 import { MONITOR_TEAM_BY_ID, type TeamId } from "@/data/aviaryTeams";
 import { useTeamAssignments } from "@/state/useTeams";
 import { SpeciesSection, TeamsSection } from "./AviaryPanels";
-import { STRUCTURES } from "@/data/aviaryTrackingSimulate";
 import { activityByHour, fmtHeight, snapshot, treeHistory, treeOccupants, type Fix } from "@/logic/aviaryTracking";
 import { HOUR, MIN, fmtDateTime, fmtTime } from "@/logic/time";
 import { useSimClock, useTracking, type TrackingState } from "@/state/useTracking";
@@ -83,7 +82,8 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
   });
   const [treeView, setTreeView] = useState(false);
   const [maxed, setMaxed] = useState(false);
-  const [markerStyle, setMarkerStyle] = useState<"photo" | "dot">("photo");
+  // Birds that share an estimated spot even at the closest zoom, listed on the map.
+  const [groupIds, setGroupIds] = useState<string[] | null>(null);
   const [grouping, setGrouping] = useState(true);
   // Esc leaves the maximised map (the selection stays).
   useEffect(() => {
@@ -118,7 +118,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
       const active = isActive(f);
       if (!active && !dimRest && (filtered || level !== "all")) continue;
       const sp = MONITOR_SPECIES_BY_ID[f.bird.speciesId];
-      out.push({ id: f.bird.id, pos: f.det.pos, species: sp.code, color: sp.color, ring: FIX_STATUS[f.status].color, dim: !active, label: `${f.bird.id} · ${sp.common} · ${fmtHeight(f.det.pos.y)}` });
+      out.push({ id: f.bird.id, pos: f.det.pos, color: sp.color, dim: !active, label: `${f.bird.id} · ${sp.common} · ${fmtHeight(f.det.pos.y)}` });
     }
     return out;
   }, [all, dimRest, filtered, level, teamFilter, teamOf, speciesId, zoneId, statusF]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -224,8 +224,8 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
                   {clock.playing ? <Pause size={13} /> : <Play size={13} />}
                 </button>
               )}
-              <LayersMenu layers={layers} onLayers={setLayers} dimRest={dimRest} onDimRest={setDimRest} markerStyle={markerStyle} onMarkerStyle={setMarkerStyle} grouping={grouping} onGrouping={setGrouping} />
-              <Segmented size="sm" value={mode} onChange={setMode} options={[{ value: "2d", label: "2D view" }, { value: "3d", label: "3D view" }]} />
+              <LayersMenu layers={layers} onLayers={setLayers} dimRest={dimRest} onDimRest={setDimRest} grouping={grouping} onGrouping={setGrouping} />
+              <Segmented size="sm" value={mode} onChange={setMode} options={[{ value: "3d", label: "3D view" }, { value: "2d", label: "Top view 2D" }]} />
               <button
                 onClick={() => setMaxed((v) => !v)}
                 className={cx("inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium", maxed ? "border-accent bg-accent text-white" : "border-line-strong text-ink hover:border-accent/50")}
@@ -239,7 +239,6 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
           <div className="relative min-h-[380px] flex-1">
             <AviaryScene
               trees={trees}
-              structures={STRUCTURES}
               points={points}
               selectedBirdId={birdId ?? highlightId}
               selectedTreeId={treeId}
@@ -252,8 +251,8 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
               dimTrees={level !== "all"}
               smooth={smooth}
               layers={layers}
-              markerStyle={markerStyle}
               cluster={grouping}
+              onSelectGroup={setGroupIds}
               onSelectBird={(id) => openBird(id, false)}
               onSelectTree={(id) => openTree(id)}
               onSelectZone={(z) => setZoneId((cur) => (cur === z ? "" : z))}
@@ -264,10 +263,13 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
                   {FIX_STATUS[s].label} <span className="num ml-auto pl-2 text-ink">{counts[s]}</span>
                 </span>
               ))}
-              <span className="mt-0.5 text-[10px] text-faint">{markerStyle === "photo" ? "Photo = species · ring = status" : "Dot colour = species"}</span>
+              <span className="mt-0.5 text-[10px] text-faint">Dot colour = species</span>
               {grouping && <span className="text-[10px] text-faint">Numbers = grouped birds · zoom in</span>}
             </div>
             {selTree && !treeView && <TreeFloat tree={selTree} fixes={fixes} onOpen={() => setTreeView(true)} onClose={() => setTreeId(null)} onBird={(id) => openBird(id)} />}
+            {groupIds && (
+              <GroupCard ids={groupIds} fixes={fixes} onBird={(id) => (setGroupIds(null), openBird(id, false))} onClose={() => setGroupIds(null)} />
+            )}
             {maxed && selFix && (
               <div className="scroll-thin absolute right-3 top-28 max-h-[calc(100%-8rem)] w-[340px] overflow-y-auto rounded-2xl">{birdCard}</div>
             )}
@@ -377,7 +379,7 @@ function TreePanel({ tree, fixes, asOf, ds, src, highlightId, onHighlight, onOpe
         <div className="px-2 pt-2">
           <TreeIllustration tree={tree} birds={shown} highlightId={highlightId} onHover={onHighlight} onOpen={onOpenBird} />
           <p className="px-2 text-[10px] leading-snug text-faint">
-            Each image is a bird at its estimated height and offset from the trunk (bar = ± uncertainty); nearby birds overlap. Trunk, branches and crown are schematic, levels provisional, and no branch is assigned.
+            Each dot is a bird, in its species colour, at its estimated height and offset from the trunk (bar = ± uncertainty); nearby birds overlap. Trunk, branches and crown are schematic, levels provisional, and no branch is assigned.
           </p>
         </div>
 
@@ -534,13 +536,11 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
   );
 }
 
-function LayersMenu({ layers, onLayers, dimRest, onDimRest, markerStyle, onMarkerStyle, grouping, onGrouping }: {
+function LayersMenu({ layers, onLayers, dimRest, onDimRest, grouping, onGrouping }: {
   layers: Layers3D;
   onLayers: (l: Layers3D) => void;
   dimRest: boolean;
   onDimRest: (v: boolean) => void;
-  markerStyle: "photo" | "dot";
-  onMarkerStyle: (v: "photo" | "dot") => void;
   grouping: boolean;
   onGrouping: (v: boolean) => void;
 }) {
@@ -570,10 +570,6 @@ function LayersMenu({ layers, onLayers, dimRest, onDimRest, markerStyle, onMarke
           <input type="checkbox" checked={grouping} onChange={() => onGrouping(!grouping)} className="accent-[var(--accent)]" />
           Group nearby birds
         </label>
-        <div className="border-t border-line pt-2">
-          <p className="mb-1 text-[10px] uppercase tracking-wider text-faint">Bird markers</p>
-          <Segmented size="sm" value={markerStyle} onChange={onMarkerStyle} options={[{ value: "photo", label: "Species photo" }, { value: "dot", label: "Colour dot" }]} />
-        </div>
       </div>
     </details>
   );
@@ -775,7 +771,7 @@ function TreeFloat({ tree, fixes, onOpen, onClose, onBird }: { tree: AviaryTree;
           return (
             <li key={f.bird.id}>
               <button onClick={() => onBird(f.bird.id)} className="flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-ink/[0.04]">
-                <SpeciesAvatar code={sp.code} size={20} ring={FIX_STATUS[f.status].color} />
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white" style={{ background: sp.color }} />
                 <span className="font-mono text-[11px] font-semibold text-ink">{f.bird.id}</span>
                 <span className="truncate text-[10px] text-muted">{sp.common}</span>
                 <span className="num ml-auto text-[10px] text-ink">{f.det!.pos!.y.toFixed(1)} m</span>
@@ -787,6 +783,36 @@ function TreeFloat({ tree, fixes, onOpen, onClose, onBird }: { tree: AviaryTree;
       <button onClick={onOpen} className="mt-2 inline-flex h-7 items-center gap-1 rounded-lg bg-accent px-2.5 text-[11px] font-semibold text-white">
         Vertical tree view
       </button>
+    </div>
+  );
+}
+
+/** Birds that stay together at the closest zoom: they share an estimated spot, so they are listed, not spread out. */
+function GroupCard({ ids, fixes, onBird, onClose }: { ids: string[]; fixes: Map<string, Fix>; onBird: (id: string) => void; onClose: () => void }) {
+  return (
+    <div className="absolute left-3 top-3 w-[270px] rounded-xl border border-line-strong bg-panel-solid/95 p-3 shadow-lg backdrop-blur">
+      <button onClick={onClose} className="absolute right-2 top-2 rounded-md p-1 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Close">
+        <X size={14} />
+      </button>
+      <p className="text-sm font-semibold text-ink">{ids.length} birds at about the same spot</p>
+      <p className="mt-0.5 text-[11px] text-muted">Their estimated positions overlap; they are listed instead of being spread out.</p>
+      <ul className="scroll-thin mt-2 max-h-48 overflow-y-auto">
+        {ids.map((id) => {
+          const f = fixes.get(id);
+          if (!f) return null;
+          const sp = MONITOR_SPECIES_BY_ID[f.bird.speciesId];
+          return (
+            <li key={id}>
+              <button onClick={() => onBird(id)} className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-ink/[0.04]">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white" style={{ background: sp.color }} />
+                <span className="font-mono text-[11px] font-semibold text-ink">{id}</span>
+                <span className="truncate text-[10px] text-muted">{sp.common}</span>
+                <span className="num ml-auto text-[10px] text-ink">{f.det?.pos ? `${f.det.pos.y.toFixed(1)} m` : "—"}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

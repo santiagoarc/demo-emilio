@@ -79,6 +79,7 @@ export function runDemoChecks(ds: TrackingDataset, src: TrackingSource, fixes: M
       pass: registry.birds.length === DEMO_TOTAL_BIRDS && countSum === DEMO_TOTAL_BIRDS && perSpeciesOk,
       detail: `${registry.birds.length} records · distribution adds up to ${countSum}${REQUESTED_TOTAL !== DEMO_TOTAL_BIRDS ? ` (requested ${REQUESTED_TOTAL}, corrected)` : ""}`,
     },
+    { id: "colours", label: "Each species has its own colour", pass: new Set(registry.species.map((s) => s.color.toLowerCase())).size === registry.species.length, detail: `${new Set(registry.species.map((s) => s.color.toLowerCase())).size} distinct colours for ${registry.species.length} species` },
     { id: "ids", label: "Every bird has a unique ID", pass: uniqueIds, detail: `${new Set(ids).size} distinct IDs` },
     {
       id: "species-ref",

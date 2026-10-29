@@ -36,7 +36,7 @@ La barra lateral cambia entre **Penguins** y **Aviary** y se puede plegar a solo
 | | `/health` | Seguimiento de casos (simulados) y chequeo de actividad (inferencia, no diagnóstico). |
 | | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |
 | | `/penguins/rules` | Reglas propuestas (ejemplos configurables, no alertas operativas). |
-| **Aviary** | `/aviary/map` | **Map** (portada del aviario): especies con foto a la izquierda (clic = filtra el mapa y muestra sus ejemplares); mapa 3D con filtros, marcadores con la **foto de la especie y anillo de estado** (o punto de color, en *Layers*), **agrupación** con número que se separa al acercar, IDs de árbol que aparecen al acercar sin encimarse y botón **Maximise** (Esc para salir, conserva la selección); a la derecha los **10 equipos** con búsqueda y reasignación. Clic en un árbol: ficha compacta (altura, aves por nivel, última detección) y vista vertical. |
+| **Aviary** | `/aviary/map` | **Map**: el aviario reconstruido a partir del render de referencia (domo geodésico, árbol central con plataformas, pasarelas elevadas, lagunas, cascadas y rocas; `src/domain/aviaryLayout.ts`) en **vista 3D** y **vista superior 2D** del mismo modelo (mismos árboles e IDs; filtros y selección se conservan al cambiar). Cada ave es un **punto pequeño del color de su especie** (32 colores únicos); los puntos que se enciman se agrupan con un número y se separan al acercar, y si comparten punto aun al máximo zoom se listan. Leyenda de especies a la izquierda (clic = filtra), 10 equipos a la derecha, ficha compacta del árbol y vista vertical, botón **Maximise**. |
 | | `/aviary` | **Activity**: cifras, mapa en tarjeta, desglose por especie, movimientos y actividad. |
 | | `/aviary/species` | Catálogo de 32 especies (pedidas vs. generadas, sexo, edad), árboles y validaciones de los datos. |
 | | `/aviary/species/[id]` | Ficha de la especie: foto de referencia (Wikimedia Commons, con autor y licencia), resumen de Wikipedia, cifras de la demo y una tarjeta por cada ave. |
@@ -65,7 +65,7 @@ Las miniaturas de `public/aviary/species/` son copias (330 px) de fotos de
 Wikimedia Commons con licencias libres; autor, licencia y enlace de cada una están
 en `src/data/aviarySpeciesInfo.ts` y se muestran en la ficha de cada especie. El
 recorte circular de cada foto se ajusta en `src/data/aviarySpeciesIcons.ts`.
-Los nombres de árbol (Ceiba, Mango…) son ilustrativos de la demo.
+Los nombres de árbol (Ceiba, Mango…) son ilustrativos de la demo. En el mapa no se usan fotos: cada especie tiene un color exclusivo (`src/data/aviaryCatalog.ts`).
 
 ## Equipos del aviario
 
