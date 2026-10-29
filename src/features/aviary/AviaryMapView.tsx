@@ -25,6 +25,7 @@ import { Segmented, cx } from "@/components/ui/primitives";
 import { Donut, LineChart } from "@/components/charts/Charts";
 import { DEFAULT_SCENE_LAYERS, type SceneLayers, type ScenePoint } from "./monitor/AviaryScene";
 import { AviaryScene, BirdCard, SPEEDS, STATUS_ORDER, WINDOWS, type WindowId } from "./monitor/AviaryParts";
+import { AviaryImageMap } from "./monitor/AviaryImageMap";
 import { SpeciesAvatar } from "./SpeciesAvatar";
 import { TreeIllustration, type TreeBird } from "./TreeIllustration";
 
@@ -94,7 +95,8 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
   }, [maxed]);
   // Team assignments: automatic default split, plus the user's changes.
   const { teamOf, assign } = useTeamAssignments(registry);
-  const [mode, setMode] = useState<"3d" | "2d">("3d");
+  // The reference picture is the default view; the 3D model and its top view stay available.
+  const [mode, setMode] = useState<"image" | "3d" | "2d">("image");
   const [layers, setLayers] = useState<Layers3D>({ ...DEFAULT_SCENE_LAYERS, trail: true });
   const [dimRest, setDimRest] = useState(true);
   const [smooth, setSmooth] = useState(true);
@@ -225,7 +227,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
                 </button>
               )}
               <LayersMenu layers={layers} onLayers={setLayers} dimRest={dimRest} onDimRest={setDimRest} grouping={grouping} onGrouping={setGrouping} />
-              <Segmented size="sm" value={mode} onChange={setMode} options={[{ value: "3d", label: "3D view" }, { value: "2d", label: "Top view 2D" }]} />
+              <Segmented size="sm" value={mode} onChange={setMode} options={[{ value: "image", label: "Image" }, { value: "3d", label: "3D view" }, { value: "2d", label: "Top view 2D" }]} />
               <button
                 onClick={() => setMaxed((v) => !v)}
                 className={cx("inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium", maxed ? "border-accent bg-accent text-white" : "border-line-strong text-ink hover:border-accent/50")}
@@ -237,26 +239,46 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
             </div>
           </div>
           <div className="relative min-h-[380px] flex-1">
-            <AviaryScene
-              trees={trees}
-              points={points}
-              selectedBirdId={birdId ?? highlightId}
-              selectedTreeId={treeId}
-              highlightZoneId={highlightZone || null}
-              precision={selFix?.det?.pos && selFix.det.precisionM ? { pos: selFix.det.pos, r: selFix.det.precisionM } : null}
-              trail={trail}
-              level={level}
-              mode={mode}
-              focus={focus}
-              dimTrees={level !== "all"}
-              smooth={smooth}
-              layers={layers}
-              cluster={grouping}
-              onSelectGroup={setGroupIds}
-              onSelectBird={(id) => openBird(id, false)}
-              onSelectTree={(id) => openTree(id)}
-              onSelectZone={(z) => setZoneId((cur) => (cur === z ? "" : z))}
-            />
+            {mode === "image" ? (
+              <AviaryImageMap
+                trees={trees}
+                points={points}
+                selectedBirdId={birdId ?? highlightId}
+                selectedTreeId={treeId}
+                highlightZoneId={highlightZone || null}
+                precision={selFix?.det?.pos && selFix.det.precisionM ? { pos: selFix.det.pos, r: selFix.det.precisionM } : null}
+                trail={trail}
+                focus={focus}
+                smooth={smooth}
+                layers={layers}
+                cluster={grouping}
+                onSelectGroup={setGroupIds}
+                onSelectBird={(id) => openBird(id, false)}
+                onSelectTree={(id) => openTree(id)}
+                onSelectZone={(z) => setZoneId((cur) => (cur === z ? "" : z))}
+              />
+              ) : (
+              <AviaryScene
+                trees={trees}
+                points={points}
+                selectedBirdId={birdId ?? highlightId}
+                selectedTreeId={treeId}
+                highlightZoneId={highlightZone || null}
+                precision={selFix?.det?.pos && selFix.det.precisionM ? { pos: selFix.det.pos, r: selFix.det.precisionM } : null}
+                trail={trail}
+                level={level}
+                mode={mode}
+                focus={focus}
+                dimTrees={level !== "all"}
+                smooth={smooth}
+                layers={layers}
+                cluster={grouping}
+                onSelectGroup={setGroupIds}
+                onSelectBird={(id) => openBird(id, false)}
+                onSelectTree={(id) => openTree(id)}
+                onSelectZone={(z) => setZoneId((cur) => (cur === z ? "" : z))}
+              />
+              )}
             <div className="pointer-events-none absolute right-3 top-3 flex flex-col gap-1 rounded-lg bg-panel-solid/85 px-2.5 py-2 text-[11px] text-muted shadow-sm backdrop-blur">
               {(["detected", "moving", "no-signal"] as FixStatus[]).map((s) => (
                 <span key={s} className="flex items-center gap-1.5">
