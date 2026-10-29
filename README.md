@@ -37,6 +37,7 @@ La barra lateral cambia entre tres áreas:
 | | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |
 | | `/penguins/rules` | Reglas propuestas (ejemplos configurables, no alertas operativas). |
 | **Aviary** | `/aviary` | Aves registradas en la demo vs. estimación ≈500, especies, distribución por zona y equipo. |
+| | `/aviary/monitor` | Monitor 3D (three.js): mapa conceptual con árboles T1…, niveles de altura, aves por estado, ficha del ave, ficha y vista lateral del árbol, historial y filtros de tiempo. Escenario de rastreo simulado con 30 especies ilustrativas. |
 | | `/aviary/birds`, `/aviary/birds/[id]` | Búsqueda y perfil con avistamientos y movimientos entre zonas. |
 | | `/aviary/habitat` | Plano ilustrativo por zonas, coloreado por último avistamiento. |
 | | `/aviary/inventory` | Esqueleto del inventario con fuente, conteo confirmado ("To be confirmed") y lo que SeaWorld debe enviar. |

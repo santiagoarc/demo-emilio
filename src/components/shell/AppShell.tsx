@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { Activity, Bird, BookOpenCheck, ClipboardList, Compass, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { Activity, Bird, Box, BookOpenCheck, ClipboardList, Compass, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { useDemo } from "@/state/DemoProvider";
 import { fmtDateTime } from "@/logic/time";
 import { cx } from "@/components/ui/primitives";
@@ -66,6 +66,7 @@ const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exa
   ],
   aviary: [
     { href: "/aviary", label: "Overview", icon: LayoutDashboard, exact: true },
+    { href: "/aviary/monitor", label: "3D monitor", icon: Box },
     { href: "/aviary/birds", label: "Birds", icon: Feather },
     { href: "/aviary/habitat", label: "Habitat", icon: MapIcon },
     { href: "/aviary/inventory", label: "Inventory", icon: ClipboardList },

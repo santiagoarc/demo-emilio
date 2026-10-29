@@ -80,6 +80,7 @@ export function PlatformOverview() {
               { label: "Not seen ≥ 3 days", value: birds.notSeen, hint: "Logbook gap, not a welfare signal" },
             ]}
             links={[
+              { href: "/aviary/monitor", label: "3D monitor" },
               { href: "/aviary/birds", label: "Find a bird" },
               { href: "/aviary/habitat", label: "Habitat" },
               { href: "/aviary/inventory", label: "Inventory to confirm" },

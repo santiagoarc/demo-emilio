@@ -113,3 +113,31 @@ fallas de dispositivo.
 Para pasar a datos reales del aviario basta reemplazar `generateAviary` por una
 fuente que entregue `AviaryDataset` y llenar `confirmedCount`/`source` de cada
 especie con lo que envíe SeaWorld (`INVENTORY_REQUEST`).
+
+## Monitor 3D del aviario (oct-2026)
+
+Ruta `/aviary/monitor`. Escenario de rastreo **simulado** e independiente del
+registro de avistamientos manuales (`/aviary/birds`): usa su propio catálogo
+ilustrativo de 30 especies y 520 individuos (códigos `TUC-001`, `SCM-001`…, de
+diseño, no de SeaWorld).
+
+| Archivo | Qué contiene |
+| --- | --- |
+| `src/domain/aviaryTracking.ts` | Tipos: zonas Z1–Z7 conceptuales, niveles de altura provisionales, árboles (T1…), dispositivos, `Detection`, `Stay` y la interfaz `TrackingSource`. |
+| `src/data/aviaryTrackingSimulate.ts` | Catálogo de especies, árboles, estancias por ave y la implementación simulada de `TrackingSource`. |
+| `src/logic/aviaryTracking.ts` | Estado de la ubicación (detectada, en movimiento, antigua, sin señal), calidad, historial, ocupantes de un árbol y actividad por hora. |
+| `src/features/aviary/monitor/` | Pantalla (`AviaryMonitor`), escena three.js (`AviaryScene`) y vista lateral del árbol (`TreeSideView`). |
+
+Reglas que respeta el modelo:
+
+- Tipos de ubicación: `confirmed`, `computed-3d` (con radio de incertidumbre),
+  `zone` (solo zona, sin coordenadas) y `unknown`. Una ubicación de zona o
+  desconocida **nunca** se dibuja como punto en el mapa.
+- El árbol solo se asigna si la incertidumbre cabe dentro de la copa. La rama
+  **nunca** se asigna.
+- El método de rastreo depende del tamaño del ave (`MassClass`); las aves muy
+  pequeñas quedan sin dispositivo ("suitability to evaluate").
+
+Para conectar datos reales basta implementar `TrackingSource` (`latest`,
+`history`) sobre la API de rastreadores, receptores o cámaras, y cargar los
+árboles y zonas desde el inventario real en lugar del generador.
