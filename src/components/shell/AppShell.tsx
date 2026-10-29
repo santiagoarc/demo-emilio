@@ -99,12 +99,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // The aviary uses a dark, technical theme; the penguin area stays light.
-  const dark = moduleOf(pathname) === "aviary";
-  useEffect(() => {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-  }, [dark]);
-
   if (session.user === undefined) return <div className="min-h-screen bg-bg" />;
   if (session.user === null) return <LoginScreen onEnter={session.enter} />;
 

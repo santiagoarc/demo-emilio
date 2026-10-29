@@ -101,7 +101,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
       const active = isActive(f);
       if (!active && !dimRest && (filtered || level !== "all")) continue;
       const sp = MONITOR_SPECIES_BY_ID[f.bird.speciesId];
-      out.push({ id: f.bird.id, pos: f.det.pos, species: sp.code, color: FIX_STATUS[f.status].color, dim: !active, label: `${f.bird.id} · ${sp.common} · ${fmtHeight(f.det.pos.y)}` });
+      out.push({ id: f.bird.id, pos: f.det.pos, color: sp.color, dim: !active, label: `${f.bird.id} · ${sp.common} · ${fmtHeight(f.det.pos.y)}` });
     }
     return out;
   }, [all, dimRest, filtered, level, group, speciesId, zoneId, statusF]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -205,11 +205,10 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
             <div className="pointer-events-none absolute right-3 top-3 flex flex-col gap-1 rounded-lg bg-panel-solid/85 px-2.5 py-2 text-[11px] text-muted shadow-sm backdrop-blur">
               {(["detected", "moving", "no-signal"] as FixStatus[]).map((s) => (
                 <span key={s} className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ boxShadow: `inset 0 0 0 2px ${FIX_STATUS[s].color}` }} />
                   {FIX_STATUS[s].label} <span className="num ml-auto pl-2 text-ink">{counts[s]}</span>
                 </span>
               ))}
-              <span className="mt-0.5 text-[10px] text-faint">Image = species · ring = status</span>
+              <span className="mt-0.5 text-[10px] text-faint">Dot colour = species</span>
             </div>
           </div>
         </section>
@@ -347,7 +346,7 @@ function SpeciesPanel({ fixes, group, onGroup, speciesId, onSpecies, query, onQu
             <div key={s.id}>
               <div className={cx("flex items-center gap-2 rounded-lg px-2 py-1.5", speciesId === s.id ? "bg-accent/12" : "hover:bg-ink/[0.04]")}>
                 <button onClick={() => onSpecies(speciesId === s.id ? "" : s.id)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" title={`Show only ${s.common} on the map`}>
-                  <SpeciesAvatar code={s.code} size={38} />
+                  <SpeciesAvatar code={s.code} size={38} ring={s.color} title={`Map colour of ${s.common}`} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-medium text-ink">{s.common}</span>
                     <span className="block truncate text-[11px] italic text-muted">{s.scientific}</span>
@@ -385,7 +384,7 @@ function BirdRow({ fix, on, onClick, compact }: { fix: Fix; on: boolean; onClick
   const d = fix.det;
   return (
     <button onClick={onClick} className={cx("flex w-full items-center gap-2 rounded-md px-2 py-1 text-left", on ? "bg-accent/15" : "hover:bg-ink/[0.04]")}>
-      {compact ? <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: FIX_STATUS[fix.status].color }} /> : <SpeciesAvatar code={sp.code} size={22} ring={FIX_STATUS[fix.status].color} />}
+      {compact ? <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: FIX_STATUS[fix.status].color }} /> : <SpeciesAvatar code={sp.code} size={22} ring={sp.color} />}
       <span className="font-mono text-[11px] font-semibold text-ink">{fix.bird.id}</span>
       <span className="ml-auto truncate text-[10px] text-muted">
         {d?.treeId ?? (d?.zoneId ? MONITOR_ZONE_BY_ID[d.zoneId].code : "—")}
@@ -420,7 +419,7 @@ function TreePanel({ tree, fixes, asOf, ds, src, highlightId, onHighlight, onOpe
     precisionM: f.det!.precisionM ?? 1,
     dx: f.det!.pos!.x - tree.x,
     status: f.status,
-    ring: FIX_STATUS[f.status].color,
+    ring: MONITOR_SPECIES_BY_ID[f.bird.speciesId].color,
   }));
   const bySpecies = (() => {
     const m = new Map<string, number>();
@@ -470,7 +469,7 @@ function TreePanel({ tree, fixes, asOf, ds, src, highlightId, onHighlight, onOpe
                   className={cx("inline-flex items-center gap-1.5 rounded-full border py-0.5 pl-0.5 pr-2 text-[11px]", on ? "border-accent/60 bg-accent/12 text-ink" : "border-line-strong text-muted hover:text-ink")}
                   title={`Show only ${sp.common}`}
                 >
-                  <SpeciesAvatar code={sp.code} size={22} />
+                  <SpeciesAvatar code={sp.code} size={22} ring={sp.color} />
                   <span className="max-w-[110px] truncate">{sp.common}</span>
                   <span className="num font-semibold text-ink">×{n}</span>
                 </button>
@@ -524,7 +523,7 @@ function TreePanel({ tree, fixes, asOf, ds, src, highlightId, onHighlight, onOpe
                       >
                         <td className="py-1.5 pl-4">
                           <span className="flex items-center gap-2">
-                            <SpeciesAvatar code={sp.code} size={24} ring={FIX_STATUS[f.status].color} />
+                            <SpeciesAvatar code={sp.code} size={24} ring={sp.color} />
                             <span className="font-mono font-semibold text-ink">{f.bird.id}</span>
                           </span>
                         </td>

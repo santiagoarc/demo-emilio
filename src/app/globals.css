@@ -23,38 +23,6 @@
   color-scheme: light;
 }
 
-/* Aviary area: dark, technical look (set by the shell on <html data-theme="dark">). */
-:root[data-theme="dark"] {
-  --bg: #07121c;
-  --bg-2: #0b1a27;
-  --panel: rgba(12, 27, 41, 0.92);
-  --panel-solid: #0d1d2c;
-  --panel-2: #112638;
-  --line: rgba(160, 200, 230, 0.1);
-  --line-strong: rgba(160, 200, 230, 0.18);
-  --ink: #e4eef6;
-  --muted: #93a9bd;
-  --faint: #627a90;
-  --accent: #14b8a6;
-  --accent-2: #4ba3f0;
-  --warn: #e0a326;
-  --danger: #f05252;
-  --ok: #22c55e;
-  color-scheme: dark;
-}
-
-:root[data-theme="dark"] .panel {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 32px -24px rgba(0, 0, 0, 0.6);
-}
-
-:root[data-theme="dark"] .scroll-thin {
-  scrollbar-color: rgba(160, 200, 230, 0.2) transparent;
-}
-
-:root[data-theme="dark"] input[type="range"].timeline::-webkit-slider-runnable-track {
-  background: linear-gradient(90deg, rgba(20, 184, 166, 0.8) var(--fill, 100%), rgba(160, 200, 230, 0.15) var(--fill, 100%));
-}
-
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-2: var(--bg-2);
