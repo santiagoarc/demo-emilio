@@ -1,13 +1,7 @@
-import { Suspense } from "react";
-import { BirdProfile } from "@/features/aviary/BirdProfile";
+import { redirect } from "next/navigation";
 
-// The demo generates its data in the browser; there is no UI to validate on the server.
-export const instant = false;
-
-export default function AviaryBirdPage() {
-  return (
-    <Suspense>
-      <BirdProfile />
-    </Suspense>
-  );
+// A bird's card lives in the monitor, next to the map.
+export default async function AviaryBirdPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  redirect(`/aviary?bird=${encodeURIComponent(id)}`);
 }

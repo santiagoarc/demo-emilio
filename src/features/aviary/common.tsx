@@ -1,47 +1,28 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Info } from "lucide-react";
-import { AVIARY_SPECIES_BY_ID, type AviarySpeciesId, type PresenceStatus } from "@/domain/aviary";
-import { Badge, cx } from "@/components/ui/primitives";
+import { loadClock } from "@/data/aviaryDemoStore";
+import { snapshot } from "@/logic/aviaryTracking";
+import { useTracking } from "@/state/useTracking";
 
-/** The one status line every aviary screen carries. */
+/** The status line every aviary screen carries. */
 export function DataStatusBanner({ children }: { children?: ReactNode }) {
   return (
     <div role="note" className="flex items-start gap-3 rounded-2xl border border-dashed border-warn/45 bg-warn/[0.06] px-4 py-3">
       <Info size={16} className="mt-0.5 shrink-0 text-warn" aria-hidden />
       <div className="min-w-0 text-sm">
-        <p className="font-medium text-ink">Demo data — simulated roster and sightings. Real inventory not provided yet.</p>
-        {children && <p className="mt-0.5 text-xs text-muted">{children}</p>}
+        <p className="font-medium text-ink">
+          <span className="mr-1.5 rounded bg-warn px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white">DEMO / SIMULATED DATA</span>
+          Fictional species counts, birds, trees and movements generated for this demonstration.
+        </p>
+        {children && <p className="mt-1 text-xs text-muted">{children}</p>}
       </div>
     </div>
   );
 }
 
-/** Small marker for any simulated number. */
-export function DemoTag({ className, children = "Demo" }: { className?: string; children?: ReactNode }) {
-  return (
-    <span className={cx("inline-flex items-center rounded-md border border-dashed border-line-strong px-1.5 py-px text-[10px] font-medium uppercase tracking-wider text-faint", className)}>
-      {children}
-    </span>
-  );
-}
-
-export const PRESENCE_LABEL: Record<PresenceStatus, string> = {
-  "publicly-mentioned": "Publicly mentioned",
-  confirmed: "Confirmed for this aviary",
-  "not-provided": "Not provided",
-};
-
-export function PresenceBadge({ status }: { status: PresenceStatus }) {
-  return <Badge tone={status === "confirmed" ? "ok" : status === "publicly-mentioned" ? "info" : "neutral"}>{PRESENCE_LABEL[status]}</Badge>;
-}
-
-export function SpeciesDot({ id, size = 8 }: { id: AviarySpeciesId; size?: number }) {
-  return <span aria-hidden className="inline-block shrink-0 rounded-full" style={{ width: size, height: size, background: AVIARY_SPECIES_BY_ID[id].color }} />;
-}
-
-/** Page frame: header area padding + banner, consistent across screens. */
+/** Page frame: padding + banner, consistent across screens. */
 export function AviaryFrame({ children, banner }: { children: ReactNode; banner?: ReactNode }) {
   return (
     <div className="space-y-5 px-6 lg:px-8">
@@ -49,4 +30,12 @@ export function AviaryFrame({ children, banner }: { children: ReactNode; banner?
       {children}
     </div>
   );
+}
+
+/** Demo data plus the latest detections at the saved simulated clock time. */
+export function useAviarySnapshot() {
+  const t = useTracking();
+  const asOf = useMemo(() => loadClock(t.registry).simTime, [t.registry]);
+  const fixes = useMemo(() => snapshot(t.ds, t.src, asOf), [t.ds, t.src, asOf]);
+  return { ...t, asOf, fixes };
 }

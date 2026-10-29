@@ -10,13 +10,12 @@ import {
   LEVEL_BY_ID,
   MONITOR_ZONES,
   MONITOR_ZONE_BY_ID,
-  type AviaryStructure,
   type AviaryTree,
   type LevelId,
   type MonitorZone,
   type Vec3,
 } from "@/domain/aviaryTracking";
-import { LAGOON, WATERFALL_POOL } from "@/data/aviaryTrackingSimulate";
+import { LAGOON, WATERFALL_POOL, type STRUCTURES } from "@/data/aviaryTrackingSimulate";
 import { hashSeed, mulberry32 } from "@/logic/rng";
 import { cx } from "@/components/ui/primitives";
 
@@ -30,7 +29,7 @@ export interface ScenePoint {
 
 export interface AviarySceneProps {
   trees: AviaryTree[];
-  structures: AviaryStructure[];
+  structures: typeof STRUCTURES;
   points: ScenePoint[];
   selectedBirdId: string | null;
   selectedTreeId: string | null;
@@ -146,6 +145,7 @@ export function AviaryScene(props: AviarySceneProps) {
   const rigRef = useRef<Rig | null>(null);
   const propsRef = useRef(props);
   const tipRef = useRef<HTMLDivElement>(null);
+  const hintRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -500,6 +500,18 @@ export function AviaryScene(props: AviarySceneProps) {
     el.addEventListener("pointerup", onUp);
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerleave", onLeave);
+    // Plain wheel scrolls the page; Ctrl/⌘ + wheel zooms the map (caught before OrbitControls sees it).
+    let hintTimer = 0;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return;
+      e.stopPropagation();
+      const hint = hintRef.current;
+      if (!hint) return;
+      hint.style.opacity = "1";
+      window.clearTimeout(hintTimer);
+      hintTimer = window.setTimeout(() => (hint.style.opacity = "0"), 1200);
+    };
+    wrap.addEventListener("wheel", onWheel, { capture: true });
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setReady(true);
 
@@ -508,6 +520,8 @@ export function AviaryScene(props: AviarySceneProps) {
       el.removeEventListener("pointerup", onUp);
       el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerleave", onLeave);
+      wrap.removeEventListener("wheel", onWheel, { capture: true });
+      window.clearTimeout(hintTimer);
       ro.disconnect();
       renderer.setAnimationLoop(null);
       ctl3.dispose();
@@ -699,6 +713,7 @@ export function AviaryScene(props: AviarySceneProps) {
             {selBird.id}
           </span>
         )}
+        <div ref={hintRef} className="absolute inset-0 grid place-items-center bg-ink/25 text-sm font-medium text-white opacity-0 transition-opacity">Use Ctrl + scroll to zoom the map</div>
         <div ref={tipRef} className="absolute left-0 top-0 rounded-md bg-ink/90 px-2 py-1 text-[11px] text-white opacity-0 shadow transition-opacity" />
       </div>
 
@@ -708,7 +723,7 @@ export function AviaryScene(props: AviarySceneProps) {
         <button onClick={reset} className="grid h-9 w-9 place-items-center border-t border-line text-muted hover:bg-ink/5 hover:text-ink" aria-label="Reset view"><RotateCcw size={15} /></button>
       </div>
       <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg bg-white/85 px-2 py-1 text-[10px] text-muted shadow-sm backdrop-blur">
-        <Box size={12} /> {FOOTPRINT.label} · {mode === "3d" ? "drag to rotate · scroll to zoom · right-drag to pan" : "drag to pan · scroll to zoom"}
+        <Box size={12} /> {FOOTPRINT.label} · {mode === "3d" ? "drag to rotate · Ctrl + scroll to zoom · right-drag to pan" : "drag to pan · Ctrl + scroll to zoom"}
       </div>
       {highlightZoneId && <span className="sr-only">Zone {MONITOR_ZONE_BY_ID[highlightZoneId]?.name} highlighted</span>}
     </div>

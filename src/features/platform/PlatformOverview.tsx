@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
 import { ArrowRight, Bird, BookOpenCheck, Feather, FlaskConical, Database, CircleHelp } from "lucide-react";
-import { AVIARY_ESTIMATE, AVIARY_SPECIES } from "@/domain/aviary";
 import { SPECIES } from "@/domain/species";
-import { daysSinceSeen } from "@/logic/aviary";
 import { HOUR } from "@/logic/time";
 import { useDemo } from "@/state/DemoProvider";
-import { useAviary } from "@/state/useAviary";
+import { useAviarySnapshot } from "@/features/aviary/common";
 import { Badge, Card, SimulatedTag, cx } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/shell/AppShell";
 
@@ -18,7 +16,7 @@ import { PageHeader } from "@/components/shell/AppShell";
  */
 export function PlatformOverview() {
   const { dataset, snapshots, insights, now } = useDemo();
-  const { ds: aviary } = useAviary();
+  const aviary = useAviarySnapshot();
 
   const penguins = useMemo(() => {
     const total = dataset.penguins.length;
@@ -28,12 +26,13 @@ export function PlatformOverview() {
   }, [dataset, snapshots, insights, now]);
 
   const birds = useMemo(() => {
-    const total = aviary.birds.length;
-    const seen3d = aviary.birds.filter((b) => {
-      const d = daysSinceSeen(aviary, b.id);
-      return d !== null && d < 3;
-    }).length;
-    return { total, seen3d, notSeen: total - seen3d };
+    const fixes = [...aviary.fixes.values()];
+    return {
+      total: aviary.registry.birds.length,
+      species: aviary.registry.species.length,
+      located: fixes.filter((f) => f.det?.pos).length,
+      noSignal: fixes.filter((f) => f.status === "no-signal").length,
+    };
   }, [aviary]);
 
   return (
@@ -72,18 +71,17 @@ export function PlatformOverview() {
             icon={Feather}
             title="Aviary"
             href="/aviary"
-            data="Simulated keeper sightings, logged by hand at zone level. No tags, chips or live positions are assumed for birds."
+            data="DEMO registry of 500 fictional birds across 32 species, with trees, heights and simulated movement on a 3D map. Not SeaWorld's collection."
             stats={[
-              { label: "Birds in the demo", value: birds.total, hint: `Stands in for the ${AVIARY_ESTIMATE.label} estimate · to be confirmed` },
-              { label: "Species groups", value: AVIARY_SPECIES.length, hint: "3 named publicly by SeaWorld · 1 not provided" },
-              { label: "Seen in the last 3 days", value: `${Math.round((birds.seen3d / Math.max(1, birds.total)) * 100)}%`, hint: "Share with a logged sighting" },
-              { label: "Not seen ≥ 3 days", value: birds.notSeen, hint: "Logbook gap, not a welfare signal" },
+              { label: "Birds in the demo", value: birds.total, hint: "Fictional registry generated for the demo" },
+              { label: "Species", value: birds.species, hint: "Demo catalogue · counts are fictional" },
+              { label: "With a 3D position", value: `${Math.round((birds.located / Math.max(1, birds.total)) * 100)}%`, hint: "At the saved simulated clock time" },
+              { label: "No recent signal", value: birds.noSignal, hint: "Simulated device outages" },
             ]}
             links={[
-              { href: "/aviary/monitor", label: "3D monitor" },
+              { href: "/aviary", label: "3D monitor" },
               { href: "/aviary/birds", label: "Find a bird" },
-              { href: "/aviary/habitat", label: "Habitat" },
-              { href: "/aviary/inventory", label: "Inventory to confirm" },
+              { href: "/aviary/inventory", label: "Inventory" },
             ]}
           />
         </div>
@@ -103,7 +101,7 @@ export function PlatformOverview() {
             <Kind
               tone="warn"
               label="To be confirmed by SeaWorld"
-              items={["Real head counts per species (penguins and birds)", "The ≈500-bird aviary estimate", "Aviary species list, zones and responsible teams", "Any tracking technology and its suitability"]}
+              items={["Real head counts per species (penguins and birds)", "Aviary species list, zones and responsible teams", "Any tracking technology and its suitability"]}
             />
           </div>
         </Card>

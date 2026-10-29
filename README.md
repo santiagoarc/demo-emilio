@@ -36,11 +36,9 @@ La barra lateral cambia entre tres áreas:
 | | `/health` | Seguimiento de casos (simulados) y chequeo de actividad (inferencia, no diagnóstico). |
 | | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |
 | | `/penguins/rules` | Reglas propuestas (ejemplos configurables, no alertas operativas). |
-| **Aviary** | `/aviary` | Aves registradas en la demo vs. estimación ≈500, especies, distribución por zona y equipo. |
-| | `/aviary/monitor` | Monitor 3D (three.js): mapa conceptual con árboles T1…, niveles de altura, aves por estado, ficha del ave, ficha y vista lateral del árbol, historial y filtros de tiempo. Escenario de rastreo simulado con 30 especies ilustrativas. |
-| | `/aviary/birds`, `/aviary/birds/[id]` | Búsqueda y perfil con avistamientos y movimientos entre zonas. |
-| | `/aviary/habitat` | Plano ilustrativo por zonas, coloreado por último avistamiento. |
-| | `/aviary/inventory` | Esqueleto del inventario con fuente, conteo confirmado ("To be confirmed") y lo que SeaWorld debe enviar. |
+| **Aviary** | `/aviary` | Monitor 3D (three.js): mapa conceptual con árboles T1…, niveles de altura, 500 aves por estado, ficha del ave y del árbol (con vista lateral), historial, filtros, reloj simulado con movimiento gradual, feed de movimientos y validaciones de los datos. |
+| | `/aviary/birds` | Tabla de las 500 aves con búsqueda y filtros; cada fila abre el ave en el monitor (`/aviary?bird=ID`). |
+| | `/aviary/inventory` | Catálogo de 32 especies con cantidades (pedidas vs. generadas), sexo y edad; inventario de árboles; validaciones. |
 | | `/aviary/rules` | Reglas propuestas del aviario. |
 
 ## Datos: simulado, con fuente y pendiente
@@ -50,19 +48,21 @@ La barra lateral cambia entre tres áreas:
 | 6 especies de pingüino | Fuente: [SeaWorld Abu Dhabi, 10-abr-2023](https://seaworldabudhabi.com/en/news/tropical-ocean-reveal), consultada el 27-oct-2026. |
 | 206 pingüinos y su reparto | Cifra de la demo, por confirmar. |
 | Grupos del aviario (tucanes, loros, flamenco del Caribe) | Misma fuente. No publica lista de especies ni cantidades. |
-| ≈500 aves | Estimación de la reunión, por confirmar. La demo genera 500 registros que solo la representan. |
+| 32 especies y 500 aves del aviario | **Demo**: catálogo y cantidades elegidos para la presentación; aves, edades, sexos, dispositivos, árboles, posiciones y movimientos son ficticios. La tabla pedida sumaba 503 y se ajusta sola a 500. |
 | Lecturas, avistamientos, casos de salud, equipos y personas | Simulados. |
 
-El aviario **no asume chips ni ubicación en vivo**: los datos son avistamientos
-manuales de cuidadores a nivel zona. La ubicación en tiempo real aparece solo
-como "Future integration preview", rotulada como por validar.
+El aviario es una **demo con datos simulados**: el movimiento corre sobre un reloj
+simulado y no representa rastreo real en tiempo real.
 
 ## Escenario de demostración
 
 - Pingüinos: `src/config/demo.config.ts` (cantidades por especie, días de
   historia, frecuencia de lecturas). Desde la app: **Demo scenario & reset**.
-- Aviario: `src/domain/aviary.ts` (especies, zonas configurables, equipos,
-  fuente) y `src/data/aviarySimulate.ts` (roster y avistamientos).
+- Aviario: `src/data/aviaryCatalog.ts` (32 especies y cantidades) y
+  `src/data/aviaryTrackingSimulate.ts` (aves, árboles y movimientos). El registro
+  se genera una sola vez y se guarda en el `localStorage` del navegador
+  (`aviary-demo/registry/v1`, reloj en `aviary-demo/clock/v1`); **Reset demo data**
+  en el monitor lo vuelve a generar.
 - La misma semilla genera siempre el mismo escenario. Lo que edita el usuario
   se guarda en el `localStorage` del navegador (`penguin-demo/v2`).
 

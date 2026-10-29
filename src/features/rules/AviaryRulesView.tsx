@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { AVIARY_SPECIES_BY_ID, AVIARY_ZONE_BY_ID } from "@/domain/aviary";
-import { AVIARY_HISTORY_DAYS } from "@/data/aviarySimulate";
-import { daysAgoLabel, headcountAgeBySpecies, notObservedFor, offExhibitDays, zoneLogbookActivity } from "@/logic/aviary";
-import { useAviary } from "@/state/useAviary";
+import { MONITOR_ZONE_BY_ID } from "@/domain/aviaryTracking";
+import { MONITOR_SPECIES_BY_ID } from "@/data/aviaryCatalog";
+import { treeOccupants } from "@/logic/aviaryTracking";
+import { HOUR, fmtAgo } from "@/logic/time";
 import { PageHeader } from "@/components/shell/AppShell";
-import { AviaryFrame } from "@/features/aviary/common";
+import { AviaryFrame, useAviarySnapshot } from "@/features/aviary/common";
 import { ProposedRules, type RuleDef, type RuleIdea } from "./ProposedRules";
 
 const IDEAS: RuleIdea[] = [
@@ -16,83 +16,76 @@ const IDEAS: RuleIdea[] = [
 ];
 
 export function AviaryRulesView() {
-  const { ds } = useAviary();
+  const { registry, ds, src, fixes, asOf } = useAviarySnapshot();
+  const label = (id: string) => `${id} · ${MONITOR_SPECIES_BY_ID[registry.birds.find((b) => b.id === id)!.speciesId].common}`;
 
   const rules = useMemo<RuleDef[]>(
     () => [
       {
-        id: "not-observed",
-        name: "Bird not observed recently",
-        description: (n) => `Flags a bird with no logbook sighting in the last ${n} days, so a keeper can look for it on the next round.`,
-        scope: "All birds in the roster",
-        basis: "Keeper logbook · last sighting per bird",
-        threshold: { label: "Not observed for at least", unit: "days", default: 3, min: 1, max: AVIARY_HISTORY_DAYS, step: 1 },
+        id: "no-signal",
+        name: "No recent detection",
+        description: (n) => `Flags a bird with no detection in the last ${n} hours, so a keeper can look for it and check its device.`,
+        scope: "All demo birds",
+        basis: "Simulated detections · time of the last one",
+        threshold: { label: "No detection for at least", unit: "hours", default: 6, min: 1, max: 48, step: 1 },
         defaultEnabled: true,
         noun: ["bird", "birds"],
         evaluate: (n) =>
-          notObservedFor(ds, ds.birds, n).map(({ bird, last, days }) => ({
-            key: bird.id,
-            label: `${bird.id} · ${AVIARY_SPECIES_BY_ID[bird.speciesId].name}`,
-            detail: `${daysAgoLabel(days, AVIARY_HISTORY_DAYS)}${last ? ` · ${AVIARY_ZONE_BY_ID[last.zoneId].name}` : ""}`,
-            href: `/aviary/birds/${bird.id}`,
-          })),
+          [...fixes.values()]
+            .filter((f) => !f.det || asOf - f.det.at >= n * HOUR)
+            .map((f) => ({ key: f.bird.id, label: label(f.bird.id), detail: f.det ? `last ${fmtAgo(f.det.at, asOf)}` : "never detected", href: `/aviary?bird=${f.bird.id}` })),
       },
       {
-        id: "off-exhibit",
-        name: "Bird kept off exhibit",
-        description: (n) => `Flags a bird whose sightings have been only in holding or the care room for ${n} days or more, as a prompt to review its plan.`,
-        scope: "Off-exhibit Holding and Avian Care Room",
-        basis: "Keeper logbook · zone of consecutive sightings",
-        threshold: { label: "Off exhibit for at least", unit: "days", default: 2, min: 1, max: AVIARY_HISTORY_DAYS, step: 1 },
+        id: "low-battery",
+        name: "Device battery low",
+        description: (n) => `Flags a device whose battery is at or below ${n}%, to plan its replacement.`,
+        scope: "All demo devices",
+        basis: "Simulated device status",
+        threshold: { label: "Battery at or below", unit: "%", default: 20, min: 5, max: 50, step: 5 },
         defaultEnabled: true,
+        noun: ["device", "devices"],
+        evaluate: (n) =>
+          registry.birds
+            .filter((b) => b.device.batteryPct <= n)
+            .sort((a, b) => a.device.batteryPct - b.device.batteryPct)
+            .map((b) => ({ key: b.id, label: label(b.id), detail: `${b.device.id} · ${b.device.batteryPct}%`, href: `/aviary?bird=${b.id}` })),
+      },
+      {
+        id: "away-from-home",
+        name: "Bird away from its usual zone",
+        description: (n) => `Flags a bird that has spent the last ${n} hours outside its usual zone.`,
+        scope: "Birds with a detection in the period",
+        basis: "Simulated location history",
+        threshold: { label: "Outside its zone for at least", unit: "hours", default: 4, min: 1, max: 24, step: 1 },
+        defaultEnabled: false,
         noun: ["bird", "birds"],
         evaluate: (n) =>
-          ds.birds
-            .map((b) => ({ b, off: offExhibitDays(ds, b.id) }))
-            .filter((x) => x.off && x.off.days >= n)
-            .sort((a, b) => b.off!.days - a.off!.days)
-            .map(({ b, off }) => ({
-              key: b.id,
-              label: `${b.id} · ${AVIARY_SPECIES_BY_ID[b.speciesId].name}`,
-              detail: `${AVIARY_ZONE_BY_ID[off!.zoneId].name} · ${off!.days} days`,
-              href: `/aviary/birds/${b.id}`,
-            })),
+          registry.birds
+            .filter((b) => {
+              const h = src.history(b.id, asOf - n * HOUR, asOf);
+              return h.length > 0 && h.every((s) => s.zoneId !== b.homeZoneId);
+            })
+            .map((b) => ({ key: b.id, label: label(b.id), detail: `usual zone ${MONITOR_ZONE_BY_ID[b.homeZoneId].name}`, href: `/aviary?bird=${b.id}` })),
       },
       {
-        id: "zone-logbook-gap",
-        name: "Zone with fewer sightings than usual",
-        description: (n) => `Flags a zone whose logbook entries in the last 24 h fell below ${n}% of its usual daily count — a gap in the logbook, not in the birds.`,
-        scope: "All aviary zones (illustrative layout)",
-        basis: "Keeper logbook · entries per zone",
-        threshold: { label: "Below", unit: "% of usual", default: 50, min: 10, max: 100, step: 5 },
+        id: "crowded-tree",
+        name: "Many birds in one tree",
+        description: (n) => `Flags a tree with ${n} or more birds located in it at the same time.`,
+        scope: "All demo trees",
+        basis: "Latest simulated detections",
+        threshold: { label: "At least", unit: "birds", default: 12, min: 3, max: 40, step: 1 },
         defaultEnabled: false,
-        noun: ["zone", "zones"],
+        noun: ["tree", "trees"],
         evaluate: (n) =>
-          zoneLogbookActivity(ds)
-            .filter((z) => z.usualPerDay >= 1 && z.last24h < (z.usualPerDay * n) / 100)
-            .map((z) => ({
-              key: z.zone.id,
-              label: z.zone.name,
-              detail: `${z.last24h} in 24 h · usual ${z.usualPerDay.toFixed(0)}/day`,
-              href: `/aviary/habitat?zone=${z.zone.id}`,
-            })),
-      },
-      {
-        id: "no-headcount",
-        name: "Species group without a headcount",
-        description: (n) => `Flags a species group with no headcount entry in the logbook for ${n} days or more.`,
-        scope: "All four species groups",
-        basis: "Keeper logbook · headcount entries",
-        threshold: { label: "No headcount for at least", unit: "days", default: 7, min: 1, max: AVIARY_HISTORY_DAYS, step: 1 },
-        defaultEnabled: false,
-        noun: ["species group", "species groups"],
-        evaluate: (n) =>
-          headcountAgeBySpecies(ds)
-            .filter((s) => s.days === null || s.days >= n)
-            .map((s) => ({ key: s.species.id, label: s.species.name, detail: s.days === null ? `none in ${AVIARY_HISTORY_DAYS} days` : `last ${s.days} days ago` })),
+          registry.trees
+            .map((t) => ({ t, n: treeOccupants(fixes, t.id).length }))
+            .filter((x) => x.n >= n)
+            .sort((a, b) => b.n - a.n)
+            .map(({ t, n: c }) => ({ key: t.id, label: `${t.id} · ${MONITOR_ZONE_BY_ID[t.zoneId].name}`, detail: `${c} birds` })),
       },
     ],
-    [ds],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [registry, ds, src, fixes, asOf],
   );
 
   return (
@@ -102,9 +95,9 @@ export function AviaryRulesView() {
         title="Proposed rules"
         subtitle="Examples of checks the aviary team could switch on once real data exists. Adjust a threshold to see how many demo birds it would touch."
       />
-      <AviaryFrame banner="Match counts below are computed on the simulated roster and logbook.">
+      <AviaryFrame banner="Match counts below are computed on the demo registry at the saved simulated clock time.">
         <ProposedRules
-          storageKey="penguin-demo/rules/aviary"
+          storageKey="penguin-demo/rules/aviary-v2"
           rules={rules}
           ideas={IDEAS}
           intro="None of these rules is running. They send no notifications and do not replace keeper judgement; they exist to agree with SeaWorld which checks are useful and at what thresholds."

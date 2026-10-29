@@ -116,28 +116,30 @@ especie con lo que envíe SeaWorld (`INVENTORY_REQUEST`).
 
 ## Monitor 3D del aviario (oct-2026)
 
-Ruta `/aviary/monitor`. Escenario de rastreo **simulado** e independiente del
-registro de avistamientos manuales (`/aviary/birds`): usa su propio catálogo
-ilustrativo de 30 especies y 520 individuos (códigos `TUC-001`, `SCM-001`…, de
-diseño, no de SeaWorld).
+Ruta `/aviary`. Es la única fuente de datos del aviario: el registro, el
+inventario y las reglas usan los mismos 500 ejemplares. Todo es **DEMO**.
 
 | Archivo | Qué contiene |
 | --- | --- |
-| `src/domain/aviaryTracking.ts` | Tipos: zonas Z1–Z7 conceptuales, niveles de altura provisionales, árboles (T1…), dispositivos, `Detection`, `Stay` y la interfaz `TrackingSource`. |
-| `src/data/aviaryTrackingSimulate.ts` | Catálogo de especies, árboles, estancias por ave y la implementación simulada de `TrackingSource`. |
-| `src/logic/aviaryTracking.ts` | Estado de la ubicación (detectada, en movimiento, antigua, sin señal), calidad, historial, ocupantes de un árbol y actividad por hora. |
-| `src/features/aviary/monitor/` | Pantalla (`AviaryMonitor`), escena three.js (`AviaryScene`) y vista lateral del árbol (`TreeSideView`). |
+| `src/domain/aviaryTracking.ts` | Tipos y relaciones: especie → ave → estancias (`Stay`, siempre ligadas a un árbol existente) → detecciones. Zonas Z1–Z7 conceptuales, niveles de altura provisionales y la interfaz `TrackingSource`. |
+| `src/data/aviaryCatalog.ts` | Las 32 especies (nombre en inglés y español, científico, código, grupo) y las cantidades pedidas. `adjustToTotal` comprueba la suma y la corrige a 500 por resto mayor. |
+| `src/data/aviaryTrackingSimulate.ts` | `generateRegistry` (aves con edad, sexo cuando aplica, dispositivo; árboles con puntos de referencia), `buildTimeline` (estancias por ave, deterministas por semilla) y la `TrackingSource` simulada. |
+| `src/data/aviaryDemoStore.ts` | Persistencia: el registro se guarda en `localStorage` la primera vez y se relee después; nunca se duplica. También guarda el reloj simulado. |
+| `src/state/useTracking.ts` | Carga el registro una vez por sesión, `resetDemoData` y `useSimClock` (reloj simulado con play/pausa y velocidad). |
+| `src/logic/aviaryTracking.ts` | Estado de la ubicación, calidad, historial, ocupantes de un árbol, movimientos recientes y actividad por hora. |
+| `src/logic/aviaryDemoChecks.ts` | Validaciones obligatorias (32 especies, 500 aves, IDs únicos, árboles existentes, alturas coherentes, sin duplicados, persistencia). Se muestran en el monitor y en Inventory. |
+| `src/features/aviary/monitor/` | Pantalla, escena three.js y vista lateral del árbol. |
+
+Coordenadas: X/Y en el plano y Z = altura (internamente `x`, `z` y `y` de three.js).
 
 Reglas que respeta el modelo:
 
-- Tipos de ubicación: `confirmed`, `computed-3d` (con radio de incertidumbre),
-  `zone` (solo zona, sin coordenadas) y `unknown`. Una ubicación de zona o
-  desconocida **nunca** se dibuja como punto en el mapa.
-- El árbol solo se asigna si la incertidumbre cabe dentro de la copa. La rama
-  **nunca** se asigna.
-- El método de rastreo depende del tamaño del ave (`MassClass`); las aves muy
-  pequeñas quedan sin dispositivo ("suitability to evaluate").
+- Una detección de zona (dispositivo con señal intermitente) o desconocida **nunca**
+  lleva coordenadas ni árbol, y no se dibuja como punto.
+- El árbol se reporta solo si la incertidumbre cabe en la copa; la rama **nunca**.
+- El movimiento sale de la línea de tiempo: con el reloj avanzando, solo cambian
+  las aves que terminan una estancia, en tránsito gradual de 1–5 minutos.
 
 Para conectar datos reales basta implementar `TrackingSource` (`latest`,
-`history`) sobre la API de rastreadores, receptores o cámaras, y cargar los
-árboles y zonas desde el inventario real en lugar del generador.
+`history`) sobre la API de rastreadores o cámaras y cargar especies, aves y
+árboles desde el inventario real en lugar de `generateRegistry`.

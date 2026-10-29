@@ -1,8 +1,6 @@
-import { AviaryMonitor } from "@/features/aviary/monitor/AviaryMonitor";
+import { redirect } from "next/navigation";
 
-// The demo generates its data in the browser; there is no UI to validate on the server.
-export const instant = false;
-
+// The monitor is the aviary home.
 export default function AviaryMonitorPage() {
-  return <AviaryMonitor />;
+  redirect("/aviary");
 }

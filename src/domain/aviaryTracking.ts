@@ -1,17 +1,17 @@
 /**
- * Aviary tracking concept: the data model behind the 3D monitor.
+ * Aviary demo: the data model behind the 3D monitor.
  *
- * Everything here is a design for The Rainforest aviary, not a survey of it.
- * The layout, trees, species catalogue, devices and detections are DEMO data
- * until SeaWorld provides plans, a tree inventory and its species list.
+ * Everything here is DEMO data for The Rainforest aviary: the 32-species
+ * catalogue, the 500 individuals, the layout, trees, devices and detections
+ * are fictional and do not describe SeaWorld Abu Dhabi's collection.
  *
- * The types are the contract a real source (trackers, receivers, cameras,
- * keeper logs) would have to fill through the API. See `TrackingSource`.
+ * The types are the contract a real source (trackers, receivers, cameras)
+ * would fill through an API. See `TrackingSource`.
  */
 
 /* ---------- Conceptual space ---------- */
 
-/** Plan coordinates in metres on a conceptual footprint: x east, z south, y up. */
+/** Plan coordinates in metres on a conceptual footprint: x east, z south, y up (height). */
 export interface Vec3 {
   x: number;
   y: number;
@@ -84,14 +84,14 @@ export function zoneAt(x: number, z: number): MonitorZone | null {
   return MONITOR_ZONES.find((zn) => zn.sector && deg >= zn.sector[0] && deg < zn.sector[1]) ?? null;
 }
 
-/* ---------- Trees and structures ---------- */
+/* ---------- Trees ---------- */
 
 export type TreeForm = "emergent" | "broadleaf" | "palm";
 
 export interface AviaryTree {
-  /** Working code (T1, T2…). Final codes come with the real tree inventory. */
+  /** Working code (T1, T2…). Final codes would come with a real tree inventory. */
   id: string;
-  /** Plant species; null until the tree inventory exists. */
+  /** Plant species; null in the demo. */
   plantSpecies: string | null;
   form: TreeForm;
   x: number;
@@ -99,74 +99,72 @@ export interface AviaryTree {
   zoneId: string;
   heightM: number;
   crownRadiusM: number;
-  /** Heights of the main branch tiers drawn in the side view. Schematic, not surveyed. */
+  /** Simulated reference points (branch tiers) used by the side view. Not surveyed. */
   branchTiersM: number[];
   simulated: true;
 }
 
-export interface AviaryStructure {
-  id: string;
-  name: string;
-  kind: "platform" | "walkway";
-  x: number;
-  z: number;
-  heightM: number;
-  zoneId: string;
-}
-
 /* ---------- Species and individuals ---------- */
 
-/** Group as published by SeaWorld (see aviary.ts), so honesty labels stay consistent. */
-export type SpeciesGroup = "toucan" | "parrot" | "flamingo" | "other";
+export type SpeciesGroup = "toucan" | "parrot" | "turaco" | "pigeon" | "galliform" | "wader" | "other";
 
-/** Body-mass class: drives which tracking method is even plausible. */
-export type MassClass = "tiny" | "small" | "medium" | "large";
+export const GROUP_LABEL: Record<SpeciesGroup, string> = {
+  toucan: "Toucans",
+  parrot: "Parrots & macaws",
+  turaco: "Turacos",
+  pigeon: "Pigeons",
+  galliform: "Pheasants & ground birds",
+  wader: "Waders",
+  other: "Others",
+};
 
 export interface MonitorSpecies {
   id: string;
   /** Prefix for demo IDs, e.g. TUC-001. Design example, not a SeaWorld identifier. */
   code: string;
   common: string;
+  /** Spanish common name, as given in the demo brief. */
+  commonEs: string;
   scientific: string;
   group: SpeciesGroup;
-  mass: MassClass;
   color: string;
-  /** Usual strata, used only by the simulator. */
+  /** Usual strata, used only by the simulator. The last one is where it roosts. */
   prefLevels: LevelId[];
   prefZones: string[];
-  /** Demo roster size. Not a head count. */
+  /** Sex is recorded only for species where it is visible (dimorphic). */
+  dimorphic: boolean;
+  /** Upper bound for demo ages, years. */
+  maxAge: number;
+  /** Count requested in the demo brief, before the total is checked. */
+  requestedCount: number;
+  /** Count actually generated (requested, adjusted so the total is exactly 500). */
   demoCount: number;
 }
 
-/**
- * How the simulated scenario locates a bird. Real methods depend on species
- * size, admissible device weight, battery life, coverage and veterinary approval.
- */
-export type TrackingMethod =
-  /** Tag + receiver network able to compute a 3D position. */
-  | "tag-3d"
-  /** Tag detected by receivers, only zone-level. */
-  | "tag-zone"
-  /** No tag: visual detections only (camera with identity match, or keeper). */
-  | "visual"
-  /** No method assigned yet. */
-  | "none";
+export type AgeClass = "juvenile" | "subadult" | "adult" | "senior";
+export type Sex = "male" | "female";
 
-export type DeviceStatus = "active" | "low-battery" | "no-signal" | "not-fitted";
+export type DeviceStatus = "active" | "low-battery" | "intermittent" | "no-signal";
 
 export interface TrackingDevice {
   id: string;
-  /** Technology is not selected; the demo only names the category. */
-  category: "Tracker · technology to be selected" | "None";
+  /** No technology is selected; the demo only names the category. */
+  category: "Tracker · demo device";
   status: DeviceStatus;
-  batteryPct: number | null;
+  batteryPct: number;
 }
 
 export interface MonitorBird {
   id: string;
   speciesId: string;
+  /** Position within its species (1-based); with the code it forms the ID. */
+  seq: number;
   name?: string;
-  method: TrackingMethod;
+  ageYears: number;
+  ageClass: AgeClass;
+  /** Null when not recorded (monomorphic species, or a juvenile that cannot be told apart). */
+  sex: Sex | null;
+  homeZoneId: string;
   device: TrackingDevice;
   /** After this moment the device stops reporting (simulated outage). */
   signalLostAt: number | null;
@@ -176,16 +174,17 @@ export interface MonitorBird {
 /* ---------- Detections ---------- */
 
 export type LocationKind =
-  /** Identity and position confirmed (e.g. camera frame matched to the tag, or keeper check). */
+  /** Identity and position confirmed (e.g. camera frame matched to the tag). */
   | "confirmed"
   /** 3D position calculated from receivers; carries an uncertainty radius. */
   | "computed-3d"
-  /** Only the zone is known. No coordinates are invented. */
+  /** Only the zone is known (weak or intermittent signal). No coordinates are invented. */
   | "zone"
   /** No valid location. */
   | "unknown";
 
-export type DetectionSource = "tracker" | "camera" | "keeper" | "fusion";
+export type DetectionSource = "tracker" | "camera" | "fusion";
+export type SignalQuality = "good" | "fair" | "weak" | "none";
 
 export interface Detection {
   birdId: string;
@@ -199,19 +198,25 @@ export interface Detection {
   precisionM: number | null;
   /** Tree only when the position falls inside its crown within the uncertainty. Never a branch. */
   treeId: string | null;
-  /** Null when the method cannot tell. */
   moving: boolean | null;
+  signal: SignalQuality;
+  /** Location confidence, 0–1. */
+  confidence: number;
   simulated: true;
 }
 
-/** A period where the bird stayed in one place: the location history unit. */
+/** A period where the bird stayed by one tree: the location history unit. */
 export interface Stay {
+  /** Stable id: bird id + sequence. Used to prove there are no duplicates. */
+  id: string;
   birdId: string;
   start: number;
   end: number;
   zoneId: string;
-  treeId: string | null;
-  structureId: string | null;
+  /** Tree the bird is in, or under (ground). Always an existing tree. */
+  treeId: string;
+  /** True when perched in the crown, false when on the ground beneath it. */
+  inCrown: boolean;
   pos: Vec3;
 }
 
@@ -226,33 +231,42 @@ export const FIX_STATUS: Record<FixStatus, { label: string; color: string; hint:
 };
 
 export const LOCATION_KIND: Record<LocationKind, { label: string; hint: string }> = {
-  confirmed: { label: "Confirmed location", hint: "Identity and position confirmed visually" },
+  confirmed: { label: "Confirmed location", hint: "Identity and position confirmed by a camera match" },
   "computed-3d": { label: "Calculated 3D position", hint: "Estimated from receivers, with an uncertainty radius" },
-  zone: { label: "Approximate zone", hint: "Only the zone is known; no coordinates" },
+  zone: { label: "Approximate zone", hint: "Weak signal: only the zone is known; no coordinates" },
   unknown: { label: "Not available", hint: "No valid location" },
-};
-
-export const METHOD_LABEL: Record<TrackingMethod, string> = {
-  "tag-3d": "Tag + receivers (3D)",
-  "tag-zone": "Tag + receivers (zone level)",
-  visual: "Visual only (camera / keeper)",
-  none: "No method assigned",
 };
 
 export const DEVICE_STATUS_LABEL: Record<DeviceStatus, string> = {
   active: "Active",
   "low-battery": "Low battery",
+  intermittent: "Intermittent signal",
   "no-signal": "No signal",
-  "not-fitted": "Not fitted · suitability to evaluate",
 };
 
-export interface TrackingDataset {
-  now: number;
-  windowStart: number;
+export const SIGNAL_LABEL: Record<SignalQuality, string> = { good: "Good", fair: "Fair", weak: "Weak", none: "None" };
+
+export const AGE_LABEL: Record<AgeClass, string> = { juvenile: "Juvenile", subadult: "Subadult", adult: "Adult", senior: "Senior" };
+
+/** The persisted demo registry: species, individuals and trees. Detections derive from it. */
+export interface DemoRegistry {
+  version: number;
+  seed: number;
+  /** Simulated clock origin (the demo's "now" when it was created). */
+  anchor: number;
+  createdAt: number;
   species: MonitorSpecies[];
   birds: MonitorBird[];
   trees: AviaryTree[];
-  structures: AviaryStructure[];
+  /** Note when the requested distribution had to be corrected to reach 500. */
+  distributionNote: string | null;
+}
+
+export interface TrackingDataset {
+  registry: DemoRegistry;
+  /** Start and end of the simulated period. */
+  windowStart: number;
+  horizon: number;
   /** Per bird, oldest first. */
   stays: Map<string, Stay[]>;
 }

@@ -65,10 +65,8 @@ const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exa
     { href: "/penguins/rules", label: "Proposed rules", icon: ListChecks },
   ],
   aviary: [
-    { href: "/aviary", label: "Overview", icon: LayoutDashboard, exact: true },
-    { href: "/aviary/monitor", label: "3D monitor", icon: Box },
+    { href: "/aviary", label: "3D monitor", icon: Box, exact: true },
     { href: "/aviary/birds", label: "Birds", icon: Feather },
-    { href: "/aviary/habitat", label: "Habitat", icon: MapIcon },
     { href: "/aviary/inventory", label: "Inventory", icon: ClipboardList },
     { href: "/aviary/rules", label: "Proposed rules", icon: ListChecks },
   ],

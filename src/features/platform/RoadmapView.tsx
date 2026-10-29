@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleHelp, Database, ExternalLink, FlaskConical, Ban } from "lucide-react";
-import { AVIARY_ESTIMATE, INVENTORY_REQUEST, SEAWORLD_REALMS_SOURCE } from "@/domain/aviary";
+import { INVENTORY_REQUEST, SEAWORLD_REALMS_SOURCE } from "@/domain/aviary";
 import { Badge, Card } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/shell/AppShell";
 
@@ -17,9 +17,9 @@ const DATA_STATUS: { item: string; status: Status; detail: string; source?: bool
   { item: "Penguin species (6)", status: "sourced", detail: "King, Gentoo, Chinstrap, Macaroni, Rockhopper and Adélie are named by SeaWorld Abu Dhabi for the Antarctica realm.", source: true },
   { item: "Penguin head count (206)", status: "pending", detail: "Demo scenario figure from the meeting. Not a confirmed inventory; split per species is a demo assumption." },
   { item: "Penguin locations, activity and movements", status: "simulated", detail: "Generated readings every 30 minutes. They illustrate what a validated tracking setup could provide." },
-  { item: "Aviary species groups", status: "sourced", detail: "Toucans and parrots (The Rainforest aviary) and Caribbean flamingos (Flamingo Point) are named publicly. No species list or counts are published.", source: true },
-  { item: `Aviary size (${AVIARY_ESTIMATE.label})`, status: "pending", detail: "Estimate mentioned in the meeting. The demo roster of 500 records only stands in for it." },
-  { item: "Aviary sightings and zones", status: "simulated", detail: "Manual keeper sightings at zone level, on an illustrative layout. No tags or live positions are assumed." },
+  { item: "Aviary species groups", status: "sourced", detail: "Toucans and parrots (The Rainforest aviary) are named publicly. No species list or counts are published.", source: true },
+  { item: "Aviary demo registry (32 species, 500 birds)", status: "simulated", detail: "Catalogue and counts chosen for the demo; every bird, tree, device, position and movement is fictional." },
+  { item: "Real aviary inventory and layout", status: "pending", detail: "Species list, head counts, plans and tree inventory would come from SeaWorld." },
   { item: "Health follow-up cases, care notes, teams, people", status: "simulated", detail: "Fictional records to show the workflow. No clinical data is used." },
 ];
 

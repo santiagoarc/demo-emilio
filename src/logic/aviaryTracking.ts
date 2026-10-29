@@ -33,15 +33,11 @@ export function fixStatus(det: Detection | null, asOf: number): FixStatus {
 /** Latest detection of every bird as of a moment. */
 export function snapshot(ds: TrackingDataset, src: TrackingSource, asOf: number): Map<string, Fix> {
   const out = new Map<string, Fix>();
-  for (const bird of ds.birds) {
+  for (const bird of ds.registry.birds) {
     const det = src.latest(bird.id, asOf);
     out.set(bird.id, { bird, det, status: fixStatus(det, asOf), levelId: det?.pos ? levelOf(det.pos.y).id : null });
   }
   return out;
-}
-
-export function locationKind(fix: Fix): LocationKind {
-  return fix.det?.kind ?? "unknown";
 }
 
 /** Data quality, from the kind of location and how old it is. */
@@ -55,8 +51,9 @@ export function dataQuality(fix: Fix): { label: string; tone: "ok" | "info" | "w
   return { label: "Medium · wide uncertainty", tone: "info" };
 }
 
-/** One row of location history, showing only what the method can tell. */
+/** One row of location history, showing only what the device can tell. */
 export interface HistoryRow {
+  id: string;
   start: number;
   end: number;
   zoneId: string;
@@ -65,37 +62,59 @@ export interface HistoryRow {
   kind: LocationKind;
 }
 
-export function historyRows(bird: MonitorBird, stays: Stay[]): HistoryRow[] {
+export function historyRows(bird: MonitorBird, stays: Stay[], asOf: number): HistoryRow[] {
+  const zoneOnly = bird.device.status === "intermittent";
   return stays
-    .map((s) => {
-      const end = Math.min(s.end, bird.signalLostAt ?? s.end);
-      if (bird.method === "tag-zone") return { start: s.start, end, zoneId: s.zoneId, treeId: null, heightM: null, kind: "zone" as const };
-      if (bird.method === "visual") return { start: s.start, end, zoneId: s.zoneId, treeId: s.treeId, heightM: s.pos.y, kind: "confirmed" as const };
-      return { start: s.start, end, zoneId: s.zoneId, treeId: s.treeId, heightM: s.pos.y, kind: "computed-3d" as const };
-    })
+    .filter((s) => s.start <= asOf)
+    .map((s) => ({
+      id: s.id,
+      start: s.start,
+      end: Math.min(s.end, asOf, bird.signalLostAt ?? Infinity),
+      zoneId: s.zoneId,
+      treeId: zoneOnly ? null : s.treeId,
+      heightM: zoneOnly ? null : s.pos.y,
+      kind: zoneOnly ? ("zone" as const) : ("computed-3d" as const),
+    }))
     .reverse();
 }
 
-/** Birds whose latest detection places them in a tree. */
+/** Birds whose latest detection places them in (or under) a tree. */
 export function treeOccupants(fixes: Map<string, Fix>, treeId: string): Fix[] {
   return [...fixes.values()].filter((f) => f.det?.treeId === treeId).sort((a, b) => (b.det!.pos?.y ?? 0) - (a.det!.pos?.y ?? 0));
 }
 
-/** Detections associated with a tree over a period (3D-located or visually confirmed birds only). */
+/** Stays at a tree over a period. Zone-only devices are left out: they cannot place a bird in a tree. */
 export function treeHistory(ds: TrackingDataset, src: TrackingSource, treeId: string, from: number, to: number) {
-  const rows: { birdId: string; start: number; end: number; heightM: number }[] = [];
-  for (const bird of ds.birds) {
-    if (bird.method !== "tag-3d" && bird.method !== "visual") continue;
-    for (const s of src.history(bird.id, from, to)) if (s.treeId === treeId) rows.push({ birdId: bird.id, start: s.start, end: Math.min(s.end, to), heightM: s.pos.y });
+  const rows: { id: string; birdId: string; start: number; end: number; heightM: number }[] = [];
+  for (const bird of ds.registry.birds) {
+    if (bird.device.status === "intermittent") continue;
+    for (const s of src.history(bird.id, from, to)) if (s.treeId === treeId && s.start <= to) rows.push({ id: s.id, birdId: bird.id, start: s.start, end: Math.min(s.end, to), heightM: s.pos.y });
   }
   return rows.sort((a, b) => b.start - a.start);
+}
+
+/** Arrivals at a new tree in the period before asOf: the movement feed. */
+export function recentMoves(ds: TrackingDataset, asOf: number, windowMs: number, limit = 12) {
+  const out: { id: string; birdId: string; at: number; fromTreeId: string | null; toTreeId: string; zoneId: string; heightM: number }[] = [];
+  for (const bird of ds.registry.birds) {
+    if (bird.signalLostAt && bird.signalLostAt < asOf) continue;
+    const list = ds.stays.get(bird.id) ?? [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const s = list[i];
+      if (s.start > asOf) continue;
+      if (s.start < asOf - windowMs) break;
+      if (i > 0 && list[i - 1].treeId === s.treeId) continue;
+      out.push({ id: s.id, birdId: bird.id, at: s.start, fromTreeId: i > 0 ? list[i - 1].treeId : null, toTreeId: s.treeId, zoneId: s.zoneId, heightM: s.pos.y });
+    }
+  }
+  return out.sort((a, b) => b.at - a.at).slice(0, limit);
 }
 
 /** Per hour over the 24 h before asOf: birds with a detection, and birds that moved. */
 export function activityByHour(ds: TrackingDataset, src: TrackingSource, asOf: number) {
   const start = Math.floor((asOf - 24 * HOUR) / HOUR) * HOUR + HOUR;
   const buckets = Array.from({ length: 24 }, (_, i) => ({ at: start + i * HOUR, detected: 0, moving: 0 }));
-  for (const bird of ds.birds) {
+  for (const bird of ds.registry.birds) {
     const stays = src.history(bird.id, start, asOf);
     const seen = new Set<number>();
     const moved = new Set<number>();
@@ -107,7 +126,7 @@ export function activityByHour(ds: TrackingDataset, src: TrackingSource, asOf: n
       if (s.end < asOf && tr >= 0 && tr < 24) moved.add(tr);
     }
     seen.forEach((h) => buckets[h].detected++);
-    if (bird.method !== "visual") moved.forEach((h) => buckets[h].moving++);
+    moved.forEach((h) => buckets[h].moving++);
   }
   return buckets;
 }

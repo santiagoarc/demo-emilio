@@ -1,15 +1,17 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState, type ReactNode } from "react";
-import { Activity, Crosshair, Feather, History, Info, Layers, MapPin, Search, TreePine, X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Activity, ArrowRight, CheckCircle2, Crosshair, Feather, Info, Layers, MapPin, Pause, Play, RotateCcw, Search, ShieldCheck, TreePine, X, XCircle } from "lucide-react";
 import {
+  AGE_LABEL,
   DEVICE_STATUS_LABEL,
   FIX_STATUS,
   FOOTPRINT,
   LEVELS,
   LOCATION_KIND,
-  METHOD_LABEL,
+  SIGNAL_LABEL,
   MONITOR_ZONES,
   MONITOR_ZONE_BY_ID,
   levelOf,
@@ -18,15 +20,18 @@ import {
   type LocationKind,
   type AviaryTree,
   type MonitorBird,
+  type SpeciesGroup,
   type TrackingDataset,
   type TrackingSource,
   type Vec3,
 } from "@/domain/aviaryTracking";
-import { MONITOR_SPECIES, MONITOR_SPECIES_BY_ID, TRACKING_HISTORY_DAYS } from "@/data/aviaryTrackingSimulate";
-import { activityByHour, dataQuality, fmtHeight, historyRows, snapshot, treeHistory, treeOccupants, type Fix } from "@/logic/aviaryTracking";
+import { MONITOR_SPECIES, MONITOR_SPECIES_BY_ID } from "@/data/aviaryCatalog";
+import { HISTORY_DAYS, STRUCTURES } from "@/data/aviaryTrackingSimulate";
+import { activityByHour, dataQuality, fmtHeight, historyRows, recentMoves, snapshot, treeHistory, treeOccupants, type Fix } from "@/logic/aviaryTracking";
+import { runDemoChecks } from "@/logic/aviaryDemoChecks";
 import { DAY, HOUR, MIN, fmtAgo, fmtDateTime, fmtTime } from "@/logic/time";
-import { useTracking } from "@/state/useTracking";
-import { Badge, Chip, Segmented, SimulatedTag, cx } from "@/components/ui/primitives";
+import { resetDemoData, useSimClock, useTracking, type TrackingState } from "@/state/useTracking";
+import { Badge, Chip, Segmented, cx } from "@/components/ui/primitives";
 import { BarList, Donut, LineChart, SplitBar } from "@/components/charts/Charts";
 import { PageHeader } from "@/components/shell/AppShell";
 import type { ScenePoint } from "./AviaryScene";
@@ -38,14 +43,22 @@ const AviaryScene = dynamic(() => import("./AviaryScene").then((m) => m.AviarySc
   loading: () => <div className="grid h-full place-items-center text-sm text-muted">Loading 3D map…</div>,
 });
 
-type GroupFilter = "all" | "toucan" | "parrot" | "flamingo" | "other";
+type GroupFilter = "all" | SpeciesGroup;
 const GROUPS: { id: GroupFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "toucan", label: "Toucans" },
   { id: "parrot", label: "Parrots" },
-  { id: "flamingo", label: "Flamingo" },
+  { id: "turaco", label: "Turacos" },
+  { id: "pigeon", label: "Pigeons" },
+  { id: "galliform", label: "Pheasants" },
+  { id: "wader", label: "Waders" },
   { id: "other", label: "Others" },
 ];
+const SPEEDS = [
+  { value: "1", label: "1×" },
+  { value: "60", label: "60×" },
+  { value: "300", label: "300×" },
+] as const;
 
 const KIND_COLOR: Record<LocationKind, string> = { confirmed: "#16A34A", "computed-3d": "#2563EB", zone: "#D97706", unknown: "#94A3B8" };
 const STATUS_ORDER: FixStatus[] = ["detected", "moving", "stale", "no-signal"];
@@ -56,14 +69,22 @@ const TIME_PRESETS = [
   { label: "−24 h", min: 1440 },
   { label: "−3 d", min: 4320 },
 ];
-const WINDOWS = { "6h": 6 * HOUR, "24h": DAY, "7d": TRACKING_HISTORY_DAYS * DAY } as const;
+const WINDOWS = { "6h": 6 * HOUR, "24h": DAY, "7d": HISTORY_DAYS * DAY } as const;
 type WindowId = keyof typeof WINDOWS;
 
 const STATUS_TONE: Record<FixStatus, "ok" | "info" | "warn" | "danger"> = { detected: "ok", moving: "info", stale: "warn", "no-signal": "danger" };
 
 export function AviaryMonitor() {
-  const { ds, src, treeById } = useTracking();
-  const now = ds.now;
+  const t = useTracking();
+  // A reset creates a new registry: remount so every piece of state starts over.
+  return <Monitor key={t.registry.createdAt} {...t} />;
+}
+
+function Monitor({ registry, origin, ds, src, treeById, birdById }: TrackingState) {
+  const { clock, set: setClock, restart } = useSimClock(registry, ds.horizon);
+  const now = clock.simTime;
+  const params = useSearchParams();
+  const paramBird = params.get("bird");
 
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<GroupFilter>("all");
@@ -132,7 +153,7 @@ export function AviaryMonitor() {
   const selTree = treeId ? treeById.get(treeId) ?? null : null;
 
   const trail = useMemo(() => {
-    if (!birdId || !showTrail || !selFix || selFix.bird.method !== "tag-3d") return null;
+    if (!birdId || !showTrail || !selFix || selFix.bird.device.status === "intermittent") return null;
     return src.history(birdId, asOf - WINDOWS[win], asOf).filter((s) => s.start <= asOf).map((s) => s.pos);
   }, [birdId, showTrail, selFix, src, asOf, win]);
 
@@ -154,6 +175,16 @@ export function AviaryMonitor() {
     setTreeId(id);
     if (t) setFocus({ pos: { x: t.x, y: t.heightM * 0.55, z: t.z }, key: Date.now() });
   };
+  // Opened from the registry (?bird=ID): select it and fly to it once.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (paramBird && birdById.has(paramBird)) selectBird(paramBird);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramBird]);
+
+  const checks = useMemo(() => runDemoChecks(ds, src, fixes, origin), [ds, src, origin, fixes]);
+  const moves = useMemo(() => recentMoves(ds, asOf, 30 * MIN, 10), [ds, asOf]);
+
   const clearSelection = () => {
     setBirdId(null);
     setTreeId(null);
@@ -193,17 +224,18 @@ export function AviaryMonitor() {
         title="Aviary monitor"
         subtitle={
           <>
-            Where each bird was last located, in which tree and at what height. <SimulatedTag />
+            Where each bird was last located, in which tree and at what height.{" "}
+            <span className="ml-1 inline-flex items-center rounded-md bg-warn px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white">DEMO / SIMULATED DATA</span>
           </>
         }
-        actions={<TimeControl now={now} offsetMin={offsetMin} onChange={setOffsetMin} />}
+        actions={<ClockControl clock={clock} onClock={setClock} onRestart={restart} start={ds.windowStart} offsetMin={offsetMin} onOffset={setOffsetMin} />}
       />
 
       <div className="space-y-4 px-6 lg:px-8">
         <div role="note" className="flex items-start gap-2.5 rounded-xl border border-dashed border-warn/45 bg-warn/[0.06] px-3.5 py-2.5 text-xs text-muted">
           <Info size={15} className="mt-px shrink-0 text-warn" aria-hidden />
           <p>
-            <span className="font-medium text-ink">DEMO.</span> Conceptual layout, tree codes, species catalogue (30 illustrative species), devices and every detection are simulated. They are not The Rainforest’s plans, inventory or head counts. No tracking technology has been selected; positions, heights and precisions only show what a validated setup would need to deliver.
+            <span className="font-medium text-ink">DEMO / SIMULATED DATA.</span> The 32-species catalogue, the {registry.birds.length} birds, their ages, sexes, devices, trees, positions, heights and movements are fictional and generated for this demonstration. They are not SeaWorld Abu Dhabi’s collection or layout. Movement runs on a simulated clock; it is not real-time tracking.
           </p>
         </div>
 
@@ -219,7 +251,7 @@ export function AviaryMonitor() {
               )}
             </div>
             <p className="text-[11px] text-muted">
-              {MONITOR_SPECIES.length} species · {ds.birds.length} individuals <span className="text-faint">· demo catalogue</span>
+              {registry.species.length} species · {registry.birds.length} individuals <span className="text-faint">· demo data</span>
             </p>
             <label className="relative mt-3 block">
               <span className="sr-only">Search birds by ID, species or name</span>
@@ -300,7 +332,7 @@ export function AviaryMonitor() {
               )}
             </div>
             <p className="mt-3 border-t border-line pt-2 text-[10px] leading-snug text-faint">
-              Species are illustrative examples of tropical aviary birds. Only toucans, parrots and Caribbean flamingos are named publicly by SeaWorld; none is confirmed as a species list or count.
+              Demo catalogue for this presentation. Counts and individuals are fictional and do not represent any real collection.
             </p>
           </aside>
 
@@ -348,7 +380,7 @@ export function AviaryMonitor() {
                 </MiniSelect>
                 <MiniSelect label="Tree" value={treeFilter ?? ""} onChange={(v) => setTreeFilter(v || null)}>
                   <option value="">All trees</option>
-                  {ds.trees.map((t) => (
+                  {registry.trees.map((t) => (
                     <option key={t.id} value={t.id}>{t.id} · {MONITOR_ZONE_BY_ID[t.zoneId].code} · {t.heightM.toFixed(0)} m</option>
                   ))}
                 </MiniSelect>
@@ -357,8 +389,8 @@ export function AviaryMonitor() {
             </div>
             <div className="relative h-[460px] sm:h-[540px] xl:h-auto xl:flex-1">
               <AviaryScene
-                trees={ds.trees}
-                structures={ds.structures}
+                trees={registry.trees}
+                structures={STRUCTURES}
                 points={points}
                 selectedBirdId={birdId}
                 selectedTreeId={treeId ?? treeFilter}
@@ -439,6 +471,11 @@ export function AviaryMonitor() {
         </div>
 
         <BottomPanels fixes={visible} all={fixes} ds={ds} src={src} asOf={asOf} level={level} onLevel={setLevel} zoneId={zoneId} onZone={setZoneId} />
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <MovementFeed moves={moves} asOf={asOf} onSelect={selectBird} />
+          <ChecksCard checks={checks} />
+        </div>
       </div>
     </div>
   );
@@ -490,10 +527,11 @@ function TreeCard({ tree, colorBy, fixes, asOf, now, compact, selectedBirdId, on
       </header>
       {!compact && (
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <Field k="Plant species" v={tree.plantSpecies ?? <span className="text-warn">Not inventoried</span>} />
+          <Field k="Plant species" v={tree.plantSpecies ?? <span className="text-muted">Not set (demo tree)</span>} />
           <Field k="Form" v={`${tree.form[0].toUpperCase()}${tree.form.slice(1)} (schematic)`} />
           <Field k="Total height" v={`${tree.heightM.toFixed(1)} m`} />
-          <Field k="Coordinates" v={<span className="num">x {tree.x.toFixed(0)} · z {tree.z.toFixed(0)} m</span>} />
+          <Field k="Coordinates" v={<span className="num">X {tree.x.toFixed(1)} · Y {tree.z.toFixed(1)} m</span>} />
+            <Field k="Reference points" v={<span className="num">{tree.branchTiersM.map((h, i) => `R${i + 1} ${h.toFixed(1)} m`).join(" · ")}</span>} />
           <Field k="Levels" v={levels.join(", ")} />
           <Field k="Birds now" v={<span className="num font-semibold">{occ.length}</span>} />
           <Field k="Last activity" v={Number.isFinite(lastActivity) ? `${fmtTime(lastActivity)} · ${fmtAgo(lastActivity, asOf)}` : "None in 24 h"} />
@@ -551,37 +589,118 @@ function MiniSelect({ label, value, onChange, children }: { label: string; value
   );
 }
 
-function TimeControl({ now, offsetMin, onChange }: { now: number; offsetMin: number; onChange: (m: number) => void }) {
-  const max = TRACKING_HISTORY_DAYS * 24 * 60 - 60;
+function ClockControl({ clock, onClock, onRestart, start, offsetMin, onOffset }: {
+  clock: { simTime: number; speed: number; playing: boolean };
+  onClock: (p: Partial<{ speed: number; playing: boolean }>) => void;
+  onRestart: () => void;
+  start: number;
+  offsetMin: number;
+  onOffset: (m: number) => void;
+}) {
+  const max = Math.max(60, Math.floor((clock.simTime - start) / MIN) - 60);
   return (
-    <div className="panel flex flex-wrap items-center gap-2 px-3 py-2">
-      <History size={15} className="text-muted" aria-hidden />
-      <div className="flex gap-1">
+    <div className="panel flex flex-col gap-2 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-warn">Simulated clock</span>
+        <span className="num text-sm font-semibold text-ink">{fmtDateTime(clock.simTime, clock.simTime)}</span>
+        <button
+          onClick={() => onClock({ playing: !clock.playing })}
+          className="inline-flex h-7 items-center gap-1 rounded-lg bg-accent px-2 text-xs font-medium text-white"
+          aria-label={clock.playing ? "Pause simulation" : "Play simulation"}
+        >
+          {clock.playing ? <Pause size={13} /> : <Play size={13} />} {clock.playing ? "Pause" : "Play"}
+        </button>
+        <Segmented size="sm" value={String(clock.speed)} onChange={(v) => onClock({ speed: Number(v) })} options={SPEEDS.map((o) => ({ value: o.value as string, label: o.label }))} />
+        <button onClick={onRestart} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:bg-ink/5 hover:text-ink" title="Restart the simulated clock" aria-label="Restart the simulated clock">
+          <RotateCcw size={13} />
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
         {TIME_PRESETS.map((p) => (
           <button
             key={p.label}
-            onClick={() => onChange(p.min)}
-            className={cx("h-7 rounded-lg px-2 text-xs font-medium", offsetMin === p.min ? "bg-accent text-white" : "text-muted hover:bg-ink/5 hover:text-ink")}
+            onClick={() => onOffset(p.min)}
+            className={cx("h-6 rounded-md px-1.5 text-[11px] font-medium", offsetMin === p.min ? "bg-ink/10 text-ink" : "text-muted hover:bg-ink/5 hover:text-ink")}
           >
             {p.label}
           </button>
         ))}
+        <label className="ml-1 flex items-center gap-1.5 text-[11px] text-muted">
+          <span className="sr-only">Look back in time</span>
+          <input
+            type="range"
+            min={0}
+            max={max}
+            step={15}
+            value={max - Math.min(offsetMin, max)}
+            onChange={(e) => onOffset(max - Number(e.target.value))}
+            className="w-28 accent-[var(--accent)]"
+            aria-valuetext={offsetMin ? `${Math.round(offsetMin / 60)} hours earlier` : "Current simulated time"}
+          />
+          {offsetMin > 0 && <span className="num whitespace-nowrap text-warn">viewing {fmtDateTime(clock.simTime - offsetMin * MIN, clock.simTime)}</span>}
+        </label>
       </div>
-      <label className="flex items-center gap-2 text-xs text-muted">
-        <span className="sr-only">Time offset</span>
-        <input
-          type="range"
-          min={0}
-          max={max}
-          step={15}
-          value={max - offsetMin}
-          onChange={(e) => onChange(max - Number(e.target.value))}
-          className="w-32 accent-[var(--accent)]"
-          aria-valuetext={offsetMin ? `${Math.round(offsetMin / 60)} hours ago` : "Live"}
-        />
-        <span className="num w-[118px] whitespace-nowrap text-ink">{offsetMin ? fmtDateTime(now - offsetMin * MIN, now) : `Live · ${fmtTime(now)}`}</span>
-      </label>
     </div>
+  );
+}
+
+function MovementFeed({ moves, asOf, onSelect }: { moves: ReturnType<typeof recentMoves>; asOf: number; onSelect: (id: string) => void }) {
+  return (
+    <section className="panel p-4">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+        <ArrowRight size={15} className="text-accent" /> Recent movements <Badge>Simulated</Badge>
+      </h2>
+      <p className="mt-0.5 text-[11px] text-muted">Arrivals at a new tree in the last 30 simulated minutes. Each one updates the bird’s coordinates, height, tree and history.</p>
+      {moves.length === 0 ? (
+        <p className="py-6 text-center text-xs text-muted">No movements in this period (birds roost at night).</p>
+      ) : (
+        <ul className="mt-2 space-y-0.5">
+          {moves.map((m) => (
+            <li key={m.id}>
+              <button onClick={() => onSelect(m.birdId)} className="grid w-full grid-cols-[48px_72px_1fr_auto] items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs hover:bg-ink/[0.04]">
+                <span className="num text-muted">{fmtTime(m.at)}</span>
+                <span className="font-mono font-semibold text-ink">{m.birdId}</span>
+                <span className="truncate text-muted">
+                  {m.fromTreeId ?? "—"} → <span className="font-medium text-ink">{m.toTreeId}</span> · {MONITOR_ZONE_BY_ID[m.zoneId].code} · {m.heightM.toFixed(1)} m
+                </span>
+                <span className="num text-[10px] text-faint">{fmtAgo(m.at, asOf)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+export function ChecksCard({ checks }: { checks: ReturnType<typeof runDemoChecks> }) {
+  const ok = checks.filter((c) => c.pass).length;
+  return (
+    <section className="panel p-4">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+        <ShieldCheck size={15} className="text-accent" /> Demo data checks
+        <Badge tone={ok === checks.length ? "ok" : "danger"}>
+          {ok}/{checks.length} passed
+        </Badge>
+      </h2>
+      <ul className="mt-2 space-y-1.5">
+        {checks.map((c) => (
+          <li key={c.id} className="flex gap-2 text-xs">
+            {c.pass ? <CheckCircle2 size={14} className="mt-px shrink-0 text-ok" /> : <XCircle size={14} className="mt-px shrink-0 text-danger" />}
+            <span>
+              <span className="font-medium text-ink">{c.label}</span>
+              <span className="block text-[11px] text-muted">{c.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <button
+        onClick={() => window.confirm("Generate a new demo registry? The demo birds, trees and clock stored in this browser are replaced.") && resetDemoData()}
+        className="mt-3 text-[11px] font-medium text-muted underline-offset-2 hover:text-ink hover:underline"
+      >
+        Reset demo data
+      </button>
+    </section>
   );
 }
 
@@ -663,7 +782,7 @@ function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, onTrail, 
   const { bird, det, status } = fix;
   const sp = MONITOR_SPECIES_BY_ID[bird.speciesId];
   const quality = dataQuality(fix);
-  const rows = useMemo(() => historyRows(bird, src.history(bird.id, asOf - WINDOWS[win], asOf).filter((s) => s.start <= asOf)), [bird, src, asOf, win]);
+  const rows = useMemo(() => historyRows(bird, src.history(bird.id, asOf - WINDOWS[win], asOf), asOf), [bird, src, asOf, win]);
   const kind: LocationKind = det?.kind ?? "unknown";
   const level = det?.pos ? levelOf(det.pos.y) : null;
 
@@ -708,20 +827,22 @@ function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, onTrail, 
             <Field k="Species code" v={sp.code} />
             <Field k="Common name" v={sp.common} />
             <Field k="Scientific name" v={<i>{sp.scientific}</i>} />
-            <Field k="Species status" v={<span className="text-warn">{sp.group === "other" ? "Illustrative · not confirmed" : "Group named publicly · species TBC"}</span>} />
-            <Field k="Tracking method" v={METHOD_LABEL[bird.method]} />
-            <Field k="Device" v={bird.device.id === "—" ? "None" : <span className="font-mono">{bird.device.id}</span>} />
+            <Field k="Spanish name" v={sp.commonEs} />
+            <Field k="Age" v={`${AGE_LABEL[bird.ageClass]} · ${bird.ageYears.toFixed(1)} y`} />
+            <Field k="Sex" v={bird.sex ? bird.sex[0].toUpperCase() + bird.sex.slice(1) : <span className="text-muted">{sp.dimorphic ? "Not distinguishable yet" : "Not recorded"}</span>} />
+            <Field k="Home zone" v={`${MONITOR_ZONE_BY_ID[bird.homeZoneId].code} · ${MONITOR_ZONE_BY_ID[bird.homeZoneId].name}`} />
+            <Field k="Device" v={<span className="font-mono">{bird.device.id}</span>} />
             <Field
               k="Device status"
               v={
                 <>
                   {DEVICE_STATUS_LABEL[bird.device.status]}
-                  {bird.device.batteryPct != null && <span className="text-muted"> · {bird.device.batteryPct}%</span>}
+                  <span className="text-muted"> · {bird.device.batteryPct}%</span>
                 </>
               }
             />
             <div className="col-span-2 rounded-lg bg-ink/[0.03] px-2.5 py-2 text-[11px] text-muted">
-              Device category: {bird.device.category}. Suitability depends on body size, admissible weight, battery life, coverage and veterinary approval.
+              All values are fictional demo data. A real device would be chosen by species size, admissible weight, battery life, coverage and veterinary approval.
             </div>
           </dl>
         )}
@@ -747,10 +868,12 @@ function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, onTrail, 
               <Field k="Precision" v={det?.precisionM != null ? `± ${det.precisionM.toFixed(1)} m` : det?.kind === "zone" ? "Zone level" : "—"} />
               <Field k="Last detection" v={det ? `${fmtTime(det.at)} · ${fmtAgo(det.at, asOf)}` : "Never"} />
               <Field k="Source" v={det ? det.source[0].toUpperCase() + det.source.slice(1) : "—"} />
-              <Field k="Coordinates" v={det?.pos ? <span className="num">{det.pos.x.toFixed(1)}, {det.pos.z.toFixed(1)} · {det.pos.y.toFixed(1)} m</span> : "Not available"} />
+              <Field k="Coordinates" v={det?.pos ? <span className="num">X {det.pos.x.toFixed(1)} · Y {det.pos.z.toFixed(1)} · Z {det.pos.y.toFixed(1)}</span> : "Not available"} />
+              <Field k="Signal quality" v={det ? SIGNAL_LABEL[status === "no-signal" ? "none" : det.signal] : "None"} />
+              <Field k="Location confidence" v={det ? `${Math.round(det.confidence * 100)}%` : "—"} />
               <Field k="Movement" v={det?.moving == null ? "Not determinable" : det.moving ? "In transit" : "Perched / stationary"} />
             </dl>
-            <p className="mt-2 text-[10px] text-faint">Precision values are simulated · pending validation. Coordinates are on the conceptual layout. Demo clock {fmtDateTime(now, now)}.</p>
+            <p className="mt-2 text-[10px] text-faint">Precision values are simulated · pending validation. Coordinates are on the conceptual layout (Z = height). Simulated clock {fmtDateTime(now, now)}.</p>
             {!det?.pos && (
               <p className="mt-2 rounded-lg bg-warn/[0.08] px-2.5 py-2 text-[11px] text-ink">
                 {det?.kind === "zone"
@@ -768,19 +891,19 @@ function BirdCard({ fix, asOf, now, tab, onTab, win, onWin, showTrail, onTrail, 
           <div className="mt-3">
             <div className="flex items-center justify-between gap-2">
               <Segmented size="sm" value={win} onChange={onWin} options={[{ value: "6h" as const, label: "6 h" }, { value: "24h" as const, label: "24 h" }, { value: "7d" as const, label: "7 days" }]} />
-              {bird.method === "tag-3d" && (
+              {bird.device.status !== "intermittent" && (
                 <label className="flex items-center gap-1.5 text-[11px] text-muted">
                   <input type="checkbox" checked={showTrail} onChange={(e) => onTrail(e.target.checked)} className="accent-[var(--accent)]" /> Path on map
                 </label>
               )}
             </div>
-            <p className="mt-2 text-[11px] text-muted">{rows.length} locations · {METHOD_LABEL[bird.method]}</p>
+            <p className="mt-2 text-[11px] text-muted">{rows.length} locations · device {DEVICE_STATUS_LABEL[bird.device.status].toLowerCase()}</p>
             {rows.length === 0 ? (
               <p className="py-6 text-center text-xs text-muted">No locations in this period.</p>
             ) : (
               <ol className="scroll-thin mt-1.5 max-h-72 space-y-1 overflow-y-auto">
-                {rows.map((r, i) => (
-                  <li key={`${r.start}-${i}`} className="grid grid-cols-[78px_1fr_auto] items-center gap-2 rounded-md px-1.5 py-1 text-xs odd:bg-ink/[0.025]">
+                {rows.map((r) => (
+                  <li key={r.id} className="grid grid-cols-[78px_1fr_auto] items-center gap-2 rounded-md px-1.5 py-1 text-xs odd:bg-ink/[0.025]">
                     <span className="num text-muted">{fmtTime(r.start)}–{fmtTime(Math.min(r.end, asOf))}</span>
                     <span className="truncate text-ink">
                       {MONITOR_ZONE_BY_ID[r.zoneId].code}
@@ -816,7 +939,9 @@ function BottomPanels({ fixes, all, ds, src, asOf, level, onLevel, zoneId, onZon
   const byLevel = LEVELS.map((l) => ({ l, n: withHeight.filter((f) => f.levelId === l.id).length }));
   const byStatus = STATUS_ORDER.map((s) => ({ s, n: fixes.filter((f) => f.status === s).length }));
   const byKind = (Object.keys(LOCATION_KIND) as LocationKind[]).map((k) => ({ k, n: fixes.filter((f) => (f.det?.kind ?? "unknown") === k).length }));
-  const activity = useMemo(() => activityByHour(ds, src, asOf), [ds, src, asOf]);
+  // Recomputed every 5 simulated minutes, not on every clock tick.
+  const bucket = Math.floor(asOf / (5 * MIN)) * 5 * MIN;
+  const activity = useMemo(() => activityByHour(ds, src, bucket), [ds, src, bucket]);
   const total = fixes.length;
   const pct = (n: number, d = total) => (d ? `${Math.round((n / d) * 100)}%` : "—");
 
@@ -862,7 +987,7 @@ function BottomPanels({ fixes, all, ds, src, asOf, level, onLevel, zoneId, onZon
           />
         </div>
         <p className="mt-3 text-[10px] text-faint">
-          {withHeight.length} birds with an estimated height. {total - withHeight.length} have no height (zone-level method or no location) and are not assigned a level. Ranges are provisional.
+          {withHeight.length} birds with an estimated height. {total - withHeight.length} have no height (weak signal: zone only, or no location) and are not assigned a level. Ranges are provisional.
         </p>
       </section>
 
