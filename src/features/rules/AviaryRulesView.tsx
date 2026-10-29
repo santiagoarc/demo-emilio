@@ -33,7 +33,7 @@ export function AviaryRulesView() {
         evaluate: (n) =>
           [...fixes.values()]
             .filter((f) => !f.det || asOf - f.det.at >= n * HOUR)
-            .map((f) => ({ key: f.bird.id, label: label(f.bird.id), detail: f.det ? `last ${fmtAgo(f.det.at, asOf)}` : "never detected", href: `/aviary?bird=${f.bird.id}` })),
+            .map((f) => ({ key: f.bird.id, label: label(f.bird.id), detail: f.det ? `last ${fmtAgo(f.det.at, asOf)}` : "never detected", href: `/aviary/map?bird=${f.bird.id}` })),
       },
       {
         id: "low-battery",
@@ -48,7 +48,7 @@ export function AviaryRulesView() {
           registry.birds
             .filter((b) => b.device.batteryPct <= n)
             .sort((a, b) => a.device.batteryPct - b.device.batteryPct)
-            .map((b) => ({ key: b.id, label: label(b.id), detail: `${b.device.id} · ${b.device.batteryPct}%`, href: `/aviary?bird=${b.id}` })),
+            .map((b) => ({ key: b.id, label: label(b.id), detail: `${b.device.id} · ${b.device.batteryPct}%`, href: `/aviary/map?bird=${b.id}` })),
       },
       {
         id: "away-from-home",
@@ -65,7 +65,7 @@ export function AviaryRulesView() {
               const h = src.history(b.id, asOf - n * HOUR, asOf);
               return h.length > 0 && h.every((s) => s.zoneId !== b.homeZoneId);
             })
-            .map((b) => ({ key: b.id, label: label(b.id), detail: `usual zone ${MONITOR_ZONE_BY_ID[b.homeZoneId].name}`, href: `/aviary?bird=${b.id}` })),
+            .map((b) => ({ key: b.id, label: label(b.id), detail: `usual zone ${MONITOR_ZONE_BY_ID[b.homeZoneId].name}`, href: `/aviary/map?bird=${b.id}` })),
       },
       {
         id: "crowded-tree",

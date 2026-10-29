@@ -116,8 +116,9 @@ especie con lo que envíe SeaWorld (`INVENTORY_REQUEST`).
 
 ## Monitor 3D del aviario (oct-2026)
 
-Ruta `/aviary`. Es la única fuente de datos del aviario: el registro, el
-inventario y las reglas usan los mismos 500 ejemplares. Todo es **DEMO**.
+Rutas `/aviary` (Overview) y `/aviary/map` (Habitat map), con la misma estructura
+que el área de pingüinos. Es la única fuente de datos del aviario: el registro,
+Species y las reglas usan los mismos 500 ejemplares. Todo es **DEMO**.
 
 | Archivo | Qué contiene |
 | --- | --- |
@@ -128,7 +129,7 @@ inventario y las reglas usan los mismos 500 ejemplares. Todo es **DEMO**.
 | `src/state/useTracking.ts` | Carga el registro una vez por sesión, `resetDemoData` y `useSimClock` (reloj simulado con play/pausa y velocidad). |
 | `src/logic/aviaryTracking.ts` | Estado de la ubicación, calidad, historial, ocupantes de un árbol, movimientos recientes y actividad por hora. |
 | `src/logic/aviaryDemoChecks.ts` | Validaciones obligatorias (32 especies, 500 aves, IDs únicos, árboles existentes, alturas coherentes, sin duplicados, persistencia). Se muestran en el monitor y en Inventory. |
-| `src/features/aviary/monitor/` | Pantalla, escena three.js y vista lateral del árbol. |
+| `src/features/aviary/` | `AviaryOverview`, `AviaryMapView`, `BirdRegistry`, `AviaryInventory` (Species). En `monitor/`: escena three.js (`AviaryScene`), piezas compartidas (`AviaryParts`) y vista lateral del árbol. |
 
 Coordenadas: X/Y en el plano y Z = altura (internamente `x`, `z` y `y` de three.js).
 
@@ -138,7 +139,9 @@ Reglas que respeta el modelo:
   lleva coordenadas ni árbol, y no se dibuja como punto.
 - El árbol se reporta solo si la incertidumbre cabe en la copa; la rama **nunca**.
 - El movimiento sale de la línea de tiempo: con el reloj avanzando, solo cambian
-  las aves que terminan una estancia, en tránsito gradual de 1–5 minutos.
+  las aves que terminan una estancia. El trayecto dura según la distancia (vuelo
+  ~2–3.5 m/s en arco, caminata ~0.6 m/s en el suelo) y en el mapa cada punto se
+  desliza cuadro a cuadro hacia su posición ("Smooth motion").
 
 Para conectar datos reales basta implementar `TrackingSource` (`latest`,
 `history`) sobre la API de rastreadores o cámaras y cargar especies, aves y

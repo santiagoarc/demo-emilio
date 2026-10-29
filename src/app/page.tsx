@@ -1,8 +1,6 @@
-import { PlatformOverview } from "@/features/platform/PlatformOverview";
+import { redirect } from "next/navigation";
 
-// The demo generates its data in the browser; there is no UI to validate on the server.
-export const instant = false;
-
+// Only two areas remain (Penguins, Aviary); Penguins opens first.
 export default function Home() {
-  return <PlatformOverview />;
+  redirect("/penguins/overview");
 }

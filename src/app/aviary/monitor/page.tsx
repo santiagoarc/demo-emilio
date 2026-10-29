@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// The monitor is the aviary home.
+// The 3D monitor is now the aviary Habitat map.
 export default function AviaryMonitorPage() {
-  redirect("/aviary");
+  redirect("/aviary/map");
 }

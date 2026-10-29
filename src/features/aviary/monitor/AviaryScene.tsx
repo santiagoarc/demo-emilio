@@ -27,6 +27,14 @@ export interface ScenePoint {
   label: string;
 }
 
+export interface SceneLayers {
+  zones: boolean;
+  labels: boolean;
+  dome: boolean;
+}
+
+export const DEFAULT_SCENE_LAYERS: SceneLayers = { zones: true, labels: true, dome: true };
+
 export interface AviarySceneProps {
   trees: AviaryTree[];
   structures: typeof STRUCTURES;
@@ -43,6 +51,9 @@ export interface AviarySceneProps {
   /** Change `key` to fly the camera to `pos`. */
   focus: { pos: Vec3; key: number } | null;
   dimTrees: boolean;
+  /** Glide markers to their new position instead of jumping. */
+  smooth?: boolean;
+  layers?: SceneLayers;
   onSelectBird: (id: string) => void;
   onSelectTree: (id: string) => void;
   onSelectZone: (id: string) => void;
@@ -134,6 +145,9 @@ interface Rig {
   precision: THREE.Mesh;
   treeRing: THREE.Mesh;
   trail: THREE.Line;
+  zoneEdges: THREE.Object3D[];
+  /** Bird markers: shown position glides toward the target position. */
+  marks: { ids: string[]; cur: Float32Array; tgt: Float32Array; scale: Float32Array };
   fly: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t0: number } | null;
 }
 
@@ -146,6 +160,7 @@ export function AviaryScene(props: AviarySceneProps) {
   const propsRef = useRef(props);
   const tipRef = useRef<HTMLDivElement>(null);
   const hintRef = useRef<HTMLDivElement>(null);
+  const modeRef = useRef(props.mode);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -208,6 +223,7 @@ export function AviaryScene(props: AviarySceneProps) {
 
     // Zones: tint + outline
     const zoneFills = new Map<string, THREE.Mesh>();
+    const zoneEdges: THREE.Object3D[] = [];
     for (const z of MONITOR_ZONES) {
       const g = flat(new THREE.ShapeGeometry(zoneShape(z), 24), 0.03);
       const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: z.color, transparent: true, opacity: 0.1, depthWrite: false }));
@@ -218,6 +234,7 @@ export function AviaryScene(props: AviarySceneProps) {
         new THREE.BufferGeometry().setFromPoints(zoneShape(z).getPoints(24).map((p) => new THREE.Vector3(p.x, 0.06, -p.y))),
         new THREE.LineBasicMaterial({ color: z.color, transparent: true, opacity: 0.45 }),
       );
+      zoneEdges.push(edge);
       scene.add(edge);
     }
 
@@ -391,7 +408,7 @@ export function AviaryScene(props: AviarySceneProps) {
     trail.visible = false;
     scene.add(trail);
 
-    const rig: Rig = { renderer, scene, persp, ortho, ctl3, ctl2, birds, treeParts, zoneFills, dome, levelBand, selRing, selDrop, precision, treeRing, trail, fly: null };
+    const rig: Rig = { renderer, scene, persp, ortho, ctl3, ctl2, birds, treeParts, zoneFills, dome, levelBand, selRing, selDrop, precision, treeRing, trail, zoneEdges, marks: { ids: [], cur: new Float32Array(0), tgt: new Float32Array(0), scale: new Float32Array(0) }, fly: null };
     rigRef.current = rig;
 
     // Size
@@ -413,8 +430,44 @@ export function AviaryScene(props: AviarySceneProps) {
 
     // Loop: controls, fly-to, HTML labels
     const v = new THREE.Vector3();
+    const m4b = new THREE.Matrix4();
+    const qId = new THREE.Quaternion();
+    const sv = new THREE.Vector3();
+    const dropPos = selDrop.geometry.getAttribute("position") as THREE.BufferAttribute;
+    let lastT = 0;
     renderer.setAnimationLoop((time) => {
       const p = propsRef.current;
+      // Markers glide toward their latest position (time constant ~0.35 s).
+      const dt = lastT ? Math.min(100, time - lastT) : 16;
+      lastT = time;
+      const k = p.smooth === false ? 1 : 1 - Math.exp(-dt / 350);
+      const { ids, cur, tgt, scale } = rig.marks;
+      let selIdx = -1;
+      for (let i = 0; i < ids.length; i++) {
+        const o = i * 3;
+        cur[o] += (tgt[o] - cur[o]) * k;
+        cur[o + 1] += (tgt[o + 1] - cur[o + 1]) * k;
+        cur[o + 2] += (tgt[o + 2] - cur[o + 2]) * k;
+        m4b.compose(v.set(cur[o], cur[o + 1] + 0.4, cur[o + 2]), qId, sv.setScalar(scale[i]));
+        birds.setMatrixAt(i, m4b);
+        if (ids[i] === p.selectedBirdId) selIdx = i;
+      }
+      if (ids.length) birds.instanceMatrix.needsUpdate = true;
+      if (selIdx >= 0) {
+        const o = selIdx * 3;
+        selRing.position.set(cur[o], cur[o + 1] + 0.4, cur[o + 2]);
+        dropPos.setXYZ(0, cur[o], cur[o + 1] + 0.4, cur[o + 2]);
+        dropPos.setXYZ(1, cur[o], 0.1, cur[o + 2]);
+        dropPos.needsUpdate = true;
+        selDrop.computeLineDistances();
+        if (precision.visible) precision.position.set(cur[o], cur[o + 1] + 0.4, cur[o + 2]);
+        const lbl = wrap.querySelector<HTMLElement>("[data-follow]");
+        if (lbl) {
+          lbl.dataset.x = String(cur[o]);
+          lbl.dataset.y = String(cur[o + 1] + 3.2);
+          lbl.dataset.z = String(cur[o + 2]);
+        }
+      }
       const cam = p.mode === "2d" ? ortho : persp;
       const ctl = p.mode === "2d" ? ctl2 : ctl3;
       if (rig.fly) {
@@ -546,33 +599,34 @@ export function AviaryScene(props: AviarySceneProps) {
   useEffect(() => {
     const rig = rigRef.current;
     if (!rig) return;
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
     const c = new THREE.Color();
     const grey = new THREE.Color("#c5cfd6");
+    // Keep each bird's shown position so it glides from where it was; new birds appear in place.
+    const prev = rig.marks;
+    const prevIdx = new Map(prev.ids.map((id, i) => [id, i]));
+    const n = points.length;
+    const cur = new Float32Array(n * 3);
+    const tgt = new Float32Array(n * 3);
+    const scale = new Float32Array(n);
     points.forEach((p, i) => {
-      const s = p.id === selectedBirdId ? 1.7 : p.dim ? 0.55 : 1;
-      m.compose(new THREE.Vector3(p.pos.x, p.pos.y + 0.4, p.pos.z), q, new THREE.Vector3(s, s, s));
-      rig.birds.setMatrixAt(i, m);
+      tgt.set([p.pos.x, p.pos.y, p.pos.z], i * 3);
+      const j = prevIdx.get(p.id);
+      cur.set(j === undefined ? [p.pos.x, p.pos.y, p.pos.z] : prev.cur.subarray(j * 3, j * 3 + 3), i * 3);
+      scale[i] = p.id === selectedBirdId ? 1.7 : p.dim ? 0.55 : 1;
       c.set(p.color);
       if (p.dim) c.lerp(grey, 0.7);
       rig.birds.setColorAt(i, c);
     });
-    rig.birds.count = points.length;
-    rig.birds.instanceMatrix.needsUpdate = true;
+    rig.marks = { ids: points.map((p) => p.id), cur, tgt, scale };
+    rig.birds.count = n;
     if (rig.birds.instanceColor) rig.birds.instanceColor.needsUpdate = true;
-
-    const sel = points.find((p) => p.id === selectedBirdId);
-    rig.selRing.visible = rig.selDrop.visible = !!sel;
-    if (sel) {
-      rig.selRing.position.set(sel.pos.x, sel.pos.y + 0.4, sel.pos.z);
-      rig.selDrop.geometry.setFromPoints([new THREE.Vector3(sel.pos.x, sel.pos.y + 0.4, sel.pos.z), new THREE.Vector3(sel.pos.x, 0.1, sel.pos.z)]);
-      rig.selDrop.computeLineDistances();
-    }
+    const sel = points.some((p) => p.id === selectedBirdId);
+    rig.selRing.visible = rig.selDrop.visible = sel;
   }, [points, selectedBirdId, ready]);
 
   /* ---------- selection overlays ---------- */
   const { precision, trail, selectedTreeId, highlightZoneId, trees, dimTrees, level, mode } = props;
+  const layers = props.layers ?? DEFAULT_SCENE_LAYERS;
   useEffect(() => {
     const rig = rigRef.current;
     if (!rig) return;
@@ -630,9 +684,18 @@ export function AviaryScene(props: AviarySceneProps) {
     if (!rig) return;
     rig.ctl3.enabled = mode === "3d";
     rig.ctl2.enabled = mode === "2d";
-    rig.dome.visible = mode === "3d";
-    rig.fly = null;
+    // Switching 2D/3D cancels a fly-to of the other camera; the first run must not.
+    if (modeRef.current !== mode) rig.fly = null;
+    modeRef.current = mode;
   }, [mode, ready]);
+
+  useEffect(() => {
+    const rig = rigRef.current;
+    if (!rig) return;
+    rig.dome.visible = mode === "3d" && layers.dome;
+    rig.zoneFills.forEach((m) => (m.visible = layers.zones));
+    rig.zoneEdges.forEach((e) => (e.visible = layers.zones));
+  }, [mode, layers.dome, layers.zones, ready]);
 
   /* ---------- fly-to ---------- */
   const { focus } = props;
@@ -681,7 +744,7 @@ export function AviaryScene(props: AviarySceneProps) {
     <div ref={wrapRef} className="relative h-full w-full touch-none overflow-hidden" role="application" aria-label="Interactive aviary map. Drag to rotate, scroll to zoom, click a bird or a tree to open its details.">
       {/* Labels are kept to zone codes; details open on selection. */}
       <div className="pointer-events-none absolute inset-0">
-        {MONITOR_ZONES.map((z) => {
+        {layers.labels && MONITOR_ZONES.map((z) => {
           const a = zoneAnchor(z);
           return (
             <button
@@ -709,7 +772,7 @@ export function AviaryScene(props: AviarySceneProps) {
           </span>
         )}
         {selBird && (
-          <span key={`bird-${selBird.id}`} data-x={selBird.pos.x} data-y={selBird.pos.y + 3.2} data-z={selBird.pos.z} className="absolute left-0 top-0 rounded-md bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
+          <span key={`bird-${selBird.id}`} data-follow data-x={selBird.pos.x} data-y={selBird.pos.y + 3.2} data-z={selBird.pos.z} className="absolute left-0 top-0 rounded-md bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
             {selBird.id}
           </span>
         )}

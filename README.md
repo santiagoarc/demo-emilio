@@ -24,11 +24,11 @@ datos del sistema.
 
 ## Estructura de la app
 
-La barra lateral cambia entre tres áreas:
+La barra lateral cambia entre dos áreas con la misma estructura: **Penguins** y **Aviary**.
 
 | Área | Ruta | Qué muestra |
 | --- | --- | --- |
-| **Overview** | `/` | Resumen de ambas áreas, qué datos son simulados, cuáles tienen fuente y cuáles faltan. |
+| | `/` | Redirige a Penguins. |
 | | `/roadmap` | Estado de los datos, *Potential capabilities* (salud, comportamiento, alimentación, reproducción, asignación) y *Technology to validate*. |
 | **Penguins** | `/penguins/overview` | Indicadores, especies, zonas y actividad. |
 | | `/map` | Mapa del hábitat, recorrido y paradas numeradas de un ejemplar. |
@@ -36,9 +36,10 @@ La barra lateral cambia entre tres áreas:
 | | `/health` | Seguimiento de casos (simulados) y chequeo de actividad (inferencia, no diagnóstico). |
 | | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |
 | | `/penguins/rules` | Reglas propuestas (ejemplos configurables, no alertas operativas). |
-| **Aviary** | `/aviary` | Monitor 3D (three.js): mapa conceptual con árboles T1…, niveles de altura, 500 aves por estado, ficha del ave y del árbol (con vista lateral), historial, filtros, reloj simulado con movimiento gradual, feed de movimientos y validaciones de los datos. |
-| | `/aviary/birds` | Tabla de las 500 aves con búsqueda y filtros; cada fila abre el ave en el monitor (`/aviary?bird=ID`). |
-| | `/aviary/inventory` | Catálogo de 32 especies con cantidades (pedidas vs. generadas), sexo y edad; inventario de árboles; validaciones. |
+| **Aviary** | `/aviary` | Overview como el de pingüinos: cifras, mapa 3D en tarjeta, desglose por especie, movimientos recientes, zonas, alturas y actividad. |
+| | `/aviary/map` | Habitat map como el de pingüinos: mapa 3D a pantalla completa, panel derecho (buscador, cifras, filtros, capas, leyenda, ficha del ave y del árbol con vista lateral) y reloj simulado abajo (play/pausa, 1×/5×/20×, movimiento suave). |
+| | `/aviary/species` | Catálogo de 32 especies (pedidas vs. generadas, sexo, edad), árboles y validaciones de los datos. |
+| | `/aviary/birds` | Registro de las 500 aves; cada fila abre el ave en el Habitat map. |
 | | `/aviary/rules` | Reglas propuestas del aviario. |
 
 ## Datos: simulado, con fuente y pendiente

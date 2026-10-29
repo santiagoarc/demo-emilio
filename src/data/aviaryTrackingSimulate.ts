@@ -191,6 +191,18 @@ function placeStay(rng: Rng, zoneId: string, levelId: LevelId, trees: AviaryTree
   return { zoneId: t.zoneId, treeId: t.id, inCrown: true, pos: { x: t.x + Math.cos(ang) * d, y, z: t.z + Math.sin(ang) * d } };
 }
 
+/** Ground-to-ground hops over a short distance are walked; anything else is flown. */
+export function isWalk(a: Pick<Stay, "inCrown" | "pos">, b: Pick<Stay, "inCrown" | "pos">) {
+  return !a.inCrown && !b.inCrown && Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z) < 25;
+}
+
+/** Travel time between two places: flying ~2–3.5 m/s, walking ~0.6 m/s, plus take-off. */
+function transitMs(rng: Rng, a: Pick<Stay, "inCrown" | "pos">, b: Pick<Stay, "inCrown" | "pos">) {
+  const d = Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y, a.pos.z - b.pos.z);
+  const v = isWalk(a, b) ? between(rng, 0.45, 0.75) : between(rng, 2, 3.5);
+  return Math.round((Math.min(150, Math.max(4, d / v)) + between(rng, 2, 6)) * 1000);
+}
+
 export function buildTimeline(registry: DemoRegistry): TrackingDataset {
   const windowStart = startOfDay(registry.anchor) - (HISTORY_DAYS - 1) * DAY;
   const horizon = registry.anchor + HORIZON_DAYS * DAY;
@@ -223,8 +235,11 @@ export function buildTimeline(registry: DemoRegistry): TrackingDataset {
         const bed = startOfDay(t) + Math.round(sleepAt * 60) * MIN;
         if (t < bed && t + dur > bed) dur = Math.max(5 * MIN, bed - t);
       }
-      list.push({ id: `${bird.id}#${list.length + 1}`, birdId: bird.id, start: t, end: t + dur, ...place });
-      t += dur + Math.round(between(rng, 1, 5) * 60) * 1000; // transit
+      const prev = list[list.length - 1];
+      // The bird leaves at t and arrives after the trip; the stay starts on arrival.
+      const start = prev ? t + transitMs(rng, prev, place) : t;
+      list.push({ id: `${bird.id}#${list.length + 1}`, birdId: bird.id, start, end: start + dur, ...place });
+      t = start + dur;
     }
     stays.set(bird.id, list);
   }
@@ -281,8 +296,15 @@ export function trackingSource(ds: TrackingDataset): TrackingSource {
       if (unit(birdId, at, "drop") < 0.1 && at - SAMPLE_MS >= s.start) at -= SAMPLE_MS; // missed reading
       pos = s.pos;
     } else {
-      at = s.end + Math.floor((t - s.end) / SAMPLE_MS) * SAMPLE_MS;
-      pos = lerp(s.pos, next.pos, Math.min(1, (at - s.end) / Math.max(1, next.start - s.end)));
+      // In flight the position is continuous: eased along the way, with an arc in height.
+      at = t;
+      const f = Math.min(1, (t - s.end) / Math.max(1, next.start - s.end));
+      const e = f * f * (3 - 2 * f);
+      pos = lerp(s.pos, next.pos, e);
+      if (!isWalk(s, next)) {
+        const d = Math.hypot(s.pos.x - next.pos.x, s.pos.z - next.pos.z);
+        pos = { ...pos, y: Math.min(FOOTPRINT.domeHeight - 1, pos.y + Math.sin(Math.PI * f) * Math.min(5, d * 0.18)) };
+      }
       moving = true;
       zoneId = zoneAt(pos.x, pos.z)?.id ?? s.zoneId;
     }

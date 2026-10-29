@@ -41,7 +41,7 @@ export function BirdRegistry() {
   return (
     <div className="pb-12">
       <PageHeader eyebrow="Aviary · Demo registry" title="Birds" subtitle={`${registry.birds.length} individual birds across ${registry.species.length} species. Positions as of the simulated clock, ${fmtDateTime(asOf, asOf)}.`} />
-      <AviaryFrame banner="Open a bird to see it on the 3D map with its card and detection history.">
+      <AviaryFrame banner="Open a bird to see it on the Habitat map with its card and detection history.">
         <section className="panel p-4">
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative min-w-[220px] flex-1">
@@ -105,7 +105,7 @@ export function BirdRegistry() {
                   return (
                     <tr key={f.bird.id} className="border-b border-line/60 hover:bg-ink/[0.025]">
                       <td className="px-2 py-1.5">
-                        <Link href={`/aviary?bird=${f.bird.id}`} className="font-mono font-semibold text-ink hover:text-accent">{f.bird.id}</Link>
+                        <Link href={`/aviary/map?bird=${f.bird.id}`} className="font-mono font-semibold text-ink hover:text-accent">{f.bird.id}</Link>
                       </td>
                       <td className="px-2 py-1.5">
                         <span className="flex items-center gap-1.5">

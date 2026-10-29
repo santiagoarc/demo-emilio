@@ -8,7 +8,7 @@ import { runDemoChecks } from "@/logic/aviaryDemoChecks";
 import { treeOccupants } from "@/logic/aviaryTracking";
 import { Card, cx } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/shell/AppShell";
-import { ChecksCard } from "./monitor/AviaryMonitor";
+import { ChecksCard } from "./monitor/AviaryParts";
 import { AviaryFrame, useAviarySnapshot } from "./common";
 
 const AGES: AgeClass[] = ["juvenile", "subadult", "adult", "senior"];
@@ -36,7 +36,7 @@ export function AviaryInventory() {
 
   return (
     <div className="pb-12">
-      <PageHeader eyebrow="Aviary · Demo inventory" title="Inventory" subtitle={`${registry.species.length} species · ${total} birds · ${registry.trees.length} trees. Generated once and stored in this browser.`} />
+      <PageHeader eyebrow="Aviary · Demo catalogue" title="Species" subtitle={`${registry.species.length} species · ${total} birds · ${registry.trees.length} trees. Generated once and stored in this browser.`} />
       <AviaryFrame banner="This distribution exists only for the demo and does not represent the population of any zoological facility.">
         {registry.distributionNote && (
           <p className="rounded-xl border border-accent-2/30 bg-accent-2/[0.05] px-4 py-2.5 text-xs text-ink">

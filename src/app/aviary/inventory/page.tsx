@@ -1,13 +1,6 @@
-import { Suspense } from "react";
-import { AviaryInventory } from "@/features/aviary/AviaryInventory";
+import { redirect } from "next/navigation";
 
-// The demo generates its data in the browser; there is no UI to validate on the server.
-export const instant = false;
-
+// Renamed to Species, like the penguin area.
 export default function AviaryInventoryPage() {
-  return (
-    <Suspense>
-      <AviaryInventory />
-    </Suspense>
-  );
+  redirect("/aviary/species");
 }

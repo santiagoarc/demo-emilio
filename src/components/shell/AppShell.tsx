@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { Activity, Bird, Box, BookOpenCheck, ClipboardList, Compass, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { Activity, Bird, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { useDemo } from "@/state/DemoProvider";
 import { fmtDateTime } from "@/logic/time";
 import { cx } from "@/components/ui/primitives";
 import { PenguinSearch } from "./PenguinSearch";
+import { BirdSearch } from "./BirdSearch";
 import { ScenarioDrawer } from "./ScenarioDrawer";
 import { LoginScreen } from "./LoginScreen";
 import { PenguinChat } from "@/features/chat/PenguinChat";
@@ -41,19 +42,14 @@ function useDemoSession() {
   return { user, enter, leave };
 }
 
-type ModuleId = "overview" | "penguins" | "aviary";
+type ModuleId = "penguins" | "aviary";
 
 const MODULES: { id: ModuleId; label: string; home: string }[] = [
-  { id: "overview", label: "Overview", home: "/" },
   { id: "penguins", label: "Penguins", home: "/penguins/overview" },
   { id: "aviary", label: "Aviary", home: "/aviary" },
 ];
 
 const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exact?: boolean }[]> = {
-  overview: [
-    { href: "/", label: "Platform overview", icon: Compass, exact: true },
-    { href: "/roadmap", label: "Validation & roadmap", icon: BookOpenCheck },
-  ],
   penguins: [
     { href: "/penguins/overview", label: "Overview", icon: LayoutDashboard },
     { href: "/map", label: "Habitat map", icon: MapIcon },
@@ -65,15 +61,15 @@ const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exa
     { href: "/penguins/rules", label: "Proposed rules", icon: ListChecks },
   ],
   aviary: [
-    { href: "/aviary", label: "3D monitor", icon: Box, exact: true },
-    { href: "/aviary/birds", label: "Birds", icon: Feather },
-    { href: "/aviary/inventory", label: "Inventory", icon: ClipboardList },
+    { href: "/aviary", label: "Overview", icon: LayoutDashboard, exact: true },
+    { href: "/aviary/map", label: "Habitat map", icon: MapIcon },
+    { href: "/aviary/species", label: "Species", icon: Feather },
+    { href: "/aviary/birds", label: "Bird registry", icon: IdCard },
     { href: "/aviary/rules", label: "Proposed rules", icon: ListChecks },
   ],
 };
 
 function moduleOf(pathname: string): ModuleId {
-  if (pathname === "/" || pathname.startsWith("/roadmap")) return "overview";
   if (pathname.startsWith("/aviary")) return "aviary";
   return "penguins";
 }
@@ -112,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-panel-solid/80 px-3 py-5 backdrop-blur md:flex">
-        <Link href="/" className="mb-5 block px-1">
+        <Link href="/penguins/overview" className="mb-5 block px-1">
           <span className="flex justify-center rounded-2xl bg-white px-4 py-2.5 shadow-[0_4px_14px_rgba(11,36,64,0.10)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/seaworld-abu-dhabi.png" alt="SeaWorld Abu Dhabi" className="h-14 w-auto" />
@@ -125,13 +121,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <ModuleSwitch mod={mod} />
 
-        {mod === "penguins" && (
+        {(
           <button
             onClick={() => setSearchOpen(true)}
             className="mb-3 flex h-9 items-center gap-2 rounded-xl border border-line bg-ink/[0.02] px-3 text-xs text-muted transition hover:border-line-strong hover:text-ink"
           >
             <Search size={14} />
-            Find a penguin
+            {mod === "aviary" ? "Find a bird" : "Find a penguin"}
             <kbd className="ml-auto rounded border border-line px-1 font-mono text-[10px] text-faint">Ctrl K</kbd>
           </button>
         )}
@@ -194,7 +190,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </div>
 
-      <PenguinSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      {mod === "aviary" ? <BirdSearch open={searchOpen} onClose={() => setSearchOpen(false)} /> : <PenguinSearch open={searchOpen} onClose={() => setSearchOpen(false)} />}
       <ScenarioDrawer open={scenarioOpen} onClose={() => setScenarioOpen(false)} />
       {/* The chat is about penguins; it reads ?penguin= from the map, and useSearchParams needs its own Suspense. */}
       {mod === "penguins" && (
@@ -207,10 +203,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** Switches between the platform overview and each animal area. */
+/** Switches between the two animal areas. */
 function ModuleSwitch({ mod, compact }: { mod: ModuleId; compact?: boolean }) {
   return (
-    <div role="tablist" aria-label="Area" className={cx("grid grid-cols-3 rounded-xl border border-line bg-ink/[0.05] p-0.5", compact ? "w-full" : "mb-4")}>
+    <div role="tablist" aria-label="Area" className={cx("grid grid-cols-2 rounded-xl border border-line bg-ink/[0.05] p-0.5", compact ? "w-full" : "mb-4")}>
       {MODULES.map((m) => (
         <Link
           key={m.id}
