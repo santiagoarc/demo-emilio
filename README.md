@@ -24,7 +24,7 @@ datos del sistema.
 
 ## Estructura de la app
 
-La barra lateral cambia entre dos áreas con la misma estructura: **Penguins** y **Aviary**.
+La barra lateral cambia entre **Penguins** y **Aviary** y se puede plegar a solo iconos (*Collapse menu*) para dar más espacio al mapa.
 
 | Área | Ruta | Qué muestra |
 | --- | --- | --- |
@@ -36,12 +36,15 @@ La barra lateral cambia entre dos áreas con la misma estructura: **Penguins** y
 | | `/health` | Seguimiento de casos (simulados) y chequeo de actividad (inferencia, no diagnóstico). |
 | | `/analytics` | Agua vs. tierra, actividad por hora, mapa de calor de la semana, movimientos entre zonas. |
 | | `/penguins/rules` | Reglas propuestas (ejemplos configurables, no alertas operativas). |
-| **Aviary** | `/aviary` | Overview como el de pingüinos: cifras, mapa 3D en tarjeta, desglose por especie, movimientos recientes, zonas, alturas y actividad. |
-| | `/aviary/map` | Habitat map: mapa 3D con filtros (zona, nivel, estado, especie) y un punto por ave con el color de su especie. Panel derecho: **Species** (buscador, ~8 visibles con scroll; cada especie se despliega con su resumen y sus ejemplares) y **Monitoring teams** (Alpha, Bravo, Charlie con aves, especies, detectadas y sin señal; se despliegan con sus aves y, con *Edit assignments*, se reasignan). Clic en un árbol: tarjeta sobre el mapa y vista del árbol (raíces a copa, escala, niveles, aves a su altura) en panel deslizable. Reloj simulado (1×/5×/20×). |
+| **Aviary** | `/aviary/map` | **Map** (portada del aviario): especies con foto a la izquierda (clic = filtra el mapa y muestra sus ejemplares); mapa 3D con filtros, marcadores con la **foto de la especie y anillo de estado** (o punto de color, en *Layers*), **agrupación** con número que se separa al acercar, IDs de árbol que aparecen al acercar sin encimarse y botón **Maximise** (Esc para salir, conserva la selección); a la derecha los **10 equipos** con búsqueda y reasignación. Clic en un árbol: ficha compacta (altura, aves por nivel, última detección) y vista vertical. |
+| | `/aviary` | **Activity**: cifras, mapa en tarjeta, desglose por especie, movimientos y actividad. |
 | | `/aviary/species` | Catálogo de 32 especies (pedidas vs. generadas, sexo, edad), árboles y validaciones de los datos. |
 | | `/aviary/species/[id]` | Ficha de la especie: foto de referencia (Wikimedia Commons, con autor y licencia), resumen de Wikipedia, cifras de la demo y una tarjeta por cada ave. |
-| | `/aviary/birds` | Registro de las 500 aves; cada fila abre el ave en el Habitat map. |
-| | `/aviary/rules` | Reglas propuestas del aviario. |
+| | `/aviary/birds` | **Individuals**: las 500 aves con búsqueda y filtros; cada fila abre el ave en el mapa. |
+| | `/aviary/trees` | **Trees**: árboles demo con aves por nivel, especies y última detección. |
+| | `/aviary/teams` | **Teams**: los 10 equipos (50 aves cada uno por defecto) con estado y reasignación. |
+| | `/aviary/rules` | **Alerts**: reglas propuestas del aviario (ejemplos configurables, no alertas operativas). |
+| | `/aviary/reports` | **Reports**: CSV de aves, equipos y árboles generados en el navegador, y validaciones de los datos. |
 
 ## Datos: simulado, con fuente y pendiente
 
@@ -66,10 +69,10 @@ Los nombres de árbol (Ceiba, Mango…) son ilustrativos de la demo.
 
 ## Equipos del aviario
 
-Cada ave pertenece a un solo equipo (`src/data/aviaryTeams.ts`). Por defecto:
-Alpha = tucanes, loros y guacamayos; Bravo = ibis, espátula, cigüeña y turacos;
-Charlie = palomas, faisanes y el resto. Las reasignaciones hechas en la pantalla
-se guardan en el `localStorage` (`aviary-demo/teams/v1`) y pueden deshacerse.
+Diez equipos (Alpha … Juliet). El reparto por defecto ordena las aves por grupo y
+especie y las parte en bloques de 50 (`src/data/aviaryTeams.ts`): cada equipo sigue
+2–5 especies relacionadas y cada ave está en un solo equipo. Las reasignaciones
+hechas en pantalla se guardan en el `localStorage` (`aviary-demo/teams/v2`).
 
 ## Escenario de demostración
 

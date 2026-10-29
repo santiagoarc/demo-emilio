@@ -1,5 +1,6 @@
 import { LEVEL_BY_ID, levelOf, type TrackingDataset, type TrackingSource } from "@/domain/aviaryTracking";
 import { DEMO_TOTAL_BIRDS, REQUESTED_TOTAL } from "@/data/aviaryCatalog";
+import { TEAM_IDS, defaultAssignments } from "@/data/aviaryTeams";
 import type { Fix } from "./aviaryTracking";
 
 export interface Check {
@@ -65,6 +66,11 @@ export function runDemoChecks(ds: TrackingDataset, src: TrackingSource, fixes: M
   const h1 = src.history(probe.id, ds.windowStart, ds.horizon).map((s) => s.id).join();
   const h2 = src.history(probe.id, ds.windowStart, ds.horizon).map((s) => s.id).join();
 
+  // Default team split: every bird in exactly one of the ten teams, 50 each.
+  const split = defaultAssignments(registry);
+  const perTeam = TEAM_IDS.map((t) => [...split.values()].filter((x) => x === t).length);
+  const teamsOk = split.size === registry.birds.length && registry.birds.every((b) => split.has(b.id)) && perTeam.every((n) => n === registry.birds.length / TEAM_IDS.length);
+
   return [
     { id: "species", label: "Exactly 32 species", pass: registry.species.length === 32 && new Set(codes).size === 32, detail: `${registry.species.length} species, ${new Set(codes).size} distinct codes` },
     {
@@ -84,6 +90,7 @@ export function runDemoChecks(ds: TrackingDataset, src: TrackingSource, fixes: M
     { id: "heights", label: "Vertical coordinate matches the recorded height and tree", pass: badHeight === 0 && detBadLevel === 0, detail: `y within 0 m and the tree height; level matches height · ${badHeight + detBadLevel} problems` },
     { id: "no-invent", label: "Approximate or unknown locations carry no coordinates", pass: detNoInvent === 0, detail: `${detNoInvent} detections with invented coordinates` },
     { id: "dupes", label: "The simulation creates no duplicate records", pass: dupStay === 0 && overlap === 0 && h1 === h2, detail: `${dupStay} duplicate IDs · ${overlap} overlapping stays · history repeatable` },
+    { id: "teams", label: "Ten teams of 50, each bird in exactly one", pass: teamsOk, detail: `${split.size} birds assigned · per team ${[...new Set(perTeam)].join("/")} (default split, before manual changes)` },
     {
       id: "persist",
       label: "Data persists across reloads",

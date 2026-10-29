@@ -3,55 +3,66 @@ import type { DemoRegistry, MonitorBird, SpeciesGroup } from "@/domain/aviaryTra
 /**
  * Aviary monitoring teams (DEMO). Every bird belongs to exactly one team.
  *
- * The default split follows species groups so each team watches a coherent
- * set of species; it is only a starting point. Changes made in the UI are
- * stored as per-bird overrides in this browser and win over the default.
+ * Default split: birds ordered by species group and species, then cut into
+ * ten blocks of 50, so each team follows a few related species and the
+ * total is exactly the registry. Changes made in the UI are stored as
+ * per-bird overrides in this browser and win over the default.
  */
 
-export type TeamId = "alpha" | "bravo" | "charlie";
+export const TEAM_IDS = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"] as const;
+export type TeamId = (typeof TEAM_IDS)[number];
 
 export interface MonitorTeam {
   id: TeamId;
   name: string;
   /** Fictional lead, for the demo. */
   lead: string;
-  /** What the default split gives the team. */
-  focus: string;
 }
 
-export const MONITOR_TEAMS: MonitorTeam[] = [
-  { id: "alpha", name: "Team Alpha", lead: "Lucía Ferrer", focus: "Toucans, parrots and macaws" },
-  { id: "bravo", name: "Team Bravo", lead: "Omar Haddad", focus: "Ibises, spoonbill, stork and turacos" },
-  { id: "charlie", name: "Team Charlie", lead: "Grace Lin", focus: "Pigeons, pheasants and other species" },
-];
+const LEADS = ["Lucía Ferrer", "Omar Haddad", "Grace Lin", "Tomás Herrera", "Aisha Rahman", "Ben Carter", "Renata Campos", "Yusuf Ali", "Mia Novak", "Karim Nasser"];
+
+export const MONITOR_TEAMS: MonitorTeam[] = TEAM_IDS.map((id, i) => ({ id, name: `Team ${id[0].toUpperCase()}${id.slice(1)}`, lead: LEADS[i] }));
 
 export const MONITOR_TEAM_BY_ID = Object.fromEntries(MONITOR_TEAMS.map((t) => [t.id, t])) as Record<TeamId, MonitorTeam>;
 
-const DEFAULT_BY_GROUP: Record<SpeciesGroup, TeamId> = {
-  toucan: "alpha",
-  parrot: "alpha",
-  wader: "bravo",
-  turaco: "bravo",
-  pigeon: "charlie",
-  galliform: "charlie",
-  other: "charlie",
-};
+const GROUP_ORDER: SpeciesGroup[] = ["toucan", "parrot", "turaco", "wader", "pigeon", "galliform", "other"];
+
+const cache = new WeakMap<DemoRegistry, Map<string, TeamId>>();
+
+/** Default team of every bird: equal blocks over birds sorted by group and species. */
+export function defaultAssignments(registry: DemoRegistry): Map<string, TeamId> {
+  const hit = cache.get(registry);
+  if (hit) return hit;
+  const spIndex = new Map(registry.species.map((s, i) => [s.id, i]));
+  const spGroup = new Map(registry.species.map((s) => [s.id, s.group]));
+  const ordered = [...registry.birds].sort(
+    (a, b) =>
+      GROUP_ORDER.indexOf(spGroup.get(a.speciesId)!) - GROUP_ORDER.indexOf(spGroup.get(b.speciesId)!) ||
+      spIndex.get(a.speciesId)! - spIndex.get(b.speciesId)! ||
+      a.seq - b.seq,
+  );
+  const size = Math.ceil(ordered.length / TEAM_IDS.length);
+  const out = new Map<string, TeamId>(ordered.map((b, i) => [b.id, TEAM_IDS[Math.min(TEAM_IDS.length - 1, Math.floor(i / size))]]));
+  cache.set(registry, out);
+  return out;
+}
 
 export function defaultTeam(bird: MonitorBird, registry: DemoRegistry): TeamId {
-  const sp = registry.species.find((s) => s.id === bird.speciesId);
-  return sp ? DEFAULT_BY_GROUP[sp.group] : "charlie";
+  return defaultAssignments(registry).get(bird.id) ?? "alpha";
 }
 
 /** Per-bird reassignments, keyed to the registry they were made on. */
 export type TeamOverrides = Record<string, TeamId>;
 
-const KEY = "aviary-demo/teams/v1";
+const KEY = "aviary-demo/teams/v2";
 
 export function loadTeamOverrides(registry: DemoRegistry): TeamOverrides {
   try {
     const raw = window.localStorage.getItem(KEY);
     const saved = raw ? (JSON.parse(raw) as { createdAt: number; overrides: TeamOverrides }) : null;
-    if (saved && saved.createdAt === registry.createdAt && saved.overrides && typeof saved.overrides === "object") return saved.overrides;
+    if (saved && saved.createdAt === registry.createdAt && saved.overrides && typeof saved.overrides === "object") {
+      return Object.fromEntries(Object.entries(saved.overrides).filter(([, t]) => (TEAM_IDS as readonly string[]).includes(t)));
+    }
   } catch {}
   return {};
 }

@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, Lock, Unlock, Users, ChevronDown, ChevronLeft, ChevronRight, Layers, Pause, Play, RotateCcw, Search, TreePine, X } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Layers, Maximize2, Minimize2, Pause, Play, RotateCcw, TreePine, X } from "lucide-react";
 import {
   FIX_STATUS,
-  GROUP_LABEL,
   LEVELS,
   MONITOR_ZONES,
   MONITOR_ZONE_BY_ID,
@@ -14,12 +12,12 @@ import {
   type AviaryTree,
   type FixStatus,
   type LevelId,
-  type MonitorBird,
   type Vec3,
 } from "@/domain/aviaryTracking";
 import { MONITOR_SPECIES, MONITOR_SPECIES_BY_ID } from "@/data/aviaryCatalog";
-import { MONITOR_TEAMS, MONITOR_TEAM_BY_ID, defaultTeam, loadTeamOverrides, saveTeamOverrides, type TeamId, type TeamOverrides } from "@/data/aviaryTeams";
-import { SPECIES_INFO } from "@/data/aviarySpeciesInfo";
+import { MONITOR_TEAM_BY_ID, type TeamId } from "@/data/aviaryTeams";
+import { useTeamAssignments } from "@/state/useTeams";
+import { SpeciesSection, TeamsSection } from "./AviaryPanels";
 import { STRUCTURES } from "@/data/aviaryTrackingSimulate";
 import { activityByHour, fmtHeight, snapshot, treeHistory, treeOccupants, type Fix } from "@/logic/aviaryTracking";
 import { HOUR, MIN, fmtDateTime, fmtTime } from "@/logic/time";
@@ -79,18 +77,23 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
   const [zoneId, setZoneId] = useState("");
   const [level, setLevel] = useState<LevelId | "all">("all");
   const [statusF, setStatusF] = useState<FixStatus | "">("");
-  const [teamFilter, setTeamFilter] = useState<TeamId | "">("");
+  const [teamFilter, setTeamFilter] = useState<TeamId | "">(() => {
+    const t = params.get("team");
+    return t && t in MONITOR_TEAM_BY_ID ? (t as TeamId) : "";
+  });
   const [treeView, setTreeView] = useState(false);
-  // Team assignments: automatic default per species group, plus the user's changes.
-  const [overrides, setOverrides] = useState<TeamOverrides>(() => loadTeamOverrides(registry));
-  const teamOf = (bird: MonitorBird): TeamId => overrides[bird.id] ?? defaultTeam(bird, registry);
-  const assign = (bird: MonitorBird, team: TeamId) => {
-    const next = { ...overrides };
-    if (team === defaultTeam(bird, registry)) delete next[bird.id];
-    else next[bird.id] = team;
-    setOverrides(next);
-    saveTeamOverrides(registry, next);
-  };
+  const [maxed, setMaxed] = useState(false);
+  const [markerStyle, setMarkerStyle] = useState<"photo" | "dot">("photo");
+  const [grouping, setGrouping] = useState(true);
+  // Esc leaves the maximised map (the selection stays).
+  useEffect(() => {
+    if (!maxed) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMaxed(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [maxed]);
+  // Team assignments: automatic default split, plus the user's changes.
+  const { teamOf, assign } = useTeamAssignments(registry);
   const [mode, setMode] = useState<"3d" | "2d">("3d");
   const [layers, setLayers] = useState<Layers3D>({ ...DEFAULT_SCENE_LAYERS, trail: true });
   const [dimRest, setDimRest] = useState(true);
@@ -115,10 +118,10 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
       const active = isActive(f);
       if (!active && !dimRest && (filtered || level !== "all")) continue;
       const sp = MONITOR_SPECIES_BY_ID[f.bird.speciesId];
-      out.push({ id: f.bird.id, pos: f.det.pos, color: sp.color, dim: !active, label: `${f.bird.id} · ${sp.common} · ${fmtHeight(f.det.pos.y)}` });
+      out.push({ id: f.bird.id, pos: f.det.pos, species: sp.code, color: sp.color, ring: FIX_STATUS[f.status].color, dim: !active, label: `${f.bird.id} · ${sp.common} · ${fmtHeight(f.det.pos.y)}` });
     }
     return out;
-  }, [all, dimRest, filtered, level, teamFilter, overrides, speciesId, zoneId, statusF]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [all, dimRest, filtered, level, teamFilter, teamOf, speciesId, zoneId, statusF]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selFix = birdId ? fixes.get(birdId) ?? null : null;
   const selTree = treeId ? treeById.get(treeId) ?? null : null;
@@ -164,6 +167,28 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
     return c;
   }, [all]);
 
+  const birdCard = selFix && (
+    <div className="space-y-2">
+      <p className="px-2 text-[11px] text-muted">
+        {MONITOR_TEAM_BY_ID[teamOf(selFix.bird)].name} · usual zone {MONITOR_ZONE_BY_ID[selFix.bird.homeZoneId].name}
+      </p>
+      <BirdCard
+        fix={selFix}
+        asOf={asOf}
+        now={asOf}
+        tab={tab}
+        onTab={setTab}
+        win={win}
+        onWin={setWin}
+        showTrail={layers.trail}
+        onTrail={(v) => setLayers((l) => ({ ...l, trail: v }))}
+        onClose={() => setBirdId(null)}
+        onCenter={() => openBird(selFix.bird.id)}
+        onTree={(id) => openTree(id, true)}
+      />
+    </div>
+  );
+
   const trees = registry.trees;
   const treeIdx = selTree ? trees.findIndex((t) => t.id === selTree.id) : -1;
 
@@ -181,17 +206,34 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
         <ClockBar clock={clock} onClock={setClock} onRestart={restart} start={ds.windowStart} end={ds.horizon} anchor={registry.anchor} smooth={smooth} onSmooth={setSmooth} />
       </div>
 
-      <div className="grid gap-3 xl:h-[calc(100vh-128px)] xl:min-h-[640px] xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className={cx("grid gap-3 xl:h-[calc(100vh-128px)] xl:min-h-[640px]", "xl:grid-cols-[272px_minmax(0,1fr)_340px]")}>
+        <aside className={cx("panel flex min-h-[420px] flex-col overflow-hidden", maxed && "hidden")} aria-label="Species">
+          <SpeciesSection fixes={all} speciesFilter={speciesId} onSpeciesFilter={setSpeciesId} onBird={openBird} selectedBird={birdId} />
+        </aside>
+
         {/* Map */}
-        <section className="panel flex min-h-[480px] min-w-0 flex-col overflow-hidden">
+        <section className={cx("panel flex min-h-[480px] min-w-0 flex-col overflow-hidden", maxed && "fixed inset-0 z-[55] !rounded-none !border-0")} aria-label="Aviary map">
           <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
             <FilterSelect label="Zone" value={zoneId} onChange={setZoneId} options={[["", "All zones"], ...MONITOR_ZONES.map((z) => [z.id, `${z.code} · ${z.name}`] as [string, string])]} />
             <FilterSelect label="Height level" value={level === "all" ? "" : level} onChange={(v) => setLevel((v || "all") as LevelId | "all")} options={[["", "All levels"], ...LEVELS.map((l) => [l.id, l.label] as [string, string])]} />
             <FilterSelect label="Status" value={statusF} onChange={(v) => setStatusF(v as FixStatus | "")} options={[["", "All"], ...STATUS_ORDER.map((s) => [s, FIX_STATUS[s].label] as [string, string])]} />
             <FilterSelect label="Species" value={speciesId} onChange={setSpeciesId} options={[["", "All"], ...MONITOR_SPECIES.map((s) => [s.id, s.common] as [string, string])]} />
             <div className="ml-auto flex items-center gap-2">
-              <LayersMenu layers={layers} onLayers={setLayers} dimRest={dimRest} onDimRest={setDimRest} />
+              {maxed && (
+                <button onClick={() => setClock({ playing: !clock.playing })} className="grid h-8 w-8 place-items-center rounded-lg border border-line-strong text-muted hover:text-ink" aria-label={clock.playing ? "Pause the simulation" : "Play the simulation"}>
+                  {clock.playing ? <Pause size={13} /> : <Play size={13} />}
+                </button>
+              )}
+              <LayersMenu layers={layers} onLayers={setLayers} dimRest={dimRest} onDimRest={setDimRest} markerStyle={markerStyle} onMarkerStyle={setMarkerStyle} grouping={grouping} onGrouping={setGrouping} />
               <Segmented size="sm" value={mode} onChange={setMode} options={[{ value: "2d", label: "2D view" }, { value: "3d", label: "3D view" }]} />
+              <button
+                onClick={() => setMaxed((v) => !v)}
+                className={cx("inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium", maxed ? "border-accent bg-accent text-white" : "border-line-strong text-ink hover:border-accent/50")}
+                title={maxed ? "Back to the normal layout (Esc)" : "Maximise the map"}
+                aria-pressed={maxed}
+              >
+                {maxed ? <Minimize2 size={13} /> : <Maximize2 size={13} />} {maxed ? "Exit full map" : "Maximise"}
+              </button>
             </div>
           </div>
           <div className="relative min-h-[380px] flex-1">
@@ -210,6 +252,8 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
               dimTrees={level !== "all"}
               smooth={smooth}
               layers={layers}
+              markerStyle={markerStyle}
+              cluster={grouping}
               onSelectBird={(id) => openBird(id, false)}
               onSelectTree={(id) => openTree(id)}
               onSelectZone={(z) => setZoneId((cur) => (cur === z ? "" : z))}
@@ -220,41 +264,28 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
                   {FIX_STATUS[s].label} <span className="num ml-auto pl-2 text-ink">{counts[s]}</span>
                 </span>
               ))}
-              <span className="mt-0.5 text-[10px] text-faint">Dot colour = species</span>
+              <span className="mt-0.5 text-[10px] text-faint">{markerStyle === "photo" ? "Photo = species · ring = status" : "Dot colour = species"}</span>
+              {grouping && <span className="text-[10px] text-faint">Numbers = grouped birds · zoom in</span>}
             </div>
-            {selTree && !treeView && <TreeFloat tree={selTree} fixes={fixes} onOpen={() => setTreeView(true)} onClose={() => setTreeId(null)} />}
+            {selTree && !treeView && <TreeFloat tree={selTree} fixes={fixes} onOpen={() => setTreeView(true)} onClose={() => setTreeId(null)} onBird={(id) => openBird(id)} />}
+            {maxed && selFix && (
+              <div className="scroll-thin absolute right-3 top-28 max-h-[calc(100%-8rem)] w-[340px] overflow-y-auto rounded-2xl">{birdCard}</div>
+            )}
           </div>
         </section>
 
-        {/* Right panel: species, then monitoring teams; a bird card opens on top of them. */}
-        <aside className="panel flex min-h-[560px] flex-col overflow-hidden" aria-label="Species and monitoring teams">
-          {selFix && (
+        {/* Right panel: monitoring teams; a bird card opens on top of them. */}
+        <aside className={cx("panel flex min-h-[560px] flex-col overflow-hidden", maxed && "hidden")} aria-label="Monitoring teams">
+          {selFix && !maxed && (
             <div className="scroll-thin min-h-0 flex-1 overflow-y-auto p-3">
               <button onClick={() => setBirdId(null)} className="mb-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-accent hover:bg-accent/10">
-                <ArrowLeft size={14} /> Back to species and teams
+                <ArrowLeft size={14} /> Back to teams
               </button>
-              <p className="mb-2 px-2 text-[11px] text-muted">
-                {MONITOR_TEAM_BY_ID[teamOf(selFix.bird)].name} · {MONITOR_ZONE_BY_ID[selFix.bird.homeZoneId].name} as usual zone
-              </p>
-              <BirdCard
-                fix={selFix}
-                asOf={asOf}
-                now={asOf}
-                tab={tab}
-                onTab={setTab}
-                win={win}
-                onWin={setWin}
-                showTrail={layers.trail}
-                onTrail={(v) => setLayers((l) => ({ ...l, trail: v }))}
-                onClose={() => setBirdId(null)}
-                onCenter={() => openBird(selFix.bird.id)}
-                onTree={(id) => openTree(id, true)}
-              />
+              {birdCard}
             </div>
           )}
           {/* Kept mounted while a card is open, so scroll and open sections are still there on the way back. */}
-          <div className={cx("min-h-0 flex-1 flex-col", selFix ? "hidden" : "flex")}>
-            <SpeciesSection fixes={all} speciesFilter={speciesId} onSpeciesFilter={setSpeciesId} onBird={openBird} selectedBird={birdId} />
+          <div className={cx("min-h-0 flex-1 flex-col", selFix && !maxed ? "hidden" : "flex")}>
             <TeamsSection fixes={all} teamOf={teamOf} onAssign={assign} teamFilter={teamFilter} onTeamFilter={setTeamFilter} onBird={openBird} />
           </div>
         </aside>
@@ -282,7 +313,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
         </div>
       )}
 
-      <BottomRow fixes={all} ds={ds} src={src} asOf={asOf} level={level} onLevel={setLevel} counts={counts} />
+      {!maxed && <BottomRow fixes={all} ds={ds} src={src} asOf={asOf} level={level} onLevel={setLevel} counts={counts} />}
     </div>
   );
 }
@@ -503,10 +534,19 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
   );
 }
 
-function LayersMenu({ layers, onLayers, dimRest, onDimRest }: { layers: Layers3D; onLayers: (l: Layers3D) => void; dimRest: boolean; onDimRest: (v: boolean) => void }) {
+function LayersMenu({ layers, onLayers, dimRest, onDimRest, markerStyle, onMarkerStyle, grouping, onGrouping }: {
+  layers: Layers3D;
+  onLayers: (l: Layers3D) => void;
+  dimRest: boolean;
+  onDimRest: (v: boolean) => void;
+  markerStyle: "photo" | "dot";
+  onMarkerStyle: (v: "photo" | "dot") => void;
+  grouping: boolean;
+  onGrouping: (v: boolean) => void;
+}) {
   const items: [keyof Layers3D, string][] = [
     ["zones", "Habitat zones"],
-    ["labels", "Zone names"],
+    ["labels", "Zone and tree labels"],
     ["dome", "Enclosure dome"],
     ["trail", "Selected bird's path"],
   ];
@@ -515,7 +555,7 @@ function LayersMenu({ layers, onLayers, dimRest, onDimRest }: { layers: Layers3D
       <summary className="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-line-strong px-2.5 text-xs text-muted hover:text-ink">
         <Layers size={13} /> Layers
       </summary>
-      <div className="absolute right-0 z-20 mt-1 w-56 space-y-1.5 rounded-xl border border-line-strong bg-panel-solid p-3 shadow-lg">
+      <div className="absolute right-0 z-20 mt-1 w-60 space-y-1.5 rounded-xl border border-line-strong bg-panel-solid p-3 shadow-lg">
         {items.map(([k, label]) => (
           <label key={k} className="flex cursor-pointer items-center gap-2 text-xs text-muted hover:text-ink">
             <input type="checkbox" checked={layers[k]} onChange={() => onLayers({ ...layers, [k]: !layers[k] })} className="accent-[var(--accent)]" />
@@ -526,6 +566,14 @@ function LayersMenu({ layers, onLayers, dimRest, onDimRest }: { layers: Layers3D
           <input type="checkbox" checked={dimRest} onChange={() => onDimRest(!dimRest)} className="accent-[var(--accent)]" />
           Dim birds outside the filters
         </label>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted hover:text-ink">
+          <input type="checkbox" checked={grouping} onChange={() => onGrouping(!grouping)} className="accent-[var(--accent)]" />
+          Group nearby birds
+        </label>
+        <div className="border-t border-line pt-2">
+          <p className="mb-1 text-[10px] uppercase tracking-wider text-faint">Bird markers</p>
+          <Segmented size="sm" value={markerStyle} onChange={onMarkerStyle} options={[{ value: "photo", label: "Species photo" }, { value: "dot", label: "Colour dot" }]} />
+        </div>
       </div>
     </details>
   );
@@ -696,275 +744,13 @@ function BottomRow({ fixes, ds, src, asOf, level, onLevel, counts }: {
   );
 }
 
-/* ---------- right panel: species ---------- */
-
-/** One row height; the species list shows about eight at a time. */
-const SPECIES_ROW = 44;
-
-/** Discreet monitoring status for a group of birds: worst state wins. */
-function monitorState(fixes: Fix[]) {
-  const noSignal = fixes.filter((f) => f.status === "no-signal").length;
-  const stale = fixes.filter((f) => f.status === "stale").length;
-  const detected = fixes.length - noSignal - stale;
-  if (noSignal) return { color: FIX_STATUS["no-signal"].color, label: `${noSignal} without signal`, detected, noSignal };
-  if (stale) return { color: FIX_STATUS.stale.color, label: `${stale} with an old location`, detected, noSignal };
-  return { color: FIX_STATUS.detected.color, label: "All detected", detected, noSignal };
-}
-
-function lastPlace(f: Fix) {
-  const d = f.det;
-  if (!d) return "No location";
-  const zone = d.zoneId ? MONITOR_ZONE_BY_ID[d.zoneId].code : "—";
-  return [zone, d.treeId, d.pos ? `${d.pos.y.toFixed(1)} m` : d.kind === "zone" ? "zone only" : null].filter(Boolean).join(" · ");
-}
-
-function SpeciesSection({ fixes, speciesFilter, onSpeciesFilter, onBird, selectedBird }: {
-  fixes: Fix[];
-  speciesFilter: string;
-  onSpeciesFilter: (id: string) => void;
-  onBird: (id: string) => void;
-  selectedBird: string | null;
-}) {
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState<string | null>(null);
-  const bySpecies = useMemo(() => {
-    const m = new Map<string, Fix[]>();
-    for (const f of fixes) {
-      const list = m.get(f.bird.speciesId);
-      if (list) list.push(f);
-      else m.set(f.bird.speciesId, [f]);
-    }
-    return m;
-  }, [fixes]);
-  const t = q.trim().toLowerCase();
-  const list = MONITOR_SPECIES.filter((s) => !t || `${s.common} ${s.commonEs} ${s.scientific}`.toLowerCase().includes(t));
-
-  return (
-    <section className="flex shrink-0 flex-col" aria-label="Species">
-      <div className="px-4 pb-2 pt-3">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[15px] font-semibold text-ink">Species</h2>
-          <span className="text-[11px] text-muted">
-            {MONITOR_SPECIES.length} species · {fixes.length} birds
-          </span>
-        </div>
-        <label className="relative mt-2 block">
-          <span className="sr-only">Search a species by name</span>
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search a species…"
-            className="h-9 w-full rounded-xl border border-line-strong bg-panel-solid pl-8 pr-7 text-xs text-ink outline-none placeholder:text-faint focus:border-accent/60"
-          />
-          {q && (
-            <button onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-faint hover:text-ink" aria-label="Clear search">
-              <X size={13} />
-            </button>
-          )}
-        </label>
-      </div>
-      <ul className="scroll-thin overflow-y-auto px-2 pb-2" style={{ maxHeight: SPECIES_ROW * 8 }}>
-        {list.length === 0 && <li className="px-2 py-6 text-center text-xs text-muted">No species matches “{q}”.</li>}
-        {list.map((s) => {
-          const birds = bySpecies.get(s.id) ?? [];
-          const st = monitorState(birds);
-          const expanded = open === s.id;
-          const heights = birds.map((f) => f.det?.pos?.y).filter((h): h is number => h != null);
-          return (
-            <li key={s.id}>
-              <button
-                onClick={() => setOpen(expanded ? null : s.id)}
-                aria-expanded={expanded}
-                className={cx("flex w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors", expanded ? "bg-accent/10" : "hover:bg-ink/[0.04]")}
-                style={{ height: SPECIES_ROW }}
-              >
-                <SpeciesAvatar code={s.code} size={32} ring={s.color} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-ink">{s.common}</span>
-                  <span className="block truncate text-[10px] italic text-muted">{s.scientific}</span>
-                </span>
-                <span className="num text-[13px] font-semibold text-ink">{birds.length}</span>
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: st.color }} title={st.label} aria-label={st.label} />
-                <ChevronDown size={14} className={cx("shrink-0 text-faint transition", expanded && "rotate-180")} />
-              </button>
-              {expanded && (
-                <div className="mx-2 mb-2 rounded-lg border border-line bg-panel-solid/60 p-2.5">
-                  <p className="text-[11px] leading-snug text-muted">{SPECIES_INFO[s.code].summary}</p>
-                  <dl className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
-                    <div>
-                      <dt className="text-[9px] uppercase tracking-wide text-faint">Detected</dt>
-                      <dd className="num text-ink">
-                        {st.detected}/{birds.length}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-[9px] uppercase tracking-wide text-faint">Avg height</dt>
-                      <dd className="num text-ink">{heights.length ? `${(heights.reduce((a, b) => a + b, 0) / heights.length).toFixed(1)} m` : "—"}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[9px] uppercase tracking-wide text-faint">Group</dt>
-                      <dd className="truncate text-ink">{GROUP_LABEL[s.group]}</dd>
-                    </div>
-                  </dl>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    <button
-                      onClick={() => onSpeciesFilter(speciesFilter === s.id ? "" : s.id)}
-                      className={cx("h-7 rounded-lg border px-2 text-[11px] font-medium", speciesFilter === s.id ? "border-accent bg-accent text-white" : "border-line-strong text-ink hover:border-accent/50")}
-                    >
-                      {speciesFilter === s.id ? "Showing only this species" : "Show only on map"}
-                    </button>
-                    <Link href={`/aviary/species/${s.id}`} className="inline-flex h-7 items-center rounded-lg px-2 text-[11px] text-accent hover:bg-accent/10">
-                      Species page →
-                    </Link>
-                  </div>
-                  <ul className="scroll-thin mt-2 max-h-44 overflow-y-auto border-t border-line pt-1">
-                    {birds.map((f) => (
-                      <li key={f.bird.id}>
-                        <button
-                          onClick={() => onBird(f.bird.id)}
-                          className={cx("flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left", selectedBird === f.bird.id ? "bg-accent/15" : "hover:bg-ink/[0.04]")}
-                        >
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: FIX_STATUS[f.status].color }} title={FIX_STATUS[f.status].label} />
-                          <span className="font-mono text-[11px] font-semibold text-ink">{f.bird.id}</span>
-                          {f.bird.name && <span className="truncate text-[10px] text-muted">“{f.bird.name}”</span>}
-                          <span className="ml-auto truncate text-[10px] text-muted">{lastPlace(f)}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-/* ---------- right panel: monitoring teams ---------- */
-
-function TeamsSection({ fixes, teamOf, onAssign, teamFilter, onTeamFilter, onBird }: {
-  fixes: Fix[];
-  teamOf: (bird: MonitorBird) => TeamId;
-  onAssign: (bird: MonitorBird, team: TeamId) => void;
-  teamFilter: TeamId | "";
-  onTeamFilter: (t: TeamId | "") => void;
-  onBird: (id: string) => void;
-}) {
-  const [open, setOpen] = useState<TeamId | null>(null);
-  // Demo permission: the signed-in demo user may reassign birds once editing is switched on.
-  const [editing, setEditing] = useState(false);
-  const byTeam = useMemo(() => {
-    const m = new Map<TeamId, Fix[]>(MONITOR_TEAMS.map((t) => [t.id, []]));
-    for (const f of fixes) m.get(teamOf(f.bird))!.push(f);
-    return m;
-  }, [fixes, teamOf]);
-
-  return (
-    <section className="flex min-h-[190px] flex-1 flex-col border-t-4 border-line" aria-label="Monitoring teams">
-      <div className="flex items-center justify-between gap-2 px-4 pb-1.5 pt-2.5">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink" title="Each bird belongs to one team. Default split by species group; changes are saved in this browser.">
-          <Users size={15} className="text-accent" /> Monitoring teams
-        </h2>
-        <button
-          onClick={() => setEditing((v) => !v)}
-          className={cx("inline-flex h-7 items-center gap-1 rounded-lg border px-2 text-[11px] font-medium", editing ? "border-accent bg-accent/12 text-ink" : "border-line-strong text-muted hover:text-ink")}
-          title="Demo permission: the signed-in user can reassign birds"
-          aria-pressed={editing}
-        >
-          {editing ? <Unlock size={12} /> : <Lock size={12} />} {editing ? "Editing assignments" : "Edit assignments"}
-        </button>
-      </div>
-      <ul className="scroll-thin min-h-0 flex-1 space-y-1.5 overflow-y-auto px-2 pb-3">
-        {MONITOR_TEAMS.map((team) => {
-          const birds = byTeam.get(team.id)!;
-          const st = monitorState(birds);
-          const species = new Set(birds.map((f) => f.bird.speciesId)).size;
-          const expanded = open === team.id;
-          return (
-            <li key={team.id} className={cx("rounded-xl border", expanded ? "border-accent/40" : "border-line")}>
-              <button onClick={() => setOpen(expanded ? null : team.id)} aria-expanded={expanded} className="flex w-full items-center gap-3 px-3 py-2 text-left">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink/[0.06] text-sm font-bold text-ink">{team.name.split(" ")[1][0]}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="text-[13px] font-semibold text-ink">{team.name}</span>
-                    <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: st.color }}>
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} />
-                      {st.noSignal ? "Check" : "OK"}
-                    </span>
-                  </span>
-                  <span className="num block truncate text-[11px] text-muted">
-                    {birds.length} birds · {species} species · {st.detected} detected · {st.noSignal} no signal
-                  </span>
-                </span>
-                <ChevronDown size={14} className={cx("shrink-0 text-faint transition", expanded && "rotate-180")} />
-              </button>
-              {expanded && (
-                <div className="border-t border-line px-2 pb-2 pt-2">
-                  <div className="flex flex-wrap items-center gap-1.5 px-1">
-                    <span className="text-[10px] text-muted">
-                      Lead {team.lead} · {team.focus}
-                    </span>
-                    <button
-                      onClick={() => onTeamFilter(teamFilter === team.id ? "" : team.id)}
-                      className={cx("ml-auto h-6 rounded-md border px-1.5 text-[10px] font-medium", teamFilter === team.id ? "border-accent bg-accent text-white" : "border-line-strong text-ink hover:border-accent/50")}
-                    >
-                      {teamFilter === team.id ? "Showing on map" : "Show on map"}
-                    </button>
-                  </div>
-                  <ul className="scroll-thin mt-1.5 max-h-64 overflow-y-auto">
-                    {birds.map((f) => {
-                      const sp = MONITOR_SPECIES_BY_ID[f.bird.speciesId];
-                      return (
-                        <li key={f.bird.id} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-ink/[0.04]">
-                          <button onClick={() => onBird(f.bird.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                            <SpeciesAvatar code={sp.code} size={24} ring={sp.color} />
-                            <span className="min-w-0 flex-1">
-                              <span className="flex items-baseline gap-1.5">
-                                <span className="font-mono text-[11px] font-semibold text-ink">{f.bird.id}</span>
-                                <span className="truncate text-[10px] text-muted">{sp.common}</span>
-                              </span>
-                              <span className="block truncate text-[10px] text-faint">
-                                <span style={{ color: FIX_STATUS[f.status].color }}>●</span> {lastPlace(f)}
-                              </span>
-                            </span>
-                          </button>
-                          {editing && (
-                            <select
-                              value={team.id}
-                              onChange={(e) => onAssign(f.bird, e.target.value as TeamId)}
-                              aria-label={`Team for ${f.bird.id}`}
-                              className="h-6 rounded-md border border-line-strong bg-panel-solid px-1 text-[10px] text-ink"
-                            >
-                              {MONITOR_TEAMS.map((t) => (
-                                <option key={t.id} value={t.id}>
-                                  {t.name.replace("Team ", "")}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-/** Small card over the map for the selected tree; the full tree view opens from it. */
-function TreeFloat({ tree, fixes, onOpen, onClose }: { tree: AviaryTree; fixes: Map<string, Fix>; onOpen: () => void; onClose: () => void }) {
+/** Compact, closable card for the selected tree; the vertical view opens from it. */
+function TreeFloat({ tree, fixes, onOpen, onClose, onBird }: { tree: AviaryTree; fixes: Map<string, Fix>; onOpen: () => void; onClose: () => void; onBird: (id: string) => void }) {
   const occ = treeOccupants(fixes, tree.id);
-  const codes = [...new Set(occ.map((f) => MONITOR_SPECIES_BY_ID[f.bird.speciesId]))];
+  const byLevel = LEVELS.filter((l) => l.id === "ground" || l.min < tree.heightM).map((l) => ({ l, n: occ.filter((f) => f.levelId === l.id).length }));
+  const last = occ.reduce((m, f) => Math.max(m, f.det!.at), 0);
   return (
-    <div className="absolute bottom-3 left-3 w-[290px] rounded-xl border border-line-strong bg-panel-solid/95 p-3 shadow-lg backdrop-blur">
+    <div className="absolute bottom-3 left-3 w-[300px] rounded-xl border border-line-strong bg-panel-solid/95 p-3 shadow-lg backdrop-blur">
       <button onClick={onClose} className="absolute right-2 top-2 rounded-md p-1 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Close">
         <X size={14} />
       </button>
@@ -973,18 +759,33 @@ function TreeFloat({ tree, fixes, onOpen, onClose }: { tree: AviaryTree; fixes: 
         {tree.plantSpecies && <span>— {tree.plantSpecies}</span>}
       </p>
       <p className="mt-0.5 text-[11px] text-muted">
-        {tree.heightM.toFixed(1)} m · {MONITOR_ZONE_BY_ID[tree.zoneId].name} · {occ.length} birds · <span className="text-warn">demo tree</span>
+        {tree.heightM.toFixed(1)} m · {MONITOR_ZONE_BY_ID[tree.zoneId].name} · {occ.length} birds{last ? ` · last ${fmtTime(last)}` : ""} · <span className="text-warn">demo</span>
       </p>
-      {codes.length > 0 && (
-        <span className="mt-2 flex -space-x-1.5">
-          {codes.slice(0, 9).map((sp) => (
-            <SpeciesAvatar key={sp.id} code={sp.code} size={24} ring={sp.color} title={sp.common} />
-          ))}
-          {codes.length > 9 && <span className="pl-2.5 text-[10px] text-muted">+{codes.length - 9}</span>}
-        </span>
-      )}
-      <button onClick={onOpen} className="mt-2.5 inline-flex h-7 items-center gap-1 rounded-lg bg-accent px-2.5 text-[11px] font-semibold text-white">
-        Open tree view
+      <div className="mt-2 flex gap-1">
+        {byLevel.reverse().map(({ l, n }) => (
+          <span key={l.id} className="flex-1 rounded-md bg-ink/[0.04] px-1 py-0.5 text-center" title={l.label}>
+            <span className="block text-[9px] text-faint">{LEVEL_SHORT[l.id]}</span>
+            <span className="num text-xs font-semibold text-ink">{n}</span>
+          </span>
+        ))}
+      </div>
+      <ul className="scroll-thin mt-2 max-h-32 overflow-y-auto">
+        {occ.map((f) => {
+          const sp = MONITOR_SPECIES_BY_ID[f.bird.speciesId];
+          return (
+            <li key={f.bird.id}>
+              <button onClick={() => onBird(f.bird.id)} className="flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-ink/[0.04]">
+                <SpeciesAvatar code={sp.code} size={20} ring={FIX_STATUS[f.status].color} />
+                <span className="font-mono text-[11px] font-semibold text-ink">{f.bird.id}</span>
+                <span className="truncate text-[10px] text-muted">{sp.common}</span>
+                <span className="num ml-auto text-[10px] text-ink">{f.det!.pos!.y.toFixed(1)} m</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <button onClick={onOpen} className="mt-2 inline-flex h-7 items-center gap-1 rounded-lg bg-accent px-2.5 text-[11px] font-semibold text-white">
+        Vertical tree view
       </button>
     </div>
   );

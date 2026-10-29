@@ -40,7 +40,9 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
         .map((f) => ({
           id: f.bird.id,
           pos: f.det!.pos!,
+          species: MONITOR_SPECIES_BY_ID[f.bird.speciesId].code,
           color: MONITOR_SPECIES_BY_ID[f.bird.speciesId].color,
+          ring: FIX_STATUS[f.status].color,
           dim: false,
           label: `${f.bird.id} · ${MONITOR_SPECIES_BY_ID[f.bird.speciesId].common}`,
         })),
@@ -72,7 +74,7 @@ function OverviewInner({ registry, ds, src, treeById }: TrackingState) {
         <div className="min-w-0">
           <p className="eyebrow">Aviary · The Rainforest</p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-            <h1 className="text-[24px] font-semibold tracking-tight text-ink">Aviary overview</h1>
+            <h1 className="text-[24px] font-semibold tracking-tight text-ink">Aviary activity</h1>
             <span className="inline-flex items-center gap-1.5 text-xs text-muted">
               <span className="h-2 w-2 rounded-full bg-ok" />
               Simulated data · clock at {fmtTime(asOf)}

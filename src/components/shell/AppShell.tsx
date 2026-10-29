@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { Activity, Bird, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { Activity, BellRing, Bird, FileText, PanelLeftClose, PanelLeftOpen, TreePine, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { useDemo } from "@/state/DemoProvider";
 import { fmtDateTime } from "@/logic/time";
 import { cx } from "@/components/ui/primitives";
@@ -15,6 +15,7 @@ import { PenguinChat } from "@/features/chat/PenguinChat";
 import { ChartTipLayer } from "@/components/charts/Charts";
 
 const SESSION_KEY = "penguin-demo/session";
+const MENU_KEY = "penguin-demo/menu-collapsed";
 
 /** Demo user saved in this browser; `undefined` while it is read. */
 function useDemoSession() {
@@ -46,7 +47,7 @@ type ModuleId = "penguins" | "aviary";
 
 const MODULES: { id: ModuleId; label: string; home: string }[] = [
   { id: "penguins", label: "Penguins", home: "/penguins/overview" },
-  { id: "aviary", label: "Aviary", home: "/aviary" },
+  { id: "aviary", label: "Aviary", home: "/aviary/map" },
 ];
 
 const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exact?: boolean }[]> = {
@@ -61,11 +62,14 @@ const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exa
     { href: "/penguins/rules", label: "Proposed rules", icon: ListChecks },
   ],
   aviary: [
-    { href: "/aviary", label: "Overview", icon: LayoutDashboard, exact: true },
-    { href: "/aviary/map", label: "Habitat map", icon: MapIcon },
+    { href: "/aviary/map", label: "Map", icon: MapIcon },
     { href: "/aviary/species", label: "Species", icon: Feather },
-    { href: "/aviary/birds", label: "Bird registry", icon: IdCard },
-    { href: "/aviary/rules", label: "Proposed rules", icon: ListChecks },
+    { href: "/aviary/birds", label: "Individuals", icon: IdCard },
+    { href: "/aviary/trees", label: "Trees", icon: TreePine },
+    { href: "/aviary/teams", label: "Teams", icon: Users },
+    { href: "/aviary", label: "Activity", icon: Activity, exact: true },
+    { href: "/aviary/rules", label: "Alerts", icon: BellRing },
+    { href: "/aviary/reports", label: "Reports", icon: FileText },
   ],
 };
 
@@ -87,6 +91,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [scenarioOpen, setScenarioOpen] = useState(false);
   const session = useDemoSession();
+  // Compact menu: icons only, so pages like the aviary map get more room. Remembered in this browser.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    let saved = false;
+    try {
+      saved = localStorage.getItem(MENU_KEY) === "1";
+    } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCollapsed(saved);
+  }, []);
+  const toggleCollapsed = () =>
+    setCollapsed((v) => {
+      try {
+        localStorage.setItem(MENU_KEY, v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -104,31 +125,35 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 
   const mod = moduleOf(pathname);
+  const slim = collapsed;
 
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-panel-solid/80 px-3 py-5 backdrop-blur md:flex">
-        <Link href="/penguins/overview" className="mb-5 block px-1">
-          <span className="flex justify-center rounded-2xl bg-white px-4 py-2.5 shadow-[0_4px_14px_rgba(11,36,64,0.10)]">
+      <aside className={cx("sticky top-0 hidden h-screen shrink-0 flex-col border-r border-line bg-panel-solid/80 py-5 backdrop-blur transition-[width] md:flex", slim ? "w-[68px] px-2" : "w-[248px] px-3")}>
+        <Link href="/penguins/overview" className={cx("block", slim ? "mb-4" : "mb-5 px-1")} title="Animal Care Platform">
+          <span className={cx("flex justify-center rounded-2xl bg-white shadow-[0_4px_14px_rgba(11,36,64,0.10)]", slim ? "px-1 py-1.5" : "px-4 py-2.5")}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/seaworld-abu-dhabi.png" alt="SeaWorld Abu Dhabi" className="h-14 w-auto" />
+            <img src="/brand/seaworld-abu-dhabi.png" alt="SeaWorld Abu Dhabi" className={slim ? "h-7 w-auto" : "h-14 w-auto"} />
           </span>
-          <span className="mt-2.5 block text-center leading-tight">
-            <span className="block text-[13px] font-semibold tracking-tight">Animal Care Platform</span>
-            <span className="block text-[11px] text-faint">Concept demo</span>
-          </span>
+          {!slim && (
+            <span className="mt-2.5 block text-center leading-tight">
+              <span className="block text-[13px] font-semibold tracking-tight">Animal Care Platform</span>
+              <span className="block text-[11px] text-faint">Concept demo</span>
+            </span>
+          )}
         </Link>
 
-        <ModuleSwitch mod={mod} />
+        <ModuleSwitch mod={mod} slim={slim} />
 
         {(
           <button
             onClick={() => setSearchOpen(true)}
-            className="mb-3 flex h-9 items-center gap-2 rounded-xl border border-line bg-ink/[0.02] px-3 text-xs text-muted transition hover:border-line-strong hover:text-ink"
+            title={mod === "aviary" ? "Find a bird (Ctrl K)" : "Find a penguin (Ctrl K)"}
+            className={cx("mb-3 flex h-9 items-center gap-2 rounded-xl border border-line bg-ink/[0.02] text-xs text-muted transition hover:border-line-strong hover:text-ink", slim ? "justify-center px-0" : "px-3")}
           >
             <Search size={14} />
-            {mod === "aviary" ? "Find a bird" : "Find a penguin"}
-            <kbd className="ml-auto rounded border border-line px-1 font-mono text-[10px] text-faint">Ctrl K</kbd>
+            {!slim && (mod === "aviary" ? "Find a bird" : "Find a penguin")}
+            {!slim && <kbd className="ml-auto rounded border border-line px-1 font-mono text-[10px] text-faint">Ctrl K</kbd>}
           </button>
         )}
 
@@ -140,20 +165,24 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={href}
                 href={href}
                 aria-current={active ? "page" : undefined}
+                title={slim ? label : undefined}
+                aria-label={slim ? label : undefined}
                 className={cx(
-                  "group relative flex h-10 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition",
+                  "group relative flex h-10 items-center gap-3 rounded-xl text-[13px] font-medium transition",
+                  slim ? "justify-center px-0" : "px-3",
                   active ? "bg-gradient-to-r from-accent/14 to-transparent text-ink" : "text-muted hover:bg-ink/[0.03] hover:text-ink",
                 )}
               >
                 {active && <span className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-accent" />}
                 <Icon size={17} className={active ? "text-accent" : "text-faint group-hover:text-muted"} />
-                {label}
+                {!slim && label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-auto space-y-2 px-1">
+        <div className={cx("mt-auto space-y-2", !slim && "px-1")}>
+          {!slim && (
           <div className="rounded-xl border border-line bg-ink/[0.02] p-3">
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-accent-2" />
@@ -166,7 +195,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               What needs validation →
             </Link>
           </div>
-          {mod === "penguins" && (
+          )}
+          {mod === "penguins" && !slim && (
             <button
               onClick={() => setScenarioOpen(true)}
               className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-faint transition hover:text-muted"
@@ -176,11 +206,21 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           )}
           <button
+            onClick={toggleCollapsed}
+            className={cx("flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-faint transition hover:text-muted", slim && "justify-center")}
+            title={slim ? "Expand the menu" : "Collapse the menu"}
+            aria-label={slim ? "Expand the menu" : "Collapse the menu"}
+          >
+            {slim ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={13} />}
+            {!slim && "Collapse menu"}
+          </button>
+          <button
             onClick={session.leave}
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-faint transition hover:text-muted"
+            title={`Sign out · ${session.user}`}
+            className={cx("flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-faint transition hover:text-muted", slim && "justify-center")}
           >
             <LogOut size={13} />
-            <span className="truncate">Sign out · {session.user}</span>
+            {!slim && <span className="truncate">Sign out · {session.user}</span>}
           </button>
         </div>
       </aside>
@@ -204,9 +244,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 /** Switches between the two animal areas. */
-function ModuleSwitch({ mod, compact }: { mod: ModuleId; compact?: boolean }) {
+function ModuleSwitch({ mod, compact, slim }: { mod: ModuleId; compact?: boolean; slim?: boolean }) {
   return (
-    <div role="tablist" aria-label="Area" className={cx("grid grid-cols-2 rounded-xl border border-line bg-ink/[0.05] p-0.5", compact ? "w-full" : "mb-4")}>
+    <div role="tablist" aria-label="Area" className={cx("grid rounded-xl border border-line bg-ink/[0.05] p-0.5", slim ? "mb-4 grid-cols-1 gap-0.5" : "grid-cols-2", compact ? "w-full" : !slim && "mb-4")}>
       {MODULES.map((m) => (
         <Link
           key={m.id}
@@ -218,7 +258,7 @@ function ModuleSwitch({ mod, compact }: { mod: ModuleId; compact?: boolean }) {
             mod === m.id ? "bg-panel-solid text-ink shadow-[0_0_0_1px_var(--line-strong)]" : "text-muted hover:text-ink",
           )}
         >
-          {m.label}
+          {slim ? m.label.slice(0, 3) : m.label}
         </Link>
       ))}
     </div>

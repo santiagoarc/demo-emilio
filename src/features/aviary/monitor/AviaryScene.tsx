@@ -18,6 +18,7 @@ import {
 import { LAGOON, WATERFALL_POOL, type STRUCTURES } from "@/data/aviaryTrackingSimulate";
 import { hashSeed, mulberry32 } from "@/logic/rng";
 import { cx } from "@/components/ui/primitives";
+import { SPECIES_ICON } from "@/data/aviarySpeciesIcons";
 
 /**
  * Markers keep the same size on screen at any zoom, like the penguin map dots.
@@ -52,12 +53,110 @@ function dotTexture(color: string, cache: Map<string, THREE.CanvasTexture>) {
   return tex;
 }
 
+/** Round species image with a white edge, drawn once per species. */
+function speciesTexture(code: string, cache: Map<string, THREE.CanvasTexture>) {
+  const hit = cache.get(code);
+  if (hit) return hit;
+  const S = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#9fb3c2";
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2);
+  g.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const icon = SPECIES_ICON[code];
+  if (icon) {
+    const img = new Image();
+    img.onload = () => {
+      const side = Math.min(img.width, img.height) * icon.zoom;
+      const sx = Math.min(img.width - side, Math.max(0, icon.fx * img.width - side / 2));
+      const sy = Math.min(img.height - side, Math.max(0, icon.fy * img.height - side / 2));
+      g.clearRect(0, 0, S, S);
+      g.save();
+      g.beginPath();
+      g.arc(S / 2, S / 2, S / 2 - 7, 0, Math.PI * 2);
+      g.clip();
+      g.drawImage(img, sx, sy, side, side, 0, 0, S, S);
+      g.restore();
+      g.strokeStyle = "#ffffff";
+      g.lineWidth = 6;
+      g.beginPath();
+      g.arc(S / 2, S / 2, S / 2 - 7, 0, Math.PI * 2);
+      g.stroke();
+      tex.needsUpdate = true;
+    };
+    img.src = icon.src;
+  }
+  cache.set(code, tex);
+  return tex;
+}
+
+/** Status ring drawn behind the species image. */
+function statusRingTexture(color: string, cache: Map<string, THREE.CanvasTexture>) {
+  const hit = cache.get(color);
+  if (hit) return hit;
+  const S = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d")!;
+  g.fillStyle = color;
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
+  g.fill();
+  const tex = new THREE.CanvasTexture(c);
+  cache.set(color, tex);
+  return tex;
+}
+
+/** Group marker: how many birds overlap on screen there. */
+function clusterTexture(label: string, cache: Map<string, THREE.CanvasTexture>) {
+  const hit = cache.get(label);
+  if (hit) return hit;
+  const S = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "rgba(14,159,149,0.28)";
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "#ffffff";
+  g.strokeStyle = "#0e9f95";
+  g.lineWidth = 7;
+  g.beginPath();
+  g.arc(S / 2, S / 2, S / 2 - 14, 0, Math.PI * 2);
+  g.fill();
+  g.stroke();
+  g.fillStyle = "#0b2440";
+  g.font = `700 ${label.length > 2 ? 34 : 42}px system-ui, sans-serif`;
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(label, S / 2, S / 2 + 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  cache.set(label, tex);
+  return tex;
+}
+
+/** Screen cell (px) inside which nearby birds are grouped. */
+const CLUSTER_CELL = 34;
+/** Trees show their ID once the camera is this close (perspective) or zoomed this far (2D). */
+const TREE_LABEL_DIST = 85;
+const TREE_LABEL_ZOOM = 1.7;
+
 
 export interface ScenePoint {
   id: string;
   pos: Vec3;
-  /** Dot colour: the colour of the bird's species. */
+  /** Species code: the photo marker shows that species. */
+  species: string;
+  /** Colour of the species, used by the dot marker style. */
   color: string;
+  /** Status ring around the photo marker (detected, moving, no signal). */
+  ring: string;
   dim: boolean;
   label: string;
 }
@@ -89,6 +188,10 @@ export interface AviarySceneProps {
   /** Glide markers to their new position instead of jumping. */
   smooth?: boolean;
   layers?: SceneLayers;
+  /** Species photo with a status ring (default) or a dot in the species colour. */
+  markerStyle?: "photo" | "dot";
+  /** Group birds that overlap on screen into a counter; they split when zooming in. */
+  cluster?: boolean;
   onSelectBird: (id: string) => void;
   onSelectTree: (id: string) => void;
   onSelectZone: (id: string) => void;
@@ -171,9 +274,14 @@ interface Rig {
   ctl3: OrbitControls;
   ctl2: OrbitControls;
   markers: THREE.Group;
-  pool: THREE.Sprite[];
+  pool: { icon: THREE.Sprite; ring: THREE.Sprite }[];
+  clusterPool: THREE.Sprite[];
+  /** Groups shown in the last frame, in screen pixels, for picking. */
+  clusters: { sx: number; sy: number; pos: Vec3; n: number }[];
+  /** Birds folded into a group in the last frame (not pickable on their own). */
+  hidden: Set<string>;
   spriteMat: (key: string, make: () => THREE.SpriteMaterial) => THREE.SpriteMaterial;
-  dotTex: Map<string, THREE.CanvasTexture>;
+  tex: Map<string, THREE.CanvasTexture>;
   treeParts: Map<string, THREE.Mesh[]>;
   zoneFills: Map<string, THREE.Mesh>;
   dome: THREE.Group;
@@ -185,7 +293,7 @@ interface Rig {
   trail: THREE.Line;
   zoneEdges: THREE.Object3D[];
   /** Bird markers: shown position glides toward the target position. */
-  marks: { ids: string[]; cur: Float32Array; tgt: Float32Array; scale: Float32Array };
+  marks: { ids: string[]; cur: Float32Array; tgt: Float32Array; scale: Float32Array; dim: Uint8Array };
   fly: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t0: number } | null;
 }
 
@@ -449,11 +557,13 @@ export function AviaryScene(props: AviarySceneProps) {
     trail.visible = false;
     scene.add(trail);
 
-    const rig: Rig = { renderer, scene, persp, ortho, ctl3, ctl2, markers, pool: [], spriteMat, dotTex: new Map(), treeParts, zoneFills, dome, levelBand, selRing, selDrop, precision, treeRing, trail, zoneEdges, marks: { ids: [], cur: new Float32Array(0), tgt: new Float32Array(0), scale: new Float32Array(0) }, fly: null };
+    const rig: Rig = { renderer, scene, persp, ortho, ctl3, ctl2, markers, pool: [], clusterPool: [], clusters: [], hidden: new Set(), spriteMat, tex: new Map(), treeParts, zoneFills, dome, levelBand, selRing, selDrop, precision, treeRing, trail, zoneEdges, marks: { ids: [], cur: new Float32Array(0), tgt: new Float32Array(0), scale: new Float32Array(0), dim: new Uint8Array(0) }, fly: null };
     rigRef.current = rig;
 
     // Size
     const resize = () => {
+      // A stale hover tip would stay where the layout used to be.
+      if (tipRef.current) tipRef.current.style.opacity = "0";
       const w = wrap.clientWidth, h = wrap.clientHeight;
       renderer.setSize(w, h, false);
       persp.aspect = w / Math.max(1, h);
@@ -479,10 +589,16 @@ export function AviaryScene(props: AviarySceneProps) {
       const dt = lastT ? Math.min(100, time - lastT) : 16;
       lastT = time;
       const k = p.smooth === false ? 1 : 1 - Math.exp(-dt / 350);
-      const { ids, cur, tgt, scale } = rig.marks;
+      const { ids, cur, tgt, scale, dim } = rig.marks;
+      const photo = p.markerStyle !== "dot";
       // Perspective: size as a share of the view. Orthographic has no distance, so convert to metres.
-      const unit = p.mode === "2d" ? MARK * ((ortho.top - ortho.bottom) / ortho.zoom) : MARK * 2 * Math.tan(((persp.fov / 2) * Math.PI) / 180);
-      selRing.scale.setScalar(unit * 2.6);
+      const base = p.mode === "2d" ? MARK * ((ortho.top - ortho.bottom) / ortho.zoom) : MARK * 2 * Math.tan(((persp.fov / 2) * Math.PI) / 180);
+      const unit = base * (photo ? 1.7 : 1);
+      selRing.scale.setScalar(unit * 2.2);
+      const camNow = p.mode === "2d" ? ortho : persp;
+      const W0 = wrap.clientWidth, H0 = wrap.clientHeight;
+      const grouping = p.cluster !== false;
+      const cells = new Map<number, number[]>();
       let selIdx = -1;
       for (let i = 0; i < ids.length; i++) {
         const o = i * 3;
@@ -490,11 +606,61 @@ export function AviaryScene(props: AviarySceneProps) {
         cur[o + 1] += (tgt[o + 1] - cur[o + 1]) * k;
         cur[o + 2] += (tgt[o + 2] - cur[o + 2]) * k;
         const mk = rig.pool[i];
-        mk.position.set(cur[o], cur[o + 1] + LIFT, cur[o + 2]);
+        mk.icon.position.set(cur[o], cur[o + 1] + LIFT, cur[o + 2]);
+        mk.ring.position.copy(mk.icon.position);
         const sz = unit * scale[i];
-        mk.scale.set(sz, sz, 1);
-        if (ids[i] === p.selectedBirdId) selIdx = i;
+        mk.icon.scale.set(sz, sz, 1);
+        mk.ring.scale.set(sz * 1.24, sz * 1.24, 1);
+        mk.icon.visible = true;
+        mk.ring.visible = photo;
+        if (ids[i] === p.selectedBirdId) {
+          selIdx = i;
+          continue;
+        }
+        if (!grouping || dim[i]) continue;
+        v.copy(mk.icon.position).project(camNow);
+        if (v.z > 1) continue;
+        const key = Math.floor((((v.x + 1) / 2) * W0) / CLUSTER_CELL) * 4096 + Math.floor((((1 - v.y) / 2) * H0) / CLUSTER_CELL);
+        const cell = cells.get(key);
+        if (cell) cell.push(i);
+        else cells.set(key, [i]);
       }
+      // Three or more birds in one screen cell become a counter; zooming in splits them.
+      rig.hidden.clear();
+      let ci = 0;
+      for (const list of cells.values()) {
+        if (list.length < 3) continue;
+        let x = 0, y = 0, z = 0;
+        for (const i of list) {
+          const pos = rig.pool[i].icon.position;
+          x += pos.x;
+          y += pos.y;
+          z += pos.z;
+          rig.pool[i].icon.visible = false;
+          rig.pool[i].ring.visible = false;
+          rig.hidden.add(ids[i]);
+        }
+        x /= list.length;
+        y /= list.length;
+        z /= list.length;
+        let cs = rig.clusterPool[ci];
+        if (!cs) {
+          cs = new THREE.Sprite();
+          cs.renderOrder = 12;
+          markers.add(cs);
+          rig.clusterPool.push(cs);
+        }
+        const label = list.length > 99 ? "99+" : String(list.length);
+        cs.material = spriteMat(`c:${label}`, () => new THREE.SpriteMaterial({ map: clusterTexture(label, rig.tex), depthTest: false, transparent: true, sizeAttenuation: false }));
+        cs.position.set(x, y, z);
+        cs.scale.setScalar(unit * (1.25 + Math.min(0.7, list.length / 30)));
+        cs.visible = true;
+        v.set(x, y, z).project(camNow);
+        rig.clusters[ci] = { sx: ((v.x + 1) / 2) * W0, sy: ((1 - v.y) / 2) * H0, pos: { x, y, z }, n: list.length };
+        ci++;
+      }
+      for (let j = ci; j < rig.clusterPool.length; j++) rig.clusterPool[j].visible = false;
+      rig.clusters.length = ci;
       if (selIdx >= 0) {
         const o = selIdx * 3;
         selRing.position.set(cur[o], cur[o + 1] + LIFT, cur[o + 2]);
@@ -522,9 +688,18 @@ export function AviaryScene(props: AviarySceneProps) {
       ctl.update();
       renderer.render(scene, cam);
       const w = wrap.clientWidth, h = wrap.clientHeight;
+      const near = p.mode === "2d" ? ortho.zoom > TREE_LABEL_ZOOM : persp.position.distanceTo(ctl3.target) < TREE_LABEL_DIST;
+      const placed: number[] = [];
       wrap.querySelectorAll<HTMLElement>("[data-x]").forEach((el) => {
         v.set(+el.dataset.x!, +el.dataset.y!, +el.dataset.z!).project(cam);
-        const visible = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+        let visible = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+        if (el.dataset.tree !== undefined && visible) {
+          const X = ((v.x + 1) / 2) * w, Y = ((1 - v.y) / 2) * h;
+          let free = near;
+          for (let q = 0; free && q < placed.length; q += 2) if (Math.abs(placed[q] - X) < 34 && Math.abs(placed[q + 1] - Y) < 18) free = false;
+          if (free) placed.push(X, Y);
+          visible = free;
+        }
         el.style.opacity = visible ? "" : "0";
         el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h + Number(el.dataset.dy ?? 0)}px) translate(-50%, -50%)`;
       });
@@ -533,14 +708,18 @@ export function AviaryScene(props: AviarySceneProps) {
     // Picking: birds in screen space (they are small), trees by raycast.
     const ray = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
-    const pick = (cx: number, cy: number): { type: "bird" | "tree"; id: string; label: string } | null => {
+    const pick = (cx: number, cy: number): { type: "bird" | "tree" | "cluster"; id: string; label: string; pos?: Vec3 } | null => {
       const p = propsRef.current;
       const cam = p.mode === "2d" ? ortho : persp;
       const rect = renderer.domElement.getBoundingClientRect();
       const x = cx - rect.left, y = cy - rect.top;
+      for (const c of rig.clusters) {
+        if (Math.hypot(c.sx - x, c.sy - y) < 20) return { type: "cluster", id: "", label: `${c.n} birds here · click to zoom in`, pos: c.pos };
+      }
       let best: ScenePoint | null = null;
       let bestD = 16;
       for (const pt of p.points) {
+        if (rig.hidden.has(pt.id)) continue;
         v.set(pt.pos.x, pt.pos.y + LIFT, pt.pos.z).project(cam);
         if (v.z > 1) continue;
         const d = Math.hypot(((v.x + 1) / 2) * rect.width - x, ((1 - v.y) / 2) * rect.height - y) - (pt.dim ? 3 : 0);
@@ -560,6 +739,20 @@ export function AviaryScene(props: AviarySceneProps) {
       return null;
     };
 
+    /** Clicking a group flies closer to it, so its birds split apart. */
+    const zoomInto = (pos: Vec3) => {
+      const to = new THREE.Vector3(pos.x, pos.y, pos.z);
+      if (propsRef.current.mode === "2d") {
+        ortho.zoom = Math.min(8, ortho.zoom * 2);
+        ortho.updateProjectionMatrix();
+        rig.fly = { from: ctl2.target.clone(), to: new THREE.Vector3(to.x, 0, to.z), camFrom: ortho.position.clone(), camTo: new THREE.Vector3(to.x, 160, to.z), t0: performance.now() };
+      } else {
+        const off = persp.position.clone().sub(ctl3.target);
+        const len = Math.max(14, off.length() * 0.45);
+        rig.fly = { from: ctl3.target.clone(), to, camFrom: persp.position.clone(), camTo: to.clone().add(off.setLength(len)), t0: performance.now() };
+      }
+    };
+
     const el = renderer.domElement;
     let down: { x: number; y: number } | null = null;
     let hoverQueued = false;
@@ -570,6 +763,7 @@ export function AviaryScene(props: AviarySceneProps) {
       const hit = pick(e.clientX, e.clientY);
       if (hit?.type === "bird") propsRef.current.onSelectBird(hit.id);
       else if (hit?.type === "tree") propsRef.current.onSelectTree(hit.id);
+      else if (hit?.type === "cluster" && hit.pos) zoomInto(hit.pos);
     };
     const onMove = (e: PointerEvent) => {
       if (hoverQueued || e.buttons) return;
@@ -637,7 +831,7 @@ export function AviaryScene(props: AviarySceneProps) {
   }, []);
 
   /* ---------- birds ---------- */
-  const { points, selectedBirdId } = props;
+  const { points, selectedBirdId, markerStyle } = props;
   useEffect(() => {
     const rig = rigRef.current;
     if (!rig) return;
@@ -648,27 +842,38 @@ export function AviaryScene(props: AviarySceneProps) {
     const cur = new Float32Array(n * 3);
     const tgt = new Float32Array(n * 3);
     const scale = new Float32Array(n);
+    const dim = new Uint8Array(n);
+    const photo = markerStyle !== "dot";
     points.forEach((p, i) => {
+      dim[i] = p.dim ? 1 : 0;
       tgt.set([p.pos.x, p.pos.y, p.pos.z], i * 3);
       const j = prevIdx.get(p.id);
       cur.set(j === undefined ? [p.pos.x, p.pos.y, p.pos.z] : prev.cur.subarray(j * 3, j * 3 + 3), i * 3);
       scale[i] = p.id === selectedBirdId ? 1.6 : p.dim ? 0.6 : 1;
       while (rig.pool.length <= i) {
-        const dot = new THREE.Sprite();
-        rig.markers.add(dot);
-        rig.pool.push(dot);
+        const icon = new THREE.Sprite();
+        const ring = new THREE.Sprite();
+        rig.markers.add(ring, icon);
+        rig.pool.push({ icon, ring });
       }
       const mk = rig.pool[i];
-      mk.material = rig.spriteMat(`${p.color}:${p.dim ? "d" : ""}`, () => new THREE.SpriteMaterial({ map: dotTexture(p.color, rig.dotTex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.22 : 1 }));
-      mk.renderOrder = p.id === selectedBirdId ? 15 : p.dim ? 9 : 11;
-      mk.visible = true;
-      if (j === undefined) mk.position.set(p.pos.x, p.pos.y + LIFT, p.pos.z);
+      const d = p.dim ? "d" : "";
+      if (photo) {
+        mk.icon.material = rig.spriteMat(`p:${p.species}:${d}`, () => new THREE.SpriteMaterial({ map: speciesTexture(p.species, rig.tex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.25 : 1 }));
+        mk.ring.material = rig.spriteMat(`r:${p.ring}:${d}`, () => new THREE.SpriteMaterial({ map: statusRingTexture(p.ring, rig.tex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.2 : 1 }));
+      } else {
+        mk.icon.material = rig.spriteMat(`d:${p.color}:${d}`, () => new THREE.SpriteMaterial({ map: dotTexture(p.color, rig.tex), depthTest: false, transparent: true, sizeAttenuation: false, opacity: p.dim ? 0.22 : 1 }));
+      }
+      const top = p.id === selectedBirdId;
+      mk.icon.renderOrder = top ? 15 : p.dim ? 9 : 11;
+      mk.ring.renderOrder = top ? 14 : p.dim ? 8 : 10;
+      if (j === undefined) mk.icon.position.set(p.pos.x, p.pos.y + LIFT, p.pos.z);
     });
-    for (let i = n; i < rig.pool.length; i++) rig.pool[i].visible = false;
-    rig.marks = { ids: points.map((p) => p.id), cur, tgt, scale };
+    for (let i = n; i < rig.pool.length; i++) rig.pool[i].icon.visible = rig.pool[i].ring.visible = false;
+    rig.marks = { ids: points.map((p) => p.id), cur, tgt, scale, dim };
     const sel = points.some((p) => p.id === selectedBirdId);
     rig.selRing.visible = rig.selDrop.visible = sel;
-  }, [points, selectedBirdId, ready]);
+  }, [points, selectedBirdId, markerStyle, ready]);
 
   /* ---------- selection overlays ---------- */
   const { precision, trail, selectedTreeId, highlightZoneId, trees, dimTrees, level, mode } = props;
@@ -812,6 +1017,14 @@ export function AviaryScene(props: AviarySceneProps) {
             </button>
           );
         })}
+        {layers.labels &&
+          trees
+            .filter((t) => t.id !== selectedTreeId)
+            .map((t) => (
+              <span key={t.id} data-tree data-x={t.x} data-y={t.heightM + 0.6} data-z={t.z} className="absolute left-0 top-0 rounded bg-white/90 px-1 text-[9px] font-semibold text-ink shadow-sm ring-1 ring-line transition-opacity duration-200">
+                {t.id}
+              </span>
+            ))}
         {selTree && (
           <span key={`tree-${selTree.id}`} data-x={selTree.x} data-y={selTree.heightM + 1.5} data-z={selTree.z} className="absolute left-0 top-0 rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
             {selTree.id}
