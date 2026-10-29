@@ -2,9 +2,13 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowUpRight, Search, X } from "lucide-react";
 import { AGE_LABEL, FIX_STATUS, LEVELS, MONITOR_ZONES, MONITOR_ZONE_BY_ID, type FixStatus, type LevelId } from "@/domain/aviaryTracking";
 import { MONITOR_SPECIES, MONITOR_SPECIES_BY_ID } from "@/data/aviaryCatalog";
+import { MONITOR_TEAM_BY_ID } from "@/data/aviaryTeams";
+import { useTeamAssignments } from "@/state/useTeams";
+import { SpeciesAvatar } from "./SpeciesAvatar";
 import { fmtHeight } from "@/logic/aviaryTracking";
 import { fmtAgo, fmtDateTime } from "@/logic/time";
 import { Select } from "@/components/ui/primitives";
@@ -13,9 +17,11 @@ import { AviaryFrame, useAviarySnapshot } from "./common";
 
 const PAGE = 100;
 
-/** All 500 demo birds in one searchable table. A row opens the bird in the monitor. */
+/** Every bird in one searchable table, as the penguin registry. A row opens its individual profile. */
 export function BirdRegistry() {
   const { registry, fixes, asOf } = useAviarySnapshot();
+  const { teamOf } = useTeamAssignments(registry);
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [speciesId, setSpeciesId] = useState("");
   const [zoneId, setZoneId] = useState("");
@@ -40,7 +46,7 @@ export function BirdRegistry() {
 
   return (
     <div className="pb-12">
-      <PageHeader eyebrow="Aviary · Registry" title="Birds" subtitle={`${registry.birds.length} individual birds across ${registry.species.length} species. Positions as of ${fmtDateTime(asOf, asOf)}.`} />
+      <PageHeader eyebrow="Aviary · Registry" title="Individuals" subtitle={`${registry.birds.length} birds across ${registry.species.length} species. Open any of them to see its individual profile.`} />
       <AviaryFrame>
         <section className="panel p-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -89,45 +95,71 @@ export function BirdRegistry() {
           </p>
 
           <div className="scroll-thin mt-2 overflow-x-auto">
-            <table className="w-full min-w-[980px] text-xs">
+            <table className="w-full min-w-[920px] text-sm">
               <caption className="sr-only">Bird registry</caption>
               <thead>
-                <tr className="border-b border-line text-left text-[11px] text-muted">
-                  {["ID", "Species", "Age", "Sex", "Zone", "Tree", "Height", "Level", "Status", "Device", "Last detection"].map((h) => (
-                    <th key={h} scope="col" className="px-2 py-2 font-medium">{h}</th>
-                  ))}
+                <tr className="text-left text-[11px] uppercase tracking-wider text-faint">
+                  <th className="px-3 py-2.5 font-medium">Bird</th>
+                  <th className="px-3 py-2.5 font-medium">Species</th>
+                  <th className="px-3 py-2.5 font-medium">Team</th>
+                  <th className="px-3 py-2.5 font-medium">Last location</th>
+                  <th className="px-3 py-2.5 font-medium">Last detection</th>
+                  <th className="px-3 py-2.5 font-medium">Status</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {rows.slice(0, limit).map((f) => {
                   const sp = MONITOR_SPECIES_BY_ID[f.bird.speciesId];
+                  const team = MONITOR_TEAM_BY_ID[teamOf(f.bird)];
                   const d = f.det;
+                  const href = `/aviary/birds/${f.bird.id}`;
                   return (
-                    <tr key={f.bird.id} className="border-b border-line/60 hover:bg-ink/[0.025]">
-                      <td className="px-2 py-1.5">
-                        <Link href={`/aviary/map?bird=${f.bird.id}`} className="font-mono font-semibold text-ink hover:text-accent">{f.bird.id}</Link>
+                    <tr
+                      key={f.bird.id}
+                      role="link"
+                      tabIndex={0}
+                      onClick={() => router.push(href)}
+                      onKeyDown={(e) => e.key === "Enter" && router.push(href)}
+                      className="cursor-pointer border-t border-line transition hover:bg-accent/[0.06] focus-visible:bg-accent/[0.08] focus-visible:outline-none"
+                    >
+                      <td className="px-3 py-2">
+                        <Link href={href} className="flex items-center gap-2.5">
+                          <SpeciesAvatar code={sp.code} size={30} ring={sp.color} />
+                          <span>
+                            <span className="block font-mono font-medium">{f.bird.id}</span>
+                            <span className="block text-[11px] text-muted">{f.bird.name ?? `${AGE_LABEL[f.bird.ageClass]} · ${f.bird.ageYears.toFixed(1)} y`}</span>
+                          </span>
+                        </Link>
                       </td>
-                      <td className="px-2 py-1.5">
-                        <span className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: sp.color }} />
-                          <span className="text-ink">{sp.common}</span>
+                      <td className="px-3 py-2 text-muted">
+                        <Link href={`/aviary/species/${sp.id}`} onClick={(e) => e.stopPropagation()} className="hover:text-ink hover:underline">{sp.common}</Link>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center gap-1.5 text-muted">
+                          <span className="h-2 w-2 rounded-full" style={{ background: team.color }} />
+                          {team.name}
                         </span>
-                        <span className="block pl-3.5 text-[11px] italic text-muted">{sp.scientific}</span>
                       </td>
-                      <td className="px-2 py-1.5 text-muted">{AGE_LABEL[f.bird.ageClass]} · {f.bird.ageYears.toFixed(1)} y</td>
-                      <td className="px-2 py-1.5 text-muted">{f.bird.sex ? (f.bird.sex === "male" ? "M" : "F") : "—"}</td>
-                      <td className="px-2 py-1.5 text-muted">{d?.zoneId ? MONITOR_ZONE_BY_ID[d.zoneId].code : "—"}</td>
-                      <td className="px-2 py-1.5 text-ink">{d?.treeId ?? "—"}</td>
-                      <td className="num px-2 py-1.5 text-ink">{fmtHeight(d?.pos?.y)}</td>
-                      <td className="px-2 py-1.5 text-muted">{f.levelId ? LEVELS.find((l) => l.id === f.levelId)!.short : d?.kind === "zone" ? "Zone only" : "—"}</td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-3 py-2 text-xs text-muted">
+                        {d?.zoneId ? MONITOR_ZONE_BY_ID[d.zoneId].name : "—"}
+                        <span className="block text-[10px] text-faint">{[d?.treeId, d?.pos ? fmtHeight(d.pos.y) : d?.kind === "zone" ? "zone only" : null].filter(Boolean).join(" · ")}</span>
+                      </td>
+                      <td className="num px-3 py-2 text-xs text-muted" title={d ? fmtDateTime(d.at, asOf) : undefined}>
+                        {d ? fmtAgo(d.at, asOf) : "Never"}
+                        {d && <span className="block text-[10px] text-faint">{d.precisionM != null ? `± ${d.precisionM.toFixed(1)} m` : "zone level"} · {Math.round(d.confidence * 100)}%</span>}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
                         <span className="inline-flex items-center gap-1.5">
                           <span className="h-2 w-2 rounded-full" style={{ background: FIX_STATUS[f.status].color }} />
                           {FIX_STATUS[f.status].label}
                         </span>
                       </td>
-                      <td className="px-2 py-1.5 text-muted">{f.bird.device.status.replace("-", " ")}</td>
-                      <td className="px-2 py-1.5 text-muted">{d ? fmtAgo(d.at, asOf) : "never"}</td>
+                      <td className="px-3 py-2 text-right">
+                        <Link href={href} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
+                          Profile <ArrowUpRight size={12} />
+                        </Link>
+                      </td>
                     </tr>
                   );
                 })}

@@ -924,7 +924,7 @@ function StaffTab({ teamId }: { teamId: string }) {
 
 /* ───────────── helpers ───────────── */
 
-function Kpi({ icon: Icon, color, value, label, sub }: { icon: typeof Users; color: string; value: string; label: string; sub?: string }) {
+export function Kpi({ icon: Icon, color, value, label, sub }: { icon: typeof Users; color: string; value: string; label: string; sub?: string }) {
   return (
     <div className="panel flex items-center gap-3 px-4 py-3">
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl" style={{ background: `${color}1f`, color }}>
@@ -954,18 +954,18 @@ function SortTh({ k, t, onSort, sub, children }: { k: SortKey; t: { sort: SortKe
   );
 }
 
-function HBar({ value, max, color }: { value: number; max: number; color: string }) {
+export function HBar({ value, max, color, format = fmtHours }: { value: number; max: number; color: string; format?: (v: number) => string }) {
   return (
     <span className="flex items-center gap-2">
       <span className="h-2 w-14 overflow-hidden rounded-full bg-ink/[0.05]">
         <span className="block h-full rounded-full" style={{ width: `${(value / max) * 100}%`, background: color }} />
       </span>
-      <span className="num w-11 text-xs">{fmtHours(value)}</span>
+      <span className="num w-11 text-xs">{format(value)}</span>
     </span>
   );
 }
 
-function PageBtn({ children, active, disabled, onClick }: { children: ReactNode; active?: boolean; disabled?: boolean; onClick: () => void }) {
+export function PageBtn({ children, active, disabled, onClick }: { children: ReactNode; active?: boolean; disabled?: boolean; onClick: () => void }) {
   return (
     <button
       disabled={disabled}

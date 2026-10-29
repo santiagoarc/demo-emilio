@@ -4,10 +4,10 @@
  * draws its movement. "How is it doing?" compares the last 24 h against its own previous
  * days and against its species. Not a diagnosis: it only points at what may be worth a look.
  */
-import { FOOTPRINT, type MonitorBird, type Stay, type TrackingDataset } from "@/domain/aviaryTracking";
+import { FOOTPRINT, levelOf, type LevelId, type MonitorBird, type Stay, type TrackingDataset } from "@/domain/aviaryTracking";
 import { isWalk } from "@/data/aviaryTrackingSimulate";
 import type { InsightLevel, InsightPoint } from "./insights";
-import { DAY, MIN, startOfDay } from "./time";
+import { DAY, HOUR, MIN, startOfDay } from "./time";
 
 export interface FlightStats {
   /** Time in each state within the period (ms). */
@@ -146,6 +146,50 @@ export function flightByDay(bird: MonitorBird, stays: Stay[], windowStart: numbe
     out.push({ day: d0, flyingMin: s.flyingMs / MIN, flownM: s.flownM, flights: s.flights });
   }
   return out;
+}
+
+export type ActivityKey = "flying" | "walking" | "perched" | "ground";
+
+/** Adds [a, b) to the hour-of-day buckets it covers. */
+function spread(buckets: Record<ActivityKey, number>[], key: ActivityKey, a: number, b: number) {
+  let t = a;
+  while (t < b) {
+    const next = Math.min(b, Math.floor(t / HOUR) * HOUR + HOUR);
+    buckets[new Date(t).getHours()][key] += next - t;
+    t = next;
+  }
+}
+
+/**
+ * When in the day the bird flew, walked or stayed put (summed by hour of day over
+ * the period), how long it spent at each height level, and how often it changed
+ * tree or zone. Only for birds with positions.
+ */
+export function activityBreakdown(bird: MonitorBird, stays: Stay[], from: number, to: number) {
+  const end = Math.min(to, bird.signalLostAt ?? to);
+  const hourly = Array.from({ length: 24 }, () => ({ flying: 0, walking: 0, perched: 0, ground: 0 }));
+  const levels = new Map<LevelId, number>();
+  let treeChanges = 0;
+  let zoneChanges = 0;
+  for (let i = 0; i < stays.length; i++) {
+    const st = stays[i];
+    if (st.start > end) break;
+    const a = Math.max(st.start, from), b = Math.min(st.end, end);
+    if (b > a) {
+      spread(hourly, st.inCrown ? "perched" : "ground", a, b);
+      const lv = levelOf(st.pos.y).id;
+      levels.set(lv, (levels.get(lv) ?? 0) + (b - a));
+    }
+    const next = stays[i + 1];
+    if (!next) continue;
+    const ta = Math.max(st.end, from), tb = Math.min(next.start, end);
+    if (tb > ta) spread(hourly, isWalk(st, next) ? "walking" : "flying", ta, tb);
+    if (next.start >= from && next.start <= end) {
+      if (next.treeId !== st.treeId) treeChanges++;
+      if (next.zoneId !== st.zoneId) zoneChanges++;
+    }
+  }
+  return { hourly, levels, treeChanges, zoneChanges };
 }
 
 export interface BirdInsight {

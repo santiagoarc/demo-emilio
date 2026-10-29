@@ -11,7 +11,7 @@ import { snapshotAt, type Snapshot } from "@/logic/status";
 import { MIN } from "@/logic/time";
 import { clearPersisted, loadPersisted, savePersisted, shiftPersisted } from "./persistence";
 
-export const CURRENT_USER = "Demo user";
+export const CURRENT_USER = "You";
 
 /**
  * Demo user permissions. With real authentication they would come from the

@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Layers, Maximize2, Minimize2, Pause, Play, RotateCcw, TreePine, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Layers, Maximize2, Minimize2, Pause, Play, TreePine, X } from "lucide-react";
 import {
   FIX_STATUS,
   LEVELS,
@@ -19,12 +19,12 @@ import { MONITOR_TEAMS, MONITOR_TEAM_BY_ID, type TeamId } from "@/data/aviaryTea
 import { useTeamAssignments } from "@/state/useTeams";
 import { SpeciesSection, TeamsSection } from "./AviaryPanels";
 import { activityByHour, fmtHeight, snapshot, treeHistory, treeOccupants, type Fix } from "@/logic/aviaryTracking";
-import { HOUR, MIN, fmtDateTime, fmtTime } from "@/logic/time";
+import { HOUR, MIN, fmtTime } from "@/logic/time";
 import { useSimClock, useTracking, type TrackingState } from "@/state/useTracking";
 import { Segmented, cx } from "@/components/ui/primitives";
 import { Donut, LineChart } from "@/components/charts/Charts";
 import { DEFAULT_SCENE_LAYERS, type SceneLayers, type ScenePoint } from "./monitor/AviaryScene";
-import { AviaryScene, BirdCard, type BirdTab, SPEEDS, STATUS_ORDER, WINDOWS, type WindowId } from "./monitor/AviaryParts";
+import { AviaryScene, BirdCard, type BirdTab, STATUS_ORDER, WINDOWS, type WindowId } from "./monitor/AviaryParts";
 import { AviaryImageMap, type ZoneStat } from "./monitor/AviaryImageMap";
 import { SpeciesAvatar } from "./SpeciesAvatar";
 import { TreeIllustration, type TreeBird } from "./TreeIllustration";
@@ -49,7 +49,7 @@ function zoneCenter(zoneId: string): Vec3 {
 
 function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
   const params = useSearchParams();
-  const { clock, set: setClock, restart } = useSimClock(registry, ds.horizon);
+  const { clock, set: setClock } = useSimClock(registry, ds.horizon);
   const asOf = clock.simTime;
   const fixes = useMemo(() => snapshot(ds, src, asOf), [ds, src, asOf]);
   const all = useMemo(() => [...fixes.values()], [fixes]);
@@ -101,7 +101,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
   const [dimRest, setDimRest] = useState(true);
   // On the picture, birds are summarised by area first; picking an area shows its dots.
   const [aggregate, setAggregate] = useState(true);
-  const [smooth, setSmooth] = useState(true);
+  const smooth = true;
   const [tab, setTab] = useState<BirdTab>("location");
   const [win, setWin] = useState<WindowId>("6h");
 
@@ -168,6 +168,11 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
     setTeamFilter("");
     setZoneId("");
     setStatusF("");
+  };
+  const activeFilters = [zoneId, level !== "all", statusF, speciesId, teamFilter].filter(Boolean).length;
+  const clearFilters = () => {
+    clearPick();
+    setLevel("all");
   };
   const pickLabel = [
     speciesId && MONITOR_SPECIES_BY_ID[speciesId].common,
@@ -252,7 +257,18 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
             <span className="text-sm text-muted">Tropical Ocean</span>
           </div>
         </div>
-        <ClockBar clock={clock} onClock={setClock} onRestart={restart} start={ds.windowStart} end={ds.horizon} anchor={registry.anchor} smooth={smooth} onSmooth={setSmooth} />
+        <div className="flex flex-wrap items-center justify-end gap-1.5" role="group" aria-label="Map filters">
+          <FilterChip label="Zone" value={zoneId} onChange={setZoneId} options={MONITOR_ZONES.map((z) => [z.id, `${z.code} · ${z.name}`] as [string, string])} />
+          <FilterChip label="Level" value={level === "all" ? "" : level} onChange={(v) => setLevel((v || "all") as LevelId | "all")} options={LEVELS.map((l) => [l.id, l.label] as [string, string])} />
+          <FilterChip label="Status" value={statusF} onChange={(v) => setStatusF(v as FixStatus | "")} options={STATUS_ORDER.map((s) => [s, FIX_STATUS[s].label] as [string, string])} />
+          <FilterChip label="Species" value={speciesId} onChange={setSpeciesId} options={MONITOR_SPECIES.map((s) => [s.id, s.common] as [string, string])} />
+          <FilterChip label="Team" value={teamFilter} onChange={(v) => setTeamFilter(v as TeamId | "")} options={MONITOR_TEAMS.map((t) => [t.id, t.name] as [string, string])} />
+          {activeFilters > 0 && (
+            <button onClick={clearFilters} className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium text-accent hover:bg-accent/10" title="Clear all filters">
+              <X size={12} /> Clear ({activeFilters})
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-3 xl:h-[calc(100vh-128px)] xl:min-h-[660px] xl:grid-cols-[minmax(0,1fr)_330px]">
@@ -260,11 +276,6 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
         {/* Map */}
         <section className={cx("panel flex min-h-[480px] min-w-0 flex-col overflow-hidden", maxed && "fixed inset-0 z-[55] !rounded-none !border-0")} aria-label="Aviary map">
           <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-            <FilterSelect label="Zone" value={zoneId} onChange={setZoneId} options={[["", "All zones"], ...MONITOR_ZONES.map((z) => [z.id, `${z.code} · ${z.name}`] as [string, string])]} />
-            <FilterSelect label="Height level" value={level === "all" ? "" : level} onChange={(v) => setLevel((v || "all") as LevelId | "all")} options={[["", "All levels"], ...LEVELS.map((l) => [l.id, l.label] as [string, string])]} />
-            <FilterSelect label="Status" value={statusF} onChange={(v) => setStatusF(v as FixStatus | "")} options={[["", "All"], ...STATUS_ORDER.map((s) => [s, FIX_STATUS[s].label] as [string, string])]} />
-            <FilterSelect label="Species" value={speciesId} onChange={setSpeciesId} options={[["", "All"], ...MONITOR_SPECIES.map((s) => [s.id, s.common] as [string, string])]} />
-            <FilterSelect label="Team" value={teamFilter} onChange={(v) => setTeamFilter(v as TeamId | "")} options={[["", "All"], ...MONITOR_TEAMS.map((t) => [t.id, t.name] as [string, string])]} />
             <div className="ml-auto flex items-center gap-2">
               {maxed && (
                 <button onClick={() => setClock({ playing: !clock.playing })} className="grid h-8 w-8 place-items-center rounded-lg border border-line-strong text-muted hover:text-ink" aria-label={clock.playing ? "Pause" : "Play"}>
@@ -620,6 +631,33 @@ function Info({ k, v }: { k: string; v: ReactNode }) {
 
 /* ---------- controls ---------- */
 
+/** A small filter pill: shows its value, and is tinted while it filters. */
+function FilterChip({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
+  const on = !!value;
+  const current = options.find(([v]) => v === value)?.[1];
+  return (
+    <label
+      className={cx(
+        "relative inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border pl-2.5 pr-6 text-[11px] transition",
+        on ? "border-accent/60 bg-accent/10 text-ink" : "border-line-strong bg-panel-solid text-muted hover:border-ink/25 hover:text-ink",
+      )}
+      title={on ? `${label}: ${current}` : `Filter by ${label.toLowerCase()}`}
+    >
+      <span className={cx(on && "text-accent")}>{label}</span>
+      {on && <span className="max-w-[110px] truncate font-medium">: {current}</span>}
+      <ChevronDown size={12} className="pointer-events-none absolute right-2 text-faint" />
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label={label}>
+        <option value="">All</option>
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
     <label className="flex min-w-[118px] flex-col rounded-lg border border-line-strong bg-panel-2 px-2 py-1">
@@ -674,54 +712,6 @@ function LayersMenu({ layers, onLayers, dimRest, onDimRest, grouping, onGrouping
   );
 }
 
-function ClockBar({ clock, onClock, onRestart, start, end, anchor, smooth, onSmooth }: {
-  clock: { simTime: number; speed: number; playing: boolean };
-  onClock: (p: Partial<{ simTime: number; speed: number; playing: boolean }>) => void;
-  onRestart: () => void;
-  start: number;
-  end: number;
-  anchor: number;
-  smooth: boolean;
-  onSmooth: (v: boolean) => void;
-}) {
-  return (
-    <div className="panel flex flex-wrap items-center gap-3 px-3 py-2">
-      <button
-        onClick={() => onClock({ playing: !clock.playing })}
-        className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-white"
-        aria-label={clock.playing ? "Pause" : "Play"}
-      >
-        {clock.playing ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
-      </button>
-      <div className="min-w-[200px]">
-        <p className="flex items-center justify-between gap-2 text-[10px]">
-          <span className="font-semibold uppercase tracking-wider text-warn">Clock</span>
-          <span className="num text-xs font-semibold text-ink">{fmtDateTime(clock.simTime, clock.simTime)}</span>
-        </p>
-        <input
-          type="range"
-          className="timeline"
-          min={start}
-          max={end}
-          step={60_000}
-          value={clock.simTime}
-          style={{ ["--fill" as string]: `${((clock.simTime - start) / (end - start)) * 100}%` }}
-          onChange={(e) => onClock({ simTime: Number(e.target.value) })}
-          aria-label="Time"
-          title={`Start ${fmtTime(anchor)}`}
-        />
-      </div>
-      <Segmented size="sm" value={String(clock.speed)} onChange={(v) => onClock({ speed: Number(v) })} options={SPEEDS.map((o) => ({ value: o.value as string, label: o.label }))} />
-      <button onClick={onRestart} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:bg-ink/5 hover:text-ink" title="Back to the start time" aria-label="Back to the start time">
-        <RotateCcw size={13} />
-      </button>
-      <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted">
-        <input type="checkbox" checked={smooth} onChange={() => onSmooth(!smooth)} className="accent-[var(--accent)]" />
-        Smooth motion
-      </label>
-    </div>
-  );
-}
 
 /* ---------- bottom ---------- */
 

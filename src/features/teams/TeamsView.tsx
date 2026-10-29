@@ -11,6 +11,7 @@ import { PERMISSIONS, useDemo } from "@/state/DemoProvider";
 import { Card, Segmented, cx } from "@/components/ui/primitives";
 import { Donut, SERIES, StackedColumns } from "@/components/charts/Charts";
 import { DayPicker, PeriodPicker } from "@/components/filters/PeriodPicker";
+import type { CareTeam } from "@/domain/types";
 import { ActiveBadge, Avatars, TeamFormDrawer, isActive, useTeamStats, type TeamStats } from "./shared";
 
 type SortKey = "name" | "penguins" | "status";
@@ -124,7 +125,16 @@ export function TeamsView() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
               {cards.map((x) => (
-                <TeamCard key={x.team.id} x={x} total={total} onOpen={() => router.push(`/teams/${x.team.id}`)} />
+                <TeamCard
+                  key={x.team.id}
+                  team={x.team}
+                  count={x.penguinIds.length}
+                  total={total}
+                  zoneNames={x.team.zoneIds.map((z) => ZONE_BY_ID[z]?.name ?? z)}
+                  now={{ icon: Waves, text: `${x.inWater} in water now` }}
+                  mapHref={`/map?team=${x.team.id}`}
+                  onOpen={() => router.push(`/teams/${x.team.id}`)}
+                />
               ))}
             </div>
           )}
@@ -210,9 +220,19 @@ export function TeamsView() {
   );
 }
 
-function TeamCard({ x, total, onOpen }: { x: TeamStats; total: number; onOpen: () => void }) {
-  const { team } = x;
-  const pct = Math.round((x.penguinIds.length / Math.max(1, total)) * 100);
+/** A team in the grid. Shared with the aviary teams: the caller says what is counted and where the links go. */
+export function TeamCard({ team, count, total, zoneNames, now, mapHref, onOpen, assignedLabel = "Assigned penguins" }: {
+  team: CareTeam;
+  count: number;
+  total: number;
+  zoneNames: string[];
+  now: { icon: typeof Users; text: string };
+  mapHref: string;
+  onOpen: () => void;
+  assignedLabel?: string;
+}) {
+  const pct = Math.round((count / Math.max(1, total)) * 100);
+  const NowIcon = now.icon;
   return (
     <article
       role="link"
@@ -241,26 +261,26 @@ function TeamCard({ x, total, onOpen }: { x: TeamStats; total: number; onOpen: (
       </div>
       <div className="mt-3">
         <div className="flex items-baseline justify-between text-xs">
-          <span className="text-muted">Assigned penguins</span>
+          <span className="text-muted">{assignedLabel}</span>
           <span>
-            <b className="num text-sm">{x.penguinIds.length}</b> <span className="text-faint">· {pct}% of total</span>
+            <b className="num text-sm">{count}</b> <span className="text-faint">· {pct}% of total</span>
           </span>
         </div>
         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink/[0.05]">
           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: team.color }} />
         </div>
       </div>
-      <p className="mt-3 truncate text-[11px] text-muted" title={team.zoneIds.map((z) => ZONE_BY_ID[z]?.name).join(", ")}>
+      <p className="mt-3 truncate text-[11px] text-muted" title={zoneNames.join(", ")}>
         <span className="text-faint">Zones: </span>
-        {team.zoneIds.length ? team.zoneIds.slice(0, 3).map((z) => ZONE_BY_ID[z]?.name).join(", ") : "No zones assigned"}
-        {team.zoneIds.length > 3 && ` +${team.zoneIds.length - 3}`}
+        {zoneNames.length ? zoneNames.slice(0, 3).join(", ") : "No zones assigned"}
+        {zoneNames.length > 3 && ` +${zoneNames.length - 3}`}
       </p>
       <div className="mt-3 flex items-center gap-3 border-t border-line pt-3 text-xs">
         <span className="inline-flex items-center gap-1 text-muted">
-          <Waves size={13} className="text-faint" /> {x.inWater} in water now
+          <NowIcon size={13} className="text-faint" /> {now.text}
         </span>
         <Link
-          href={`/map?team=${team.id}`}
+          href={mapHref}
           onClick={(e) => e.stopPropagation()}
           className="ml-auto inline-flex items-center gap-1 rounded-lg border border-line-strong px-2 py-1 text-[11px] text-muted hover:border-accent/50 hover:text-ink"
         >
@@ -271,7 +291,7 @@ function TeamCard({ x, total, onOpen }: { x: TeamStats; total: number; onOpen: (
   );
 }
 
-function Kpi({ icon: Icon, color, value, label, sub }: { icon: typeof Users; color: string; value: string; label: string; sub?: string }) {
+export function Kpi({ icon: Icon, color, value, label, sub }: { icon: typeof Users; color: string; value: string; label: string; sub?: string }) {
   return (
     <div className="panel flex items-center gap-3 px-4 py-3.5">
       <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl" style={{ background: `${color}1f`, color }}>
@@ -286,7 +306,7 @@ function Kpi({ icon: Icon, color, value, label, sub }: { icon: typeof Users; col
   );
 }
 
-function Dot({ color, children }: { color: string; children: React.ReactNode }) {
+export function Dot({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="h-2 w-2 rounded-full" style={{ background: color }} />

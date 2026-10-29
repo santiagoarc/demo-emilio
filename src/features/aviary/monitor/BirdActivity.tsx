@@ -15,26 +15,15 @@ const COLORS = { flying: "#2563eb", walking: "#c7850c", perched: "#16a34a", grou
 const fmtMin = (m: number) => (m >= 90 ? `${(m / 60).toFixed(1)} h` : `${Math.round(m)} min`);
 const fmtDur = (ms: number) => (ms >= HOUR ? fmtHours(ms) : ms >= MIN ? `${Math.round(ms / MIN)} min` : `${Math.round(ms / 1000)} s`);
 
-/** "How is it doing?" for a bird, plus its flight time and distances over the chosen window. */
-export function BirdActivity({ bird, asOf, windowMs, windowLabel, control }: {
-  bird: MonitorBird;
-  asOf: number;
-  windowMs: number;
-  windowLabel: string;
-  /** Window selector, shown above the figures. */
-  control: ReactNode;
-}) {
+/**
+ * "How is it doing?" for a bird: its flight over the last 24 h against its own
+ * previous days and its species. An indication of what may be worth a look.
+ */
+export function BirdInsightBlock({ bird, asOf, title = true }: { bird: MonitorBird; asOf: number; title?: boolean }) {
   const { ds } = useTracking();
-  // Recomputed every 5 simulated minutes, not on every clock tick.
-  const at = Math.floor(asOf / (5 * MIN)) * 5 * MIN;
-  const stays = ds.stays.get(bird.id);
-  const species = useMemo(() => speciesFlightBaseline(ds, bird.speciesId, at), [ds, bird.speciesId, at]);
-  const ins = useMemo(() => birdInsight(ds, bird, at, species), [ds, bird, at, species]);
-  const s = useMemo(() => flightStats(bird, stays ?? [], Math.max(ds.windowStart, at - windowMs), at), [bird, stays, ds.windowStart, at, windowMs]);
-  const days = useMemo(() => flightByDay(bird, stays ?? [], ds.windowStart, at), [bird, stays, ds.windowStart, at]);
-  const speed = flightSpeed(s);
-  const maxDay = Math.max(1, ...days.map((d) => d.flyingMin), species?.flyingMin ?? 0);
-
+  const species = useMemo(() => speciesFlightBaseline(ds, bird.speciesId, asOf), [ds, bird.speciesId, asOf]);
+  const ins = useMemo(() => birdInsight(ds, bird, asOf, species), [ds, bird, asOf, species]);
+  const measurable = bird.device.status !== "intermittent";
   const bar = (label: string, mine: number, ref: number | null, fmt: (v: number) => string) => {
     const max = Math.max(mine, ref ?? 0, 0.1);
     return (
@@ -55,31 +44,55 @@ export function BirdActivity({ bird, asOf, windowMs, windowLabel, control }: {
   };
 
   return (
-    <div className="mt-3 space-y-4">
-      <div>
-        <p className="eyebrow mb-2">How is it doing?</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <InsightBadge level={ins.level} />
-          <span className="text-sm font-medium text-ink">{ins.headline}</span>
-        </div>
-        <ul className="mt-2 space-y-1.5">
-          {ins.points.map((pt, i) => (
-            <li key={i} className="flex gap-2 text-xs text-muted">
-              <span className={cx("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", pt.level === "ok" ? "bg-ok" : pt.level === "watch" ? "bg-warn" : "bg-danger")} />
-              {pt.text}
-            </li>
-          ))}
-        </ul>
-        {s.measurable && (
-          <div className="mt-3 space-y-2.5">
-            {bar("Time flying · last 24 h", ins.today.flyingMin, species?.flyingMin ?? null, fmtMin)}
-            {bar("Distance flown · last 24 h", ins.today.flownM, species?.flownM ?? null, fmtDistance)}
-            <p className="text-[11px] text-faint">
-              The tick marks the species&rsquo; daily average{ins.before ? ` · its own previous days: ${fmtMin(ins.before.flyingMin)} and ${fmtDistance(ins.before.flownM)} per day` : ""}.
-            </p>
-          </div>
-        )}
+    <div>
+      {title && <p className="eyebrow mb-2">How is it doing?</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <InsightBadge level={ins.level} />
+        <span className="text-sm font-medium text-ink">{ins.headline}</span>
       </div>
+      <ul className="mt-2 space-y-1.5">
+        {ins.points.map((pt, i) => (
+          <li key={i} className="flex gap-2 text-xs text-muted">
+            <span className={cx("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", pt.level === "ok" ? "bg-ok" : pt.level === "watch" ? "bg-warn" : "bg-danger")} />
+            {pt.text}
+          </li>
+        ))}
+      </ul>
+      {measurable && (
+        <div className="mt-3 space-y-2.5">
+          {bar("Time flying · last 24 h", ins.today.flyingMin, species?.flyingMin ?? null, fmtMin)}
+          {bar("Distance flown · last 24 h", ins.today.flownM, species?.flownM ?? null, fmtDistance)}
+          <p className="text-[11px] text-faint">
+            The tick marks the species&rsquo; daily average{ins.before ? ` · its own previous days: ${fmtMin(ins.before.flyingMin)} and ${fmtDistance(ins.before.flownM)} per day` : ""}.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** "How is it doing?" for a bird, plus its flight time and distances over the chosen window. */
+export function BirdActivity({ bird, asOf, windowMs, windowLabel, control }: {
+  bird: MonitorBird;
+  asOf: number;
+  windowMs: number;
+  windowLabel: string;
+  /** Window selector, shown above the figures. */
+  control: ReactNode;
+}) {
+  const { ds } = useTracking();
+  // Recomputed every 5 simulated minutes, not on every clock tick.
+  const at = Math.floor(asOf / (5 * MIN)) * 5 * MIN;
+  const stays = ds.stays.get(bird.id);
+  const species = useMemo(() => speciesFlightBaseline(ds, bird.speciesId, at), [ds, bird.speciesId, at]);
+  const s = useMemo(() => flightStats(bird, stays ?? [], Math.max(ds.windowStart, at - windowMs), at), [bird, stays, ds.windowStart, at, windowMs]);
+  const days = useMemo(() => flightByDay(bird, stays ?? [], ds.windowStart, at), [bird, stays, ds.windowStart, at]);
+  const speed = flightSpeed(s);
+  const maxDay = Math.max(1, ...days.map((d) => d.flyingMin), species?.flyingMin ?? 0);
+
+  return (
+    <div className="mt-3 space-y-4">
+      <BirdInsightBlock bird={bird} asOf={at} />
 
       <div className="border-t border-line pt-3">
         <div className="mb-2">{control}</div>

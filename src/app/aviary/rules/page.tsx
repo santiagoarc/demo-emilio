@@ -1,13 +1,6 @@
-import { Suspense } from "react";
-import { AviaryRulesView } from "@/features/rules/AviaryRulesView";
+import { redirect } from "next/navigation";
 
-// The demo generates its data in the browser; there is no UI to validate on the server.
-export const instant = false;
-
+// Retired section: the aviary menu is Map, Species, Individuals, Trees, Teams and Health follow-up.
 export default function AviaryRulesPage() {
-  return (
-    <Suspense>
-      <AviaryRulesView />
-    </Suspense>
-  );
+  redirect("/aviary/health");
 }

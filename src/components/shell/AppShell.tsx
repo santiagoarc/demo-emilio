@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { Activity, BellRing, Bird, FileText, PanelLeftClose, PanelLeftOpen, TreePine, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { Activity, Bird, ChevronLeft, TreePine, Feather, HeartPulse, IdCard, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, Search, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { cx } from "@/components/ui/primitives";
 import { PenguinSearch } from "./PenguinSearch";
 import { BirdSearch } from "./BirdSearch";
@@ -65,9 +65,7 @@ const NAV: Record<ModuleId, { href: string; label: string; icon: LucideIcon; exa
     { href: "/aviary/birds", label: "Individuals", icon: IdCard },
     { href: "/aviary/trees", label: "Trees", icon: TreePine },
     { href: "/aviary/teams", label: "Teams", icon: Users },
-    { href: "/aviary", label: "Activity", icon: Activity, exact: true },
-    { href: "/aviary/rules", label: "Alerts", icon: BellRing },
-    { href: "/aviary/reports", label: "Reports", icon: FileText },
+    { href: "/aviary/health", label: "Health follow-up", icon: HeartPulse },
   ],
 };
 
@@ -126,7 +124,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className={cx("sticky top-0 hidden h-screen shrink-0 flex-col border-r border-line bg-panel-solid/80 py-5 backdrop-blur transition-[width] md:flex", slim ? "w-[68px] px-2" : "w-[248px] px-3")}>
+      <aside className={cx("sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-line bg-panel-solid/80 py-5 backdrop-blur transition-[width] duration-300 ease-out md:flex", slim ? "w-[68px] px-2" : "w-[248px] px-3")}>
+        {/* Round toggle on the menu's edge: collapses to icons and back. */}
+        <button
+          onClick={toggleCollapsed}
+          title={slim ? "Expand the menu" : "Collapse the menu"}
+          aria-label={slim ? "Expand the menu" : "Collapse the menu"}
+          aria-expanded={!slim}
+          className="absolute -right-3 top-1/2 z-40 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-line bg-panel-solid text-accent shadow-[0_2px_6px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_3px_10px_rgba(0,0,0,0.14)]"
+        >
+          <ChevronLeft size={13} strokeWidth={2.4} className={cx("transition-transform duration-300", slim && "rotate-180")} />
+        </button>
         <Link href="/penguins/overview" className={cx("block", slim ? "mb-4" : "mb-5 px-1")} title="Animal Care Platform">
           <span className={cx("flex justify-center rounded-2xl bg-white shadow-[0_4px_14px_rgba(11,36,64,0.10)]", slim ? "px-1 py-1.5" : "px-4 py-2.5")}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -187,15 +195,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               Settings & reset
             </button>
           )}
-          <button
-            onClick={toggleCollapsed}
-            className={cx("flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-faint transition hover:text-muted", slim && "justify-center")}
-            title={slim ? "Expand the menu" : "Collapse the menu"}
-            aria-label={slim ? "Expand the menu" : "Collapse the menu"}
-          >
-            {slim ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={13} />}
-            {!slim && "Collapse menu"}
-          </button>
           <button
             onClick={session.leave}
             title={`Sign out · ${session.user}`}

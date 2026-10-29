@@ -17,11 +17,35 @@ export interface MonitorTeam {
   name: string;
   /** Fictional lead, for the demo. */
   lead: string;
+  /** The lead first, then the keepers. */
+  members: string[];
+  color: string;
 }
 
 const LEADS = ["Lucía Ferrer", "Omar Haddad", "Grace Lin", "Tomás Herrera", "Aisha Rahman", "Ben Carter", "Renata Campos", "Yusuf Ali", "Mia Novak", "Karim Nasser"];
 
-export const MONITOR_TEAMS: MonitorTeam[] = TEAM_IDS.map((id, i) => ({ id, name: `Team ${id[0].toUpperCase()}${id.slice(1)}`, lead: LEADS[i] }));
+/** Keepers under each lead (fictional), and the team colour used across the aviary screens. */
+const MEMBERS: string[][] = [
+  ["Nadia Saleh", "Pablo Ortiz"],
+  ["Sara Mendes", "Hamid Qureshi", "Elena Ruiz"],
+  ["Jonas Weber", "Laila Mansour"],
+  ["Diego Navarro", "Fatima Zahra", "Chris Doyle"],
+  ["Marta Silva", "Rami Khalil"],
+  ["Hana Ito", "Lucas Moreau", "Amira Said"],
+  ["Iván Castro", "Noor Hassan"],
+  ["Olivia Grant", "Tariq Aziz", "Paula Vidal"],
+  ["Samir Rafiq", "Clara Jensen"],
+  ["Leila Darwish", "Mateo Rossi", "Ana Lima"],
+];
+const COLORS = ["#2a9d8f", "#e76f51", "#6d597a", "#f4a261", "#457b9d", "#c9184a", "#588157", "#b5838d", "#3a86ff", "#8d6e63"];
+
+export const MONITOR_TEAMS: MonitorTeam[] = TEAM_IDS.map((id, i) => ({
+  id,
+  name: `Team ${id[0].toUpperCase()}${id.slice(1)}`,
+  lead: LEADS[i],
+  members: [LEADS[i], ...MEMBERS[i]],
+  color: COLORS[i],
+}));
 
 export const MONITOR_TEAM_BY_ID = Object.fromEntries(MONITOR_TEAMS.map((t) => [t.id, t])) as Record<TeamId, MonitorTeam>;
 

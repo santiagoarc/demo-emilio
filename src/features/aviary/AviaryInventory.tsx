@@ -1,133 +1,135 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
-import { ClipboardList, TreePine } from "lucide-react";
-import { GROUP_LABEL, MONITOR_ZONE_BY_ID, type AgeClass } from "@/domain/aviaryTracking";
-import { REQUESTED_TOTAL } from "@/data/aviaryCatalog";
+import { useMemo, useState } from "react";
+import { ArrowUpRight, ChevronRight, MapPinned, Search, X } from "lucide-react";
+import { FIX_STATUS, GROUP_LABEL } from "@/domain/aviaryTracking";
 import { SPECIES_INFO } from "@/data/aviarySpeciesInfo";
 import { runDemoChecks } from "@/logic/aviaryDemoChecks";
-import { treeOccupants } from "@/logic/aviaryTracking";
-import { Card, cx } from "@/components/ui/primitives";
+import type { Fix } from "@/logic/aviaryTracking";
+import { cx } from "@/components/ui/primitives";
 import { PageHeader } from "@/components/shell/AppShell";
 import { ChecksCard } from "./monitor/AviaryParts";
+import { SpeciesRow, lastPlace, monitorState } from "./AviaryPanels";
 import { AviaryFrame, useAviarySnapshot } from "./common";
 
-const AGES: AgeClass[] = ["juvenile", "subadult", "adult", "senior"];
-
-/** Species catalogue with demo counts, the tree inventory and the data checks. */
+/**
+ * Species: a compact list to find a species fast. Picking one shows its birds,
+ * with a way to the map filtered by it and to each bird's profile.
+ */
 export function AviaryInventory() {
   const { registry, ds, src, fixes, origin } = useAviarySnapshot();
   const checks = useMemo(() => runDemoChecks(ds, src, fixes, origin), [ds, src, fixes, origin]);
+  const [q, setQ] = useState("");
+  const [picked, setPicked] = useState(registry.species[0]?.id ?? "");
 
-  const rows = useMemo(
-    () =>
-      registry.species.map((s) => {
-        const birds = registry.birds.filter((b) => b.speciesId === s.id);
-        return {
-          s,
-          n: birds.length,
-          male: birds.filter((b) => b.sex === "male").length,
-          female: birds.filter((b) => b.sex === "female").length,
-          ages: AGES.map((a) => birds.filter((b) => b.ageClass === a).length),
-        };
-      }),
-    [registry],
-  );
-  const total = rows.reduce((a, r) => a + r.n, 0);
+  const bySpecies = useMemo(() => {
+    const m = new Map<string, Fix[]>();
+    for (const f of fixes.values()) {
+      const list = m.get(f.bird.speciesId);
+      if (list) list.push(f);
+      else m.set(f.bird.speciesId, [f]);
+    }
+    return m;
+  }, [fixes]);
+  const t = q.trim().toLowerCase();
+  const list = registry.species.filter((s) => !t || `${s.common} ${s.commonEs} ${s.scientific} ${s.code}`.toLowerCase().includes(t));
+  const sp = registry.species.find((s) => s.id === picked) ?? null;
+  const birds = sp ? bySpecies.get(sp.id) ?? [] : [];
+  const st = monitorState(birds);
 
   return (
     <div className="pb-12">
-      <PageHeader eyebrow="Aviary · Catalogue" title="Species" subtitle={`${registry.species.length} species · ${total} birds · ${registry.trees.length} trees.`} />
+      <PageHeader eyebrow="Aviary · Species" title="Species" subtitle={`${registry.species.length} species · ${registry.birds.length} birds. Pick one to see its birds.`} />
       <AviaryFrame>
-        {registry.distributionNote && (
-          <p className="rounded-xl border border-accent-2/30 bg-accent-2/[0.05] px-4 py-2.5 text-xs text-ink">
-            <span className="font-semibold">Total checked before loading.</span> {registry.distributionNote}
-          </p>
-        )}
-
-        <Card title="Species catalogue" icon={ClipboardList} subtitle={`${registry.species.length} species · ${total} birds`}>
-          <div className="scroll-thin overflow-x-auto">
-            <table className="w-full min-w-[920px] text-xs">
-              <caption className="sr-only">Species catalogue with counts</caption>
-              <thead>
-                <tr className="border-b border-line text-left text-[11px] text-muted">
-                  <th scope="col" className="px-2 py-2 font-medium">Code</th>
-                  <th scope="col" className="px-2 py-2 font-medium">Species</th>
-                  <th scope="col" className="px-2 py-2 font-medium">Group</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Requested</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Birds</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">M / F</th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">Juv · Sub · Adult · Senior</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ s, n, male, female, ages }) => (
-                  <tr key={s.id} className="border-b border-line/60">
-                    <td className="px-2 py-1.5">
-                      <span className="inline-grid h-6 w-10 place-items-center rounded-md text-[10px] font-bold text-white" style={{ background: s.color }}>{s.code}</span>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <Link href={`/aviary/species/${s.id}`} className="group flex items-center gap-2.5">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={SPECIES_INFO[s.code].photo.src} alt="" loading="lazy" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
-                        <span className="min-w-0">
-                          <span className="font-medium text-ink group-hover:text-accent">{s.common}</span>
-                          <span className="block text-[11px] text-muted">
-                            <i>{s.scientific}</i> · {s.commonEs}
-                          </span>
-                        </span>
-                      </Link>
-                    </td>
-                    <td className="px-2 py-1.5 text-muted">{GROUP_LABEL[s.group]}</td>
-                    <td className={cx("num px-2 py-1.5 text-right", s.requestedCount !== n ? "text-warn" : "text-muted")}>{s.requestedCount}</td>
-                    <td className="num px-2 py-1.5 text-right font-semibold text-ink">{n}</td>
-                    <td className="num px-2 py-1.5 text-right text-muted">{s.dimorphic ? `${male} / ${female}` : "not recorded"}</td>
-                    <td className="num px-2 py-1.5 text-right text-muted">{ages.join(" · ")}</td>
-                  </tr>
-                ))}
-                <tr className="font-semibold">
-                  <td className="px-2 py-2" colSpan={3}>Total</td>
-                  <td className="num px-2 py-2 text-right">{REQUESTED_TOTAL}</td>
-                  <td className="num px-2 py-2 text-right">{total}</td>
-                  <td colSpan={2} />
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-2 text-[11px] text-faint">Open a species to see its photo, summary and every bird. Sex is recorded only for species where males and females look different; juveniles of those species are not sexed yet.</p>
-        </Card>
-
-        <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
-          <Card title="Trees" icon={TreePine} subtitle="Trees with their working IDs and positions.">
-            <div className="scroll-thin max-h-[520px] overflow-auto">
-              <table className="w-full min-w-[620px] text-xs">
-                <caption className="sr-only">Tree inventory</caption>
-                <thead className="sticky top-0 bg-panel-solid">
-                  <tr className="border-b border-line text-left text-[11px] text-muted">
-                    {["Tree", "Zone", "Form", "Height", "X · Y", "Reference points", "Birds now"].map((h) => (
-                      <th key={h} scope="col" className="px-2 py-2 font-medium">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {registry.trees.map((t) => (
-                    <tr key={t.id} className="border-b border-line/60">
-                      <td className="px-2 py-1.5 font-semibold text-ink">{t.id}</td>
-                      <td className="px-2 py-1.5 text-muted">{MONITOR_ZONE_BY_ID[t.zoneId].code} · {MONITOR_ZONE_BY_ID[t.zoneId].name}</td>
-                      <td className="px-2 py-1.5 capitalize text-muted">{t.form}</td>
-                      <td className="num px-2 py-1.5 text-ink">{t.heightM.toFixed(1)} m</td>
-                      <td className="num px-2 py-1.5 text-muted">{t.x.toFixed(1)} · {t.z.toFixed(1)}</td>
-                      <td className="num px-2 py-1.5 text-muted">{t.branchTiersM.map((h, i) => `R${i + 1} ${h.toFixed(1)}`).join(" · ")}</td>
-                      <td className="num px-2 py-1.5 text-right font-semibold text-ink">{treeOccupants(fixes, t.id).length}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+          <section className="panel flex h-[calc(100vh-190px)] min-h-[460px] flex-col overflow-hidden" aria-label="Species list">
+            <div className="border-b border-line p-3">
+              <label className="relative block">
+                <span className="sr-only">Search a species</span>
+                <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search by name or code…"
+                  className="h-9 w-full rounded-xl border border-line-strong bg-panel-solid pl-8 pr-7 text-xs text-ink outline-none placeholder:text-faint focus:border-accent/60"
+                />
+                {q && (
+                  <button onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-faint hover:text-ink" aria-label="Clear search">
+                    <X size={13} />
+                  </button>
+                )}
+              </label>
             </div>
-          </Card>
-          <ChecksCard checks={checks} />
+            <ul className="scroll-thin min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2">
+              {list.length === 0 && <li className="px-2 py-6 text-center text-xs text-muted">No species matches “{q}”.</li>}
+              {list.map((s) => (
+                <li key={s.id}>
+                  <SpeciesRow species={s} birds={bySpecies.get(s.id) ?? []} selected={picked === s.id} onClick={() => setPicked(s.id)} size="lg" />
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {sp && (
+            <section className="panel flex h-[calc(100vh-190px)] min-h-[460px] flex-col overflow-hidden" aria-label={sp.common}>
+              <div className="flex gap-4 border-b border-line p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={SPECIES_INFO[sp.code].photo.src} alt={sp.common} className="h-24 w-32 shrink-0 rounded-xl object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: sp.color }} />
+                    <span className="text-lg font-semibold text-ink">{sp.common}</span>
+                  </p>
+                  <p className="text-xs text-muted">
+                    <i>{sp.scientific}</i> · {GROUP_LABEL[sp.group]}
+                  </p>
+                  <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                    <span>
+                      <b className="num text-base text-ink">{birds.length}</b> <span className="text-muted">birds</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-muted">
+                      <span className="h-2 w-2 rounded-full" style={{ background: st.color }} /> {st.label}
+                    </span>
+                  </p>
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    <Link href={`/aviary/map?species=${sp.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-[#0b8178]">
+                      <MapPinned size={13} /> View on map
+                    </Link>
+                    <Link href={`/aviary/species/${sp.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-xs text-ink hover:border-accent/50">
+                      Species page <ArrowUpRight size={12} />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+              <p className="px-4 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wider text-faint">Individuals</p>
+              <ul className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+                {birds.map((f) => (
+                  <li key={f.bird.id}>
+                    <Link
+                      href={`/aviary/birds/${f.bird.id}`}
+                      className="group flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-ink/[0.04] hover:shadow-[0_2px_8px_rgba(11,36,64,0.06)]"
+                    >
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: FIX_STATUS[f.status].color }} title={FIX_STATUS[f.status].label} />
+                      <span className="w-20 font-mono text-xs font-semibold text-ink">{f.bird.id}</span>
+                      <span className="w-20 truncate text-xs text-muted">{f.bird.name ?? ""}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs text-muted">{lastPlace(f)}</span>
+                      <span className="hidden text-[11px] text-faint sm:inline">{FIX_STATUS[f.status].label}</span>
+                      <ChevronRight size={14} className="text-faint transition group-hover:translate-x-0.5 group-hover:text-ink" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
+
+        <details className="group">
+          <summary className={cx("cursor-pointer list-none text-xs text-muted hover:text-ink")}>Data checks and reset ›</summary>
+          <div className="mt-3 max-w-xl">
+            <ChecksCard checks={checks} />
+          </div>
+        </details>
       </AviaryFrame>
     </div>
   );

@@ -81,12 +81,33 @@ export function InsightCard({ penguinId, compact }: { penguinId: string; compact
   );
 }
 
-const lastWeight = (c: HealthCase) => c.entries.find((e) => e.weightKg !== undefined)?.weightKg;
-const firstWeight = (c: HealthCase) => [...c.entries].reverse().find((e) => e.weightKg !== undefined)?.weightKg;
+/** What the follow-up log needs from a follow-up, penguin or bird. */
+export type FollowUpLike = Pick<HealthCase, "id" | "title" | "owner" | "openedAt" | "status" | "closedAt" | "entries">;
+
+/** Where the log writes; penguins use the scenario's own actions. */
+export interface FollowUpActions {
+  now: number;
+  addEntry: (caseId: string, text: string, weightKg?: number) => void;
+  close: (caseId: string, text: string) => void;
+}
+
+const lastWeight = (c: FollowUpLike) => c.entries.find((e) => e.weightKg !== undefined)?.weightKg;
+const firstWeight = (c: FollowUpLike) => [...c.entries].reverse().find((e) => e.weightKg !== undefined)?.weightKg;
 
 /** A case with its log; lets you record progress and close it. */
-export function CaseCard({ hc, showPenguin, expandedByDefault }: { hc: HealthCase; showPenguin?: React.ReactNode; expandedByDefault?: boolean }) {
-  const { addCaseEntry, closeCase, now } = useDemo();
+export function CaseCard({ hc, showPenguin, expandedByDefault, reasonLabel, actions }: {
+  hc: FollowUpLike;
+  showPenguin?: React.ReactNode;
+  expandedByDefault?: boolean;
+  /** Defaults to the penguin reason of the case. */
+  reasonLabel?: string;
+  actions?: FollowUpActions;
+}) {
+  const demo = useDemo();
+  const now = actions?.now ?? demo.now;
+  const addCaseEntry = actions?.addEntry ?? demo.addCaseEntry;
+  const closeCase = actions?.close ?? demo.closeCase;
+  const reason = reasonLabel ?? ("reason" in hc ? REASON_LABEL[(hc as HealthCase).reason] : "");
   const [text, setText] = useState("");
   const [weight, setWeight] = useState("");
   const [closing, setClosing] = useState(false);
@@ -115,7 +136,7 @@ export function CaseCard({ hc, showPenguin, expandedByDefault }: { hc: HealthCas
           {showPenguin}
           <p className="text-sm font-semibold text-ink">{hc.title}</p>
           <p className="mt-0.5 text-[11px] text-muted">
-            {REASON_LABEL[hc.reason]} · owner {hc.owner} · {open ? `opened ${days} ${days === 1 ? "day" : "days"} ago` : `closed ${fmtDateTime(hc.closedAt!, now)} (${days} ${days === 1 ? "day" : "days"})`}
+            {reason} · owner {hc.owner} · {open ? `opened ${days} ${days === 1 ? "day" : "days"} ago` : `closed ${fmtDateTime(hc.closedAt!, now)} (${days} ${days === 1 ? "day" : "days"})`}
           </p>
         </div>
         <Badge tone={open ? "accent" : "neutral"}>{open ? "Open" : "Closed"}</Badge>

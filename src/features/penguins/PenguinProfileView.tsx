@@ -768,7 +768,7 @@ function TimelineSection({ penguinId, className }: { penguinId: string; classNam
 
 /* ───────────── helpers ───────────── */
 
-function Kpi({ label, value, sub, color, small }: { label: string; value: string; sub?: string; color?: string; small?: boolean }) {
+export function Kpi({ label, value, sub, color, small }: { label: string; value: string; sub?: string; color?: string; small?: boolean }) {
   return (
     <div className="panel px-4 py-3">
       <p className="flex items-center gap-1.5 text-[11px] text-muted">
@@ -781,7 +781,7 @@ function Kpi({ label, value, sub, color, small }: { label: string; value: string
   );
 }
 
-function Row({ k, v }: { k: string; v: ReactNode }) {
+export function Row({ k, v }: { k: string; v: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-line pb-2 last:border-0">
       <dt className="shrink-0 text-[12px] text-muted">{k}</dt>
@@ -790,7 +790,7 @@ function Row({ k, v }: { k: string; v: ReactNode }) {
   );
 }
 
-function MetricBlock({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
+export function MetricBlock({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
     <div>
       <p className="flex items-center gap-1.5 text-xs text-muted">
@@ -802,7 +802,7 @@ function MetricBlock({ label, value, sub, color }: { label: string; value: strin
   );
 }
 
-function Compare({ label, cur, prev }: { label: string; cur: number; prev: number }) {
+export function Compare({ label, cur, prev }: { label: string; cur: number; prev: number }) {
   const diff = cur - prev;
   return (
     <div>

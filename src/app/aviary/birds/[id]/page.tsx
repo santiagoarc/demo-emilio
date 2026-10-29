@@ -1,7 +1,13 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { BirdProfileView } from "@/features/aviary/BirdProfileView";
 
-// A bird's card lives on the Habitat map, next to the 3D view.
-export default async function AviaryBirdPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  redirect(`/aviary/map?bird=${encodeURIComponent(id)}`);
+// The registry lives in the browser; there is nothing to render on the server.
+export const instant = false;
+
+export default function AviaryBirdPage() {
+  return (
+    <Suspense>
+      <BirdProfileView />
+    </Suspense>
+  );
 }

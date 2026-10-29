@@ -78,7 +78,7 @@ export function loadClock(registry: DemoRegistry): ClockState {
   try {
     const raw = window.localStorage.getItem(CLOCK_KEY);
     const c = raw ? (JSON.parse(raw) as ClockState & { anchor?: number }) : null;
-    if (c && c.anchor === registry.anchor && typeof c.simTime === "number" && typeof c.speed === "number") return { simTime: c.simTime, speed: DEFAULT_SPEED, playing: !!c.playing };
+    if (c && c.anchor === registry.anchor && typeof c.simTime === "number" && typeof c.speed === "number") return { simTime: c.simTime, speed: DEFAULT_SPEED, playing: true };
   } catch {}
   return fallback;
 }

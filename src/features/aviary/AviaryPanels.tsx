@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ChevronDown, Lock, Search, Unlock, Users, X } from "lucide-react";
-import { FIX_STATUS, MONITOR_ZONE_BY_ID, type MonitorBird } from "@/domain/aviaryTracking";
+import { FIX_STATUS, MONITOR_ZONE_BY_ID, type MonitorBird, type MonitorSpecies } from "@/domain/aviaryTracking";
 import { MONITOR_SPECIES, MONITOR_SPECIES_BY_ID } from "@/data/aviaryCatalog";
 import { MONITOR_TEAMS, type TeamId } from "@/data/aviaryTeams";
 import type { Fix } from "@/logic/aviaryTracking";
@@ -16,8 +16,8 @@ import { SpeciesAvatar } from "./SpeciesAvatar";
 
 /* ---------- left panel: species ---------- */
 
-/** One legend row height. */
-const SPECIES_ROW = 32;
+/** One legend row height on the map. */
+const SPECIES_ROW = 38;
 
 /** Discreet monitoring status for a group of birds: worst state wins. */
 export function monitorState(fixes: Fix[]) {
@@ -34,6 +34,42 @@ export function lastPlace(f: Fix) {
   if (!d) return "No location";
   const zone = d.zoneId ? MONITOR_ZONE_BY_ID[d.zoneId].code : "—";
   return [zone, d.treeId, d.pos ? `${d.pos.y.toFixed(1)} m` : d.kind === "zone" ? "zone only" : null].filter(Boolean).join(" · ");
+}
+
+/**
+ * One species in a list: photo, common name, number of birds and a discreet
+ * monitoring dot. The scientific name stays as a small second line.
+ */
+export function SpeciesRow({ species: s, birds, selected, onClick, size = "sm", title }: {
+  species: MonitorSpecies;
+  birds: Fix[];
+  selected: boolean;
+  onClick: () => void;
+  size?: "sm" | "lg";
+  title?: string;
+}) {
+  const st = monitorState(birds);
+  const lg = size === "lg";
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={selected}
+      title={title}
+      className={cx(
+        "group flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 text-left transition",
+        selected ? "bg-accent/12 ring-1 ring-accent/40" : "hover:bg-ink/[0.045] hover:shadow-[0_2px_8px_rgba(11,36,64,0.08)]",
+      )}
+      style={{ minHeight: lg ? 52 : SPECIES_ROW }}
+    >
+      <SpeciesAvatar code={s.code} size={lg ? 36 : 26} ring={s.color} />
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className={cx("block truncate font-medium text-ink", lg ? "text-[13px]" : "text-[12px]")}>{s.common}</span>
+        {lg && <span className="block truncate text-[10.5px] italic text-faint">{s.scientific}</span>}
+      </span>
+      <span className={cx("num font-semibold text-ink", lg ? "text-[13px]" : "text-[12px]")}>{birds.length}</span>
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: st.color }} title={st.label} aria-label={st.label} />
+    </button>
+  );
 }
 
 export function SpeciesSection({ fixes, speciesFilter, onSpeciesFilter, onBird, selectedBird }: {
@@ -95,20 +131,7 @@ export function SpeciesSection({ fixes, speciesFilter, onSpeciesFilter, onBird, 
           const on = speciesFilter === s.id;
           return (
             <li key={s.id}>
-              <button
-                onClick={() => onSpeciesFilter(on ? "" : s.id)}
-                aria-pressed={on}
-                title={on ? "Click again to show all species" : `Show only ${s.common} on the map`}
-                className={cx("flex w-full items-center gap-2 rounded-md px-2 text-left transition-colors", on ? "bg-accent/12 ring-1 ring-accent/40" : "hover:bg-ink/[0.04]")}
-                style={{ height: SPECIES_ROW }}
-              >
-                <span className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white" style={{ background: s.color, boxShadow: "0 0 0 3px rgba(3,16,28,0.15)" }} aria-hidden />
-                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink" title={s.scientific}>
-                  {s.common}
-                </span>
-                <span className="num text-[12px] font-semibold text-ink">{birds.length}</span>
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: st.color }} title={st.label} aria-label={st.label} />
-              </button>
+              <SpeciesRow species={s} birds={birds} selected={on} onClick={() => onSpeciesFilter(on ? "" : s.id)} title={on ? "Click again to show all species" : `Show only ${s.common} on the map`} />
               {on && (
                 <div className="mx-1 mb-2 mt-1 rounded-lg border border-line bg-panel-2/60 p-2">
                   <p className="text-[11px] text-muted">
