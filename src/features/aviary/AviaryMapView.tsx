@@ -15,7 +15,7 @@ import {
   type Vec3,
 } from "@/domain/aviaryTracking";
 import { MONITOR_SPECIES, MONITOR_SPECIES_BY_ID } from "@/data/aviaryCatalog";
-import { MONITOR_TEAM_BY_ID, type TeamId } from "@/data/aviaryTeams";
+import { MONITOR_TEAMS, MONITOR_TEAM_BY_ID, type TeamId } from "@/data/aviaryTeams";
 import { useTeamAssignments } from "@/state/useTeams";
 import { SpeciesSection, TeamsSection } from "./AviaryPanels";
 import { activityByHour, fmtHeight, snapshot, treeHistory, treeOccupants, type Fix } from "@/logic/aviaryTracking";
@@ -156,6 +156,26 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
   const selFix = birdId ? fixes.get(birdId) ?? null : null;
   const selTree = treeId ? treeById.get(treeId) ?? null : null;
 
+  // In the 3D and top views the map starts clean: dots appear only for what is picked
+  // (a species, a team, a zone or a status), plus the bird that is open.
+  const sceneShown = useMemo(() => all.filter((f) => f.det?.pos && isActive(f)).length, [all, speciesId, teamFilter, zoneId, statusF, level, teamOf]); // eslint-disable-line react-hooks/exhaustive-deps
+  const scenePoints: ScenePoint[] = useMemo(() => {
+    const keep = new Set([birdId, highlightId].filter(Boolean) as string[]);
+    return points.filter((p) => (filtered ? !p.dim : false) || keep.has(p.id)).map((p) => (keep.has(p.id) ? { ...p, dim: false } : p));
+  }, [points, filtered, birdId, highlightId]);
+  const clearPick = () => {
+    setSpeciesId("");
+    setTeamFilter("");
+    setZoneId("");
+    setStatusF("");
+  };
+  const pickLabel = [
+    speciesId && MONITOR_SPECIES_BY_ID[speciesId].common,
+    teamFilter && MONITOR_TEAM_BY_ID[teamFilter].name,
+    zoneId && MONITOR_ZONE_BY_ID[zoneId].name,
+    statusF && FIX_STATUS[statusF].label,
+  ].filter(Boolean).join(" · ");
+
   const trail = useMemo(() => {
     if (!birdId || !layers.trail || !selFix || selFix.bird.device.status === "intermittent") return null;
     return src.history(birdId, asOf - WINDOWS[win], asOf).filter((s) => s.start <= asOf).map((s) => s.pos);
@@ -244,6 +264,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
             <FilterSelect label="Height level" value={level === "all" ? "" : level} onChange={(v) => setLevel((v || "all") as LevelId | "all")} options={[["", "All levels"], ...LEVELS.map((l) => [l.id, l.label] as [string, string])]} />
             <FilterSelect label="Status" value={statusF} onChange={(v) => setStatusF(v as FixStatus | "")} options={[["", "All"], ...STATUS_ORDER.map((s) => [s, FIX_STATUS[s].label] as [string, string])]} />
             <FilterSelect label="Species" value={speciesId} onChange={setSpeciesId} options={[["", "All"], ...MONITOR_SPECIES.map((s) => [s.id, s.common] as [string, string])]} />
+            <FilterSelect label="Team" value={teamFilter} onChange={(v) => setTeamFilter(v as TeamId | "")} options={[["", "All"], ...MONITOR_TEAMS.map((t) => [t.id, t.name] as [string, string])]} />
             <div className="ml-auto flex items-center gap-2">
               {maxed && (
                 <button onClick={() => setClock({ playing: !clock.playing })} className="grid h-8 w-8 place-items-center rounded-lg border border-line-strong text-muted hover:text-ink" aria-label={clock.playing ? "Pause" : "Play"}>
@@ -289,7 +310,7 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
               ) : (
               <AviaryScene
                 trees={trees}
-                points={points}
+                points={scenePoints}
                 selectedBirdId={birdId ?? highlightId}
                 selectedTreeId={treeId}
                 highlightZoneId={highlightZone || null}
@@ -318,6 +339,26 @@ function MapInner({ registry, ds, src, treeById, birdById }: TrackingState) {
               <span className="mt-0.5 text-[10px] text-faint">Dot colour = species</span>
               {grouping && <span className="text-[10px] text-faint">Numbers = grouped birds · zoom in</span>}
             </div>
+            {mode !== "image" &&
+              (filtered ? (
+                <div className="absolute left-3 top-3 inline-flex max-w-[60%] items-center gap-2 rounded-lg border border-line-strong bg-panel-solid/95 py-1 pl-2.5 pr-1 text-xs shadow-sm backdrop-blur">
+                  <span className="truncate text-ink">
+                    Showing <b className="font-semibold">{pickLabel}</b> · <span className="num">{sceneShown}</span> birds
+                  </span>
+                  <button onClick={clearPick} className="rounded p-1 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Clear the selection" title="Clear">
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <div className="absolute bottom-12 left-1/2 w-[min(440px,calc(100%-24px))] -translate-x-1/2 rounded-2xl border border-line-strong bg-panel-solid/95 p-3 shadow-lg backdrop-blur">
+                  <p className="text-sm font-semibold text-ink">Choose which birds to show</p>
+                  <p className="mt-0.5 text-[11px] text-muted">Pick a species or a team here, or click one in the lists on the right.</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <FilterSelect label="Species" value={speciesId} onChange={setSpeciesId} options={[["", "Choose…"], ...MONITOR_SPECIES.map((s) => [s.id, s.common] as [string, string])]} />
+                    <FilterSelect label="Team" value={teamFilter} onChange={(v) => setTeamFilter(v as TeamId | "")} options={[["", "Choose…"], ...MONITOR_TEAMS.map((t) => [t.id, t.name] as [string, string])]} />
+                  </div>
+                </div>
+              ))}
             {selTree && !treeView && <TreeFloat tree={selTree} fixes={fixes} onOpen={() => setTreeView(true)} onClose={() => setTreeId(null)} onBird={(id) => openBird(id)} />}
             {mode === "image" && aggregate && zoneId && (
               <ZoneCard stat={zoneStats.find((z) => z.zoneId === zoneId)!} fixes={all.filter((f) => f.det?.zoneId === zoneId && isActive(f))} onBird={(id) => openBird(id)} onClose={() => setZoneId("")} />
